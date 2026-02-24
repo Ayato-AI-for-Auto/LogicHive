@@ -123,4 +123,4 @@ uv run python dev_tools/dev.py --ship -m "msg" # CI + Git Push
 
 ---
 
-Created by Ayato AI & Horiemon Persona.
+Created by Ayato AI & LogicHive Architect.
