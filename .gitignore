@@ -48,6 +48,9 @@ mcp_config.json
 
 # Private Documentation & Tools (IP Protection)
 docs/internal_*
+docs/internal_strategy.md
+docs/Idea_Note/
+docs/troubleshooting/
 dev_tools/
 !dev_tools/dev.py
 !dev_tools/__init__.py
