@@ -1,0 +1,32 @@
+# Avoid copying sensitive documentation to the cloud container
+docs/
+dev_tools/
+.github/
+.cursor/
+.vscode/
+
+# Build artifacts and local environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.venv/
+node_modules/
+dist/
+
+# Git data
+.git/
+.gitignore
+
+# Database and local data
+*.db
+*.db.wal
+data/
+
+# Environment and secrets
+.env
+*.log
+dev_tool.log
+proxy_boot_log.txt

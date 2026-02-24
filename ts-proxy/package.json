@@ -1,0 +1,35 @@
+{
+  "name": "@ayato-ai/function-store-mcp",
+  "version": "2.0.0",
+  "description": "TypeScript proxy for the Function Store MCP Python backend. Bridges high-performance AI logic with a zero-friction distribution model.",
+  "main": "dist/index.js",
+  "bin": {
+    "function-store-proxy": "./dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "python",
+    "ai-agent",
+    "function-store"
+  ],
+  "author": "Ayato AI",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "duckdb": "^1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
