@@ -19,6 +19,7 @@ dependencies = [
     "bandit", # Security: Static analysis
     "safety", # Security: Dependency vulnerability check
     "qdrant-client", # High performance vector search
+    "python-dotenv", # BYOK: Load .env files
 ]
 
 [project.scripts]

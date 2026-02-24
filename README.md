@@ -47,12 +47,19 @@ Cursor の場合：
 
 提供されている自動デプロイツールを使って、ご自身の GCP プロジェクトに数分でデプロイできます。
 
+**Step 1: 設定の準備**
+`.env.example` を `.env` にコピーし、ご自身の `FS_GEMINI_API_KEY` などを設定します。
+```bash
+cp .env.example .env
+```
+
+**Step 2: デプロイ**
 ```powershell
 # GCPにログイン
 gcloud auth login
 
-# デプロイ (ご自身のプロジェクトIDとGemini APIキーを指定)
-python dev_tools/deploy.py --project <YOUR_PROJECT_ID> --gemini-key <YOUR_GEMINI_KEY>
+# デプロイ (ご自身のプロジェクトIDを指定。APIキーは.envから読み込まれます)
+python dev_tools/deploy.py --project <YOUR_PROJECT_ID>
 ```
 デプロイ後に出力されるURLを、上記のエディタ設定(`--hub-url`)に使用してください。
 
