@@ -49,4 +49,23 @@ Pythonで書かれた裏側のローカル処理の核。
 *   `status`: VARCHAR ('pending', 'verified', 'broken', 'archived')
 *   `test_cases`: VARCHAR (JSON String)
 
-※埋め込み(Embeddings)の次元数は、Edge側で使用するモデルによって動的に格納される。
+## 5. デプロイメント・フットプリントとセキュリティ境界
+
+LogicHiveのアーキテクチャでは、**GitHub（Publicリポジトリ）に配置すべきファイル**と、**絶対に配置してはならないファイル（危険）**の境界を明確に定義しています。
+
+### ✅ GitHub上（ローカルPC向け）に必要なファイル
+ユーザーがEdgeクライアントとして利用するため、以下のコンポーネントがGitHubに公開される必要があります。
+*   `backend/edge/` : MCPサーバーとしてのビジネスロジック、DB管理、同期処理。
+*   `backend/core/` : モジュールの静的解析や設定など、Edge/Hubで共有される基盤ロジック。
+*   `ts-proxy/` : Cursor等のエディタと接続するためのTypeScriptアダプタ。
+*   `pyproject.toml`, `README.md`, `LICENSE` : パッケージ管理とプロジェクトの説明。
+
+### 🚨 GitHub上に配置すると危険・不要なファイル
+以下の要素は、セキュリティリスクや構成の混乱を招くため、PublicなGitHubリポジトリには配置すべきではありません（あるいは`.gitignore`で厳重に除外されているべきです）。
+*   **危険: 環境変数ファイル (`.env`) や トークン (`token_secret.txt`)**
+    *   ユーザー自身のAPIキー（Google Gemini API Key等）や、GCPのデプロイトークンが含まれます。これらがGitHubに露出すると、APIの不正利用による大規模な金銭的被害（Cloudの流出事故）に直結します。
+*   **不要: Hub固有のインフラ設定 (`backend/hub/Dockerfile`)**
+    *   Edgeクライアントを動かすだけであれば、クラウド用のDocker設定は不要であり、ユーザーに「サーバーを立ち上げる必要があるのか？」と誤解を与えます。
+    *   *※ 現在のLogicHiveリポジトリは「開発元用」の側面も持つため同梱されていますが、純粋なEdgeクライアント配布パッケージからは除外されるべきものです。*
+*   **危険: Hubの内部知能 (`backend/hub/router.py`)**
+    *   本来、高品質なリランキングを行うためのプロンプトや独自ロジックは運営側のIP（知的財産）であり、SaaSとして提供する場合はGitHubに公開せず、GCP上に隠蔽することでリバースエンジニアリングを防ぐべきです。
