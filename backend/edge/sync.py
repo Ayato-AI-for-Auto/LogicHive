@@ -1,10 +1,11 @@
 import json
 import logging
-import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import httpx
+import git
 from core import config
 from core.database import DBWriteLock, get_db_connection
 
@@ -14,56 +15,39 @@ logger = logging.getLogger(__name__)
 class GitHubSyncEngine:
     """
     Sync Engine that treats a GitHub Public Repository as a Serverless Database.
-    Tasks:
-    1. Clone/Pull from the Hub.
-    2. Import JSON data into Local DuckDB.
-    3. Export Local changes to JSON and Push to Hub.
+    Now using GitPython for robust git operations.
     """
 
     def __init__(self):
         self.repo_url = config.SYNC_REPO_URL
         self.local_dir = config.SYNC_LOCAL_DIR
         self.functions_dir = self.local_dir / "functions"
+        self._repo: Optional[git.Repo] = None
         self._initialized = False
-
-    def _run_git(self, args: List[str], cwd: Optional[Path] = None) -> bool:
-        """Helper to run git commands."""
-        try:
-            cmd = ["git"] + args
-            subprocess.run(
-                cmd,
-                cwd=str(cwd or self.local_dir),
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Git command failed: {e.cmd} -> {e.stderr}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error running git: {e}")
-            return False
 
     def ensure_repo(self) -> bool:
         """Ensures the local cache directory is a valid git repository."""
-        if not (self.local_dir / ".git").exists():
-            logger.info(f"Sync: Initializing local hub cache at {self.local_dir}...")
-            # If directory is not empty but no .git, it's a conflict, but we assume it's clean for now
-            if self._run_git(["clone", "--depth", "1", self.repo_url, "."]):
-                self._initialized = True
+        if self._initialized and self._repo:
+            return True
+
+        self.local_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            if not (self.local_dir / ".git").exists():
+                logger.info(f"Sync: Initializing local hub cache at {self.local_dir}...")
+                self._repo = git.Repo.clone_from(self.repo_url, self.local_dir, depth=1)
             else:
-                # If clone fails (e.g. repo empty), try init
-                if self._run_git(["init"]):
-                    self._run_git(["remote", "add", "origin", self.repo_url])
-                    self._initialized = True
-        else:
+                self._repo = git.Repo(self.local_dir)
+            
             self._initialized = True
-
-        if self._initialized:
             self.functions_dir.mkdir(parents=True, exist_ok=True)
-
-        return self._initialized
+            return True
+        except git.GitCommandError as e:
+            logger.error(f"Sync: Git command failed during initialization: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Sync: Unexpected error during repo init: {e}")
+            return False
 
     def pull(self) -> int:
         """Fetch latest from Hub and merge into local DB."""
@@ -71,9 +55,12 @@ class GitHubSyncEngine:
             return 0
 
         logger.info("Sync: Pulling latest changes from Hub...")
-        if not self._run_git(["pull", "origin", "main"]):
-            logger.warning("Sync: Pull failed (likely empty repository or conflict).")
-            # Don't return, we try to parse what we have
+        try:
+            origin = self._repo.remotes.origin
+            origin.pull()
+        except git.GitCommandError as e:
+            logger.warning(f"Sync: Pull failed (likely conflict or network error): {e}")
+            # Continue to parse whatever we have locally
 
         count = 0
         if not self.functions_dir.exists():
@@ -115,10 +102,6 @@ class GitHubSyncEngine:
 
     def _upsert_function(self, conn, data: Dict):
         """Helper to upsert function data into DuckDB."""
-        # This is a simplified version of logic.py's save.
-        # In a real system, we'd share the same save logic.
-        from datetime import datetime
-
         now = datetime.now().isoformat()
 
         # Check if exists
@@ -170,60 +153,59 @@ class GitHubSyncEngine:
             )
 
     def push(self, name: str) -> bool:
-        """Export a local function to the Hub cache and push."""
+        """Export a local function and push to Hub via Mediated API."""
         if not self.ensure_repo():
             return False
 
-        logger.info(f"Sync: Pushing '{name}' to Hub...")
+        logger.info(f"Sync: Delegating push for '{name}' to Hub...")
         conn = get_db_connection(read_only=False)
         try:
             if not self._export_to_cache(conn, name):
                 logger.error(f"Sync: Function '{name}' not found locally.")
                 return False
 
-            # Commit and push
-            self._run_git(["add", f"functions/{name}.json"])
+            # Read the exported JSON
+            fpath = self.functions_dir / f"{name}.json"
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
 
-            # --- Index update ---
-            self._update_index()
-            self._run_git(["add", "index.json"])
+            # POST to Hub (Mediated Push)
+            url = f"{config.HUB_URL}/api/v1/sync/push"
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.post(url, json=data)
+                resp.raise_for_status()
 
-            # Check if there are changes to commit
-            status = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=str(self.local_dir),
-                capture_output=True,
-                text=True,
-            )
-            if not status.stdout.strip():
-                logger.info(f"Sync: No changes to push for '{name}'.")
-                return True
-
-            self._run_git(["commit", "-m", f"feat: sync {name}"])
-            return self._run_git(["push", "origin", "main"])
-
+            logger.info(f"Sync: Hub successfully accepted '{name}'.")
+            return True
+        except Exception as e:
+            logger.error(f"Sync: Hub-Mediated push failed for '{name}': {e}")
+            return False
         finally:
             conn.close()
 
     def publish_all(self):
-        """Export all local functions to the Hub and push in a single batch."""
+        """Export all local functions to the Hub and push via Mediated API."""
         if not self.ensure_repo():
             return False
 
-        logger.info("Sync: Publishing all local functions to Hub...")
+        logger.info("Sync: Publishing all local functions to Hub via API...")
         conn = get_db_connection(read_only=False)
         try:
             rows = conn.execute(
                 "SELECT name FROM functions WHERE status != 'deleted'"
             ).fetchall()
+            
+            success_count = 0
             for r in rows:
                 name = r[0]
-                self._export_to_cache(conn, name)
-
-            self._update_index()
-            self._run_git(["add", "functions/*.json", "index.json"])
-            self._run_git(["commit", "-m", "feat: bulk publish all functions"])
-            return self._run_git(["push", "origin", "main"])
+                if self.push(name):
+                    success_count += 1
+            
+            logger.info(f"Sync: Bulk publish complete. {success_count}/{len(rows)} functions pushed.")
+            return True
+        except Exception as e:
+            logger.error(f"Sync: Bulk publish failed: {e}")
+            return False
         finally:
             conn.close()
 

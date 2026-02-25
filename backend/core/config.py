@@ -98,3 +98,9 @@ SYNC_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
 # Execution Runtime Config
 # Options: "auto" (local venv), "docker" (containerized), "cloud" (managed)
 EXECUTION_MODE = get_setting("FS_EXECUTION_MODE", "auto")
+
+# GitHub Storage Auth (For Hub-mediated Push)
+GITHUB_TOKEN = get_setting("FS_GITHUB_TOKEN", "")
+GITHUB_STORAGE_REPO = get_setting(
+    "FS_GITHUB_STORAGE_REPO", "Ayato-AI-for-Auto/LogicHive-Storage"
+)

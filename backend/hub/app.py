@@ -36,6 +36,14 @@ class RerankFinalizeRequest(BaseModel):
     candidates: List[Dict]
     llm_output: str
 
+class PushRequest(BaseModel):
+    name: str
+    code: str
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    dependencies: Optional[List[str]] = None
+    metadata: Optional[Dict] = None
+
 # --- ENDPOINTS ---
 
 @app.get("/health")
@@ -91,6 +99,27 @@ async def intelligence_rerank_finalize(req: RerankFinalizeRequest):
     from hub.router import router
     selected_name = router.finalize_decision(req.candidates, req.llm_output)
     return {"selected_name": selected_name}
+
+@app.post("/api/v1/sync/push")
+async def sync_push(req: PushRequest):
+    """
+    Mediated Push: Hub receives function data and pushes to GitHub Storage.
+    Only called by Edge client after validation.
+    """
+    logger.info(f"Hub: Mediated push request for '{req.name}'")
+    from hub.github_api import push_function_to_github
+    success, message = push_function_to_github(
+        name=req.name,
+        code=req.code,
+        description=req.description or "",
+        tags=req.tags or [],
+        dependencies=req.dependencies or [],
+        metadata=req.metadata or {}
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to push: {message}")
+    
+    return {"status": "success", "message": f"Function '{req.name}' pushed to storage."}
 
 if __name__ == "__main__":
     logger.info(f"LogicHive Hub starting (Stateless) on {HOST}:{PORT}...")

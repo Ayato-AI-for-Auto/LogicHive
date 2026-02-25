@@ -68,6 +68,15 @@ pytest_fail*.txt
 .mcp_envs/
 proxy_boot_log.txt
 dev_tool.log
+*.txt
+auth.txt
+perms.txt
+user.txt
+cloud_logs.txt
+it_error*.txt
+tmp_storage/
+LogicHive.spec
+Local_sync_cache/
 
 # Node/Frontend (if any)
 node_modules/

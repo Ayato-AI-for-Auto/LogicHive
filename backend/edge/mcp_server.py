@@ -30,6 +30,7 @@ from edge.orchestrator import (
     do_get_impl,
     do_get_details_impl,
     do_delete_impl,
+    do_list_impl,
     do_smart_get_impl,
 )
 
@@ -39,6 +40,11 @@ mcp = FastMCP("function-store", dependencies=["duckdb", "fastembed"])
 # ----------------------------------------------------------------------
 # MCP Tools (Direct Local Execution)
 # ----------------------------------------------------------------------
+
+@mcp.tool()
+def list_functions(limit: int = 100) -> List[Dict]:
+    """Lists all stored functions from the local store."""
+    return do_list_impl(limit=limit)
 
 @mcp.tool()
 def search_functions(query: str, limit: int = 5) -> List[Dict]:
@@ -107,6 +113,35 @@ def main():
     args = parser.parse_args()
 
     config_file = project_root / "mcp_config_logic_hive.json"
+    config = {}
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception as e:
+            logging.error(f"Failed to load config: {e}")
+
+    # --- LICENSE CONSENT LOGIC ---
+    if is_frozen and os.name == "nt" and not config.get("license_consent"):
+        consent_text = (
+            "LogicHive utilizes 'LogicHive-Storage' (a public GitHub repository) as a global shared database for the community.\n\n"
+            "By using this software for free during the MVP phase, you agree that any functions you register/save will be "
+            "published under the MIT License and shared with the global community.\n\n"
+            "Do you agree to these terms?"
+        )
+        # MB_YESNO = 0x4, MB_ICONQUESTION = 0x20, IDYES = 6
+        res = ctypes.windll.user32.MessageBoxW(0, consent_text, "LogicHive License Consent", 0x4 | 0x20)
+        if res != 6:
+            logging.info("User declined license consent. Exiting.")
+            sys.exit(0)
+        
+        config["license_consent"] = True
+        try:
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+            logging.info("License consent saved to config.")
+        except Exception as e:
+            logging.error(f"Failed to save consent to config: {e}")
 
     # AUTO-SETUP logic: If running as EXE and config is missing, generate it first.
     if is_frozen and not config_file.exists() or args.generate_mcp_config:

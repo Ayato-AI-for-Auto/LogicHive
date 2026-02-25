@@ -16,6 +16,8 @@ dependencies = [
     "bandit",
     "safety",
     "python-dotenv",
+    "gitpython",
+    "PyGithub",
 ]
 
 [project.scripts]

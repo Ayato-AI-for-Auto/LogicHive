@@ -2,16 +2,14 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { spawn, execSync } from "child_process";
+import { execSync } from "child_process";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import duckdb from "duckdb";
 import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "../../");
-const DB_PATH = path.join(ROOT_DIR, "functions.duckdb");
 
 // Load local .env from project root
 const ROOT_ENV_PATH = path.join(ROOT_DIR, ".env");
@@ -57,129 +55,26 @@ if (hubUrlArgIndex !== -1 && args[hubUrlArgIndex + 1]) {
 }
 
 /**
- * Local Database Management (DuckDB)
+ * Helper to call Python MCP Tools via CLI.
+ * This ensures single ownership of the DuckDB file by the Python process.
  */
-class LocalDB {
-    private db: duckdb.Database;
-
-    constructor(path: string) {
-        this.db = new duckdb.Database(path);
-    }
-
-    private query(sql: string, params: any[] = []): Promise<any[]> {
-        return new Promise((resolve, reject) => {
-            this.db.all(sql, ...params, (err: any, rows: any[]) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
-    }
-
-    private exec(sql: string, params: any[] = []): Promise<void> {
-        return new Promise((resolve, reject) => {
-            this.db.run(sql, ...params, (err: any) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-    }
-
-    async init() {
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS functions (
-                id INTEGER PRIMARY KEY,
-                name VARCHAR UNIQUE,
-                code VARCHAR,
-                description VARCHAR,
-                tags VARCHAR,
-                metadata VARCHAR,
-                status VARCHAR DEFAULT 'active',
-                test_cases VARCHAR,
-                call_count INTEGER DEFAULT 0,
-                last_called_at VARCHAR,
-                created_at VARCHAR,
-                updated_at VARCHAR
-            )
-        `);
-    }
-
-    async listFunctions(query?: string, tag?: string, limit = 20, includeArchived = false) {
-        let sql = "SELECT name, description, tags, status, call_count FROM functions";
-        const where: string[] = [];
-        const params: any[] = [];
-
-        if (!includeArchived) where.push("status != 'archived'");
-        if (tag) {
-            where.push("tags LIKE ?");
-            params.push(`%"${tag}"%`);
-        }
-        if (query) {
-            where.push("(name ILIKE ? OR description ILIKE ?)");
-            params.push(`%${query}%`, `%${query}%`);
-        }
-
-        if (where.length > 0) sql += " WHERE " + where.join(" AND ");
-        sql += " ORDER BY updated_at DESC LIMIT ?";
-        params.push(limit);
-
-        return await this.query(sql, params);
-    }
-
-    async getFunctionDetails(name: string) {
-        const rows = await this.query("SELECT * FROM functions WHERE name = ?", [name]);
-        if (rows.length === 0) return null;
-        const row = rows[0];
-        return {
-            ...row,
-            tags: JSON.parse(row.tags || "[]"),
-            metadata: JSON.parse(row.metadata || "{}"),
-            test_cases: JSON.parse(row.test_cases || "[]")
-        };
-    }
-
-    async saveFunction(data: any) {
-        const now = new Date().toISOString();
-        const existing = await this.getFunctionDetails(data.name);
-
-        if (existing) {
-            await this.exec(
-                "UPDATE functions SET code=?, description=?, tags=?, metadata=?, test_cases=?, status=?, updated_at=? WHERE name=?",
-                [
-                    data.code,
-                    data.description || existing.description,
-                    JSON.stringify(data.tags || existing.tags),
-                    JSON.stringify(data.metadata || existing.metadata),
-                    JSON.stringify(data.test_cases || existing.test_cases),
-                    data.status || existing.status,
-                    now,
-                    data.name
-                ]
-            );
-        } else {
-            await this.exec(
-                "INSERT INTO functions (name, code, description, tags, metadata, test_cases, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    data.name,
-                    data.code,
-                    data.description || "",
-                    JSON.stringify(data.tags || []),
-                    JSON.stringify(data.metadata || {}),
-                    JSON.stringify(data.test_cases || []),
-                    data.status || "active",
-                    now,
-                    now
-                ]
-            );
-        }
+function callPythonTool(toolName: string, args: any): any {
+    try {
+        const payload = JSON.stringify(args).replace(/"/g, '\\"');
+        // We use 'uv run' to ensure the correct environment. 
+        // Note: For real performance, we'd use a persistent JSON-RPC bridge.
+        const cmd = `uv run python -c "from edge.orchestrator import do_${toolName.replace('save_function', 'save')}_impl; import json; print(json.dumps(do_${toolName.replace('save_function', 'save')}_impl(**json.loads('${payload}'))))"`;
+        const result = execSync(cmd, { cwd: ROOT_DIR, encoding: "utf-8" });
+        return JSON.parse(result);
+    } catch (e: any) {
+        throw new Error(`Python Bridge Error (${toolName}): ${e.message}`);
     }
 }
-
-const localDb = new LocalDB(DB_PATH);
 
 const server = new Server(
     {
         name: "function-store-proxy",
-        version: "3.0.0", // Hybrid Edition
+        version: "3.1.0", // Hybrid Edition - Slim Proxy
     },
     {
         capabilities: {
@@ -228,7 +123,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         query: { type: "string" },
                         tag: { type: "string" },
                         limit: { type: "number" },
-                        include_archived: { type: "boolean" },
                     },
                 },
             },
@@ -260,120 +154,75 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: toolArgs } = request.params;
 
     try {
         switch (name) {
             case "list_functions": {
-                const results = await localDb.listFunctions(
-                    args?.query as string,
-                    args?.tag as string,
-                    args?.limit as number,
-                    args?.include_archived as boolean
-                );
+                // Delegate to Python
+                const results = callPythonTool("list", { limit: toolArgs?.limit || 100 });
                 return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
             }
 
             case "get_function_details": {
-                const detail = await localDb.getFunctionDetails(args?.name as string);
-                return { content: [{ type: "text", text: detail ? JSON.stringify(detail, null, 2) : "Not found." }] };
+                const detail = callPythonTool("get_details", { name: toolArgs?.name });
+                return { content: [{ type: "text", text: JSON.stringify(detail, null, 2) }] };
             }
 
             case "save_function": {
-                // 1. Initial Local Save (Pending)
-                await localDb.saveFunction({ ...args, status: "pending" });
+                // 1. Initial Local Save (Delegated to Python)
+                const saveResult = callPythonTool("save_function", {
+                    asset_name: toolArgs?.name,
+                    code: toolArgs?.code,
+                    description: toolArgs?.description,
+                    tags: toolArgs?.tags,
+                    dependencies: toolArgs?.dependencies,
+                    test_cases: toolArgs?.test_cases
+                });
 
-                // 2. Cloud Intelligence - Step A: Get Verification Prompt
+                // 2. Cloud Intelligence (Keep in Proxy for hybrid orchestration)
                 try {
                     const promptRes = await fetch(`${HUB_URL}/api/v1/intelligence/verify/get-prompt`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(args)
+                        body: JSON.stringify(toolArgs)
                     });
-                    if (!promptRes.ok) throw new Error("Could not retrieve verification prompt.");
-                    const { prompt } = await promptRes.json();
+                    if (promptRes.ok) {
+                        const { prompt } = await promptRes.json();
+                        const llmOutput = await callGeminiLocally(prompt);
 
-                    // 3. Local Execution - Execute verification locally
-                    const llmOutput = await callGeminiLocally(prompt);
-
-                    // 4. Cloud Intelligence - Step B: Finalize Verification
-                    const finalizeRes = await fetch(`${HUB_URL}/api/v1/intelligence/verify/finalize`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            name: args?.name,
-                            code: args?.code,
-                            llm_output: llmOutput,
-                            description: args?.description,
-                            dependencies: args?.dependencies
-                        })
-                    });
-
-                    if (finalizeRes.ok) {
-                        const intellectResult = await finalizeRes.json();
-                        // 5. Update Local DB with Intelligence results
-                        await localDb.saveFunction({
-                            name: args?.name,
-                            ...intellectResult.metadata,
-                            status: intellectResult.status || "verified"
+                        await fetch(`${HUB_URL}/api/v1/intelligence/verify/finalize`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                name: toolArgs?.name,
+                                code: toolArgs?.code,
+                                llm_output: llmOutput
+                            })
                         });
-                        return { content: [{ type: "text", text: `SUCCESS (Reverse Intelligence): Function '${args?.name}' saved and verified safely.` }] };
                     }
                 } catch (e) {
-                    return { content: [{ type: "text", text: `WARNING: Saved locally as 'pending', but Cloud Verification failed: ${e instanceof Error ? e.message : String(e)}` }] };
+                    console.error("Cloud verification skip/fail (non-blocking):", e);
                 }
-                return { content: [{ type: "text", text: `SUCCESS: Saved locally as 'pending'.` }] };
+
+                return { content: [{ type: "text", text: saveResult }] };
             }
 
             case "smart_search_and_get": {
-                // 1. Local Broad Search
-                const candidates = await localDb.listFunctions(args?.query as string, undefined, 10);
-                if (candidates.length === 0) {
-                    return { content: [{ type: "text", text: "No matching functions found locally." }] };
-                }
-
-                // 2. Cloud Intelligence - Step A: Get Secret Prompt (Zero-Trust)
-                const promptRes = await fetch(`${HUB_URL}/api/v1/intelligence/rerank/get-prompt`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query: args?.query, candidates })
+                // Delegate the entire complex flow to Python
+                const result = callPythonTool("smart_get", {
+                    query: toolArgs?.query,
+                    target_dir: toolArgs?.target_dir || "./"
                 });
+                return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+            }
 
-                if (!promptRes.ok) throw new Error("Could not retrieve Rerank Prompt from Cloud Hub.");
-                const { prompt } = await promptRes.json();
-
-                // 3. Local Execution - Execution: Client calls LLM locally (API Key safe!)
-                const llmOutput = await callGeminiLocally(prompt);
-
-                // 4. Cloud Intelligence - Step B: Finalize Decision (Zero-Trust)
-                const cloudRes = await fetch(`${HUB_URL}/api/v1/intelligence/rerank/finalize`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ candidates, llm_output: llmOutput })
+            case "search_functions": {
+                const results = callPythonTool("search", {
+                    query: toolArgs?.query,
+                    limit: toolArgs?.limit || 5
                 });
-
-                if (!cloudRes.ok) throw new Error("Cloud Reranking finalization failed.");
-                const { selected_name } = await cloudRes.json();
-
-                if (!selected_name || selected_name === "NONE") {
-                    return { content: [{ type: "text", text: "Cloud Intelligence could not find a definitive match." }] };
-                }
-
-                // 5. Local Retrieval & Injection
-                const details = await localDb.getFunctionDetails(selected_name);
-                if (!details) throw new Error("Selected function disappeared from Local DB.");
-
-                const targetDir = (args?.target_dir as string) || "./";
-                const pkgDir = path.join(process.cwd(), targetDir, "local_pkg");
-                if (!fs.existsSync(pkgDir)) fs.mkdirSync(pkgDir, { recursive: true });
-                fs.writeFileSync(path.join(pkgDir, `${selected_name}.py`), details.code);
-
-                return {
-                    content: [{
-                        type: "text",
-                        text: `SUCCESS (Reverse Intelligence): Selected '${selected_name}' via Hub logic.\nInjected into ${targetDir}/local_pkg/\n[Security Note: API Key remained local throughout.]`
-                    }]
-                };
+                return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
             }
 
             default:
@@ -382,23 +231,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } catch (error) {
         return {
             isError: true,
-            content: [{ type: "text", text: `Hybrid Proxy Error: ${error instanceof Error ? error.message : String(error)}` }],
+            content: [{ type: "text", text: `Slim Proxy Error: ${error instanceof Error ? error.message : String(error)}` }],
         };
     }
 });
 
 async function main() {
-    await localDb.init();
-
     // Security check: Warn if remote Hub is used without HTTPS
     if (HUB_URL.startsWith("http://") && !HUB_URL.includes("localhost") && !HUB_URL.includes("127.0.0.1")) {
         console.warn("\x1b[33m%s\x1b[0m", "SECURITY WARNING: You are connecting to a remote Hub via insecure HTTP.");
-        console.warn("\x1b[33m%s\x1b[0m", "Your API Key will be sent unencrypted. Please use HTTPS for remote deployments.");
     }
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`Function Store Hybrid Proxy running. Hub: ${HUB_URL}`);
+    console.error(`Function Store Slim Proxy running (Python delegated). Hub: ${HUB_URL}`);
 }
 
 main().catch((error) => {
