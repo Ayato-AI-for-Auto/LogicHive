@@ -1,4 +1,4 @@
-name: LogicHive Release
+name: Cloud Build & Release
 
 on:
   push:
@@ -20,18 +20,16 @@ jobs:
         run: uv python install 3.12
         
       - name: Install Dependencies
-        run: uv sync --all-extras
+        run: uv sync
         
-      - name: Install PyInstaller
-        run: uv pip install pyinstaller
-        
-      - name: Build LogicHive EXE
+      - name: Run Cloud Build
+        # This will run the same build script used locally, but in the cloud
         run: uv run python dev_tools/build_exe.py
         
       - name: Create Release & Upload Artifact
         uses: softprops/action-gh-release@v2
         with:
-          files: release/LogicHive-Windows.zip
+          files: release/FunctionStore.exe
           draft: false
           prerelease: false
         env:
