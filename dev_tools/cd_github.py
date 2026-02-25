@@ -35,11 +35,11 @@ def get_next_version():
 
 def main():
     print("=== LogicHive Edge CD (GitHub) ===")
+    print("[NOTE] Linting and Testing are now handled by GitHub Actions CI.")
 
-    # 1. Format & Lint
-    print("\n[INFO] Running Ruff formatter/linter...")
-    run_command(["uv", "run", "ruff", "format", "."])
-    run_command(["uv", "run", "ruff", "check", ".", "--fix"])
+    # 1. Versioning
+    next_ver = get_next_version()
+    print(f"\n[INFO] Target Version: {next_ver}")
 
     # 2. Check for changes
     status = run_command(["git", "status", "--porcelain"])
@@ -48,11 +48,7 @@ def main():
         print("\n[INFO] No changes to deploy to GitHub.")
         return
 
-    # 3. Versioning
-    next_ver = get_next_version()
-    print(f"\n[INFO] Target Version: {next_ver}")
-
-    # 4. Add and commit
+    # 3. Add and commit
     print("\n[INFO] Committing changes...")
     run_command(["git", "add", "."])
 
@@ -68,7 +64,7 @@ def main():
 
     run_command(["git", "commit", "-m", commit_msg])
 
-    # 5. Tag and Push
+    # 4. Tag and Push
     if next_ver:
         print(f"\n[INFO] Tagging with {next_ver}...")
         run_command(["git", "tag", next_ver])
@@ -78,7 +74,8 @@ def main():
     if next_ver:
         run_command(["git", "push", "origin", next_ver])
 
-    print(f"\n[SUCCESS] Edge successfully deployed and {next_ver} release triggered!")
+    print("\n[SUCCESS] Edge changes pushed!")
+    print("[INFO] GitHub Actions CI/CD will now run tests and build the EXE.")
 
 
 if __name__ == "__main__":

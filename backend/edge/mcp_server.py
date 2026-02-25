@@ -5,7 +5,6 @@ import os
 import sys
 import ctypes
 from pathlib import Path
-from typing import List, Dict
 
 from mcp.server.fastmcp import FastMCP
 from core.config import TRANSPORT
@@ -46,13 +45,13 @@ mcp = FastMCP("LogicHive", dependencies=["duckdb", "fastembed"])
 
 
 @mcp.tool()
-def list_functions(limit: int = 100) -> List[Dict]:
+def list_functions(limit: int = 100) -> list[dict]:
     """Lists all stored functions from the local store."""
     return do_list_impl(limit=limit)
 
 
 @mcp.tool()
-def search_functions(query: str, limit: int = 5) -> List[Dict]:
+def search_functions(query: str, limit: int = 5) -> list[dict]:
     """
     [EXPLORATION TOOL] Catalog search for reusable functions.
     Searches local DuckDB/Qdrant.
@@ -65,9 +64,9 @@ def save_function(
     name: str,
     code: str,
     description: str = "",
-    tags: List[str] = [],
-    dependencies: List[str] = [],
-    test_cases: List[Dict] = [],
+    tags: list[str] = [],
+    dependencies: list[str] = [],
+    test_cases: list[dict] = [],
     skip_test: bool = False,
 ) -> str:
     """
@@ -97,13 +96,13 @@ def get_function(name: str, integrate_dependencies: bool = False) -> str:
 
 
 @mcp.tool()
-def get_function_details(name: str) -> Dict:
+def get_function_details(name: str) -> dict:
     """Retrieves full metadata for a local function."""
     return do_get_details_impl(name=name)
 
 
 @mcp.tool()
-def smart_search_and_get(query: str, target_dir: str = "./") -> Dict:
+def smart_search_and_get(query: str, target_dir: str = "./") -> dict:
     """
     [PRIMARY AI PROTOCOL] Intent-based Search -> Selection -> Injection.
     Uses local search + Hub-based reranking.
