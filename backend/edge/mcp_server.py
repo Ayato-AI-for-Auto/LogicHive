@@ -9,6 +9,20 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from core.config import TRANSPORT, SETTINGS_PATH
 
+def setup_logging(is_frozen: bool, project_root: Path):
+    """Configures logging to both console and file."""
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # Base configuration for console
+    logging.basicConfig(level=logging.INFO, format=log_format)
+    
+    if is_frozen:
+        log_file = project_root / "logichive.log"
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setFormatter(logging.Formatter(log_format))
+        logging.getLogger().addHandler(file_handler)
+        logging.info(f"Logging initialized. Log file: {log_file}")
+
 # Import local stateful orchestrator
 from edge.orchestrator import (
     do_save_impl,
@@ -82,12 +96,16 @@ def smart_search_and_get(query: str, target_dir: str = "./") -> Dict:
 
 def main():
     """Entry point for the Edge MCP server."""
+    is_frozen = getattr(sys, "frozen", False)
+    project_root = Path(sys.executable).parent if is_frozen else Path(__file__).parent.parent.parent
+    
+    # Initialize logging
+    setup_logging(is_frozen, project_root)
+    
     parser = argparse.ArgumentParser(description="LogicHive Edge MCP Server")
     parser.add_argument("--generate-mcp-config", action="store_true", help="Generate Cursor/Gemini Desktop config")
     args = parser.parse_args()
 
-    is_frozen = getattr(sys, "frozen", False)
-    project_root = Path(sys.executable).parent if is_frozen else Path(__file__).parent.parent.parent
     config_file = project_root / "mcp_config_logic_hive.json"
 
     # AUTO-SETUP logic: If running as EXE and config is missing, generate it first.
