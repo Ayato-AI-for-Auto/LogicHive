@@ -30,9 +30,10 @@ SaaSとしての体験を提供しつつ、運営コストを最小化するた�
 
 ---
 
-## 2. アーキテクチャ全体構成
-
-システムは、ローカルエッジで状態を持つ **Edge (TS Proxy / Python FastMCP)** と、知能と評価を提供する **Cloud (FastAPI Hub)** の協調アーキテクチャを採用している。
+## 2. アーキテクチャ全体構成 (Dual-Repo Architecture)
+システムは、物理的に分離された2つのリポジトリによって独立稼働する協調アーキテクチャを採用している。
+*   **Edge Client (`LogicHive-Edge` リポジトリ)**: ユーザーのローカルPCで状態を持つ、完全公開の OSS アプリケーション。
+*   **Cloud Intelligence (`LogicHive-Hub-Private` リポジトリ)**: 運営側の知能（プロンプト・評価ロジック）を秘匿し、GCP上で完全自動デプロイされるプライベート SaaS バックエンド。
 
 ```mermaid
 graph TD
