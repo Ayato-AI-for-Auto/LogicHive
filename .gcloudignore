@@ -1,47 +1,16 @@
-.gcloudignore
-.git
-.gitignore
+# Ignore GitHub tracked files
+.git/
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-
-# Node modules
-node_modules/
-
-# IDE and Editor files
-.vscode/
-.cursor/
-
-# Build artifacts and local environment
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.ruff_cache/
-dist/
-build/
-release/
-
-# Database and local data
-*.db
-*.db.wal
-*.duckdb
-*.duckdb.wal
-data/
-
-# Environment and secrets
+# Ignore Edge & Client files that are useless on GCP Hub
 .env
-*.log
-dev_tool.log
-proxy_boot_log.txt
-
-# Documentation & Tools not needed for Cloud Run
-docs/
+backend/edge/
+ts-proxy/
 dev_tools/
-.github/
+tests/
+*.bat
+docs/
 
-# Mac OS
-.DS_Store
+# Explicitly allow backend/hub even if it's in .gitignore!
+!backend/hub/
+!backend/hub/**
+!backend/hub/Dockerfile

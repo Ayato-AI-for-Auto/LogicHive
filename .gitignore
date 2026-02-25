@@ -88,3 +88,8 @@ Thumbs.db
 # Project Launchers (Explicitly allow)
 !*.bat
 !*.sh
+
+# Hub Confidential Intelligence (IP Protection)
+backend/hub/
+backend/core/config.py
+backend/core/models.py
