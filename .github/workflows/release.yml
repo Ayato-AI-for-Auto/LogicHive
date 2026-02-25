@@ -16,7 +16,7 @@ jobs:
       - name: Install uv
         run: |
           irm https://astral.sh/uv/install.ps1 | iex
-          echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
+          $env:USERPROFILE + "\.local\bin" | Add-Content -Path $env:GITHUB_PATH
 
       - name: Setup Python
         run: uv python install 3.12
