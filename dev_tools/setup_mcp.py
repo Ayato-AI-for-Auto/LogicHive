@@ -7,8 +7,10 @@ sys.path.append(str(project_root / "backend"))
 
 from core.setup import generate_config
 
+
 def main():
     generate_config(is_frozen=False)
+
 
 if __name__ == "__main__":
     main()

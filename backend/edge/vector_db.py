@@ -1,5 +1,4 @@
 import logging
-from typing import List, Optional
 
 from core.database import get_db_connection
 
@@ -18,10 +17,13 @@ class VectorDB:
             try:
                 model_name = metadata.get("model_name", "unknown")
                 dim = len(vector)
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO embeddings (function_name, vector, model_name, dimension, encoded_at)
                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (function_name, vector, model_name, dim))
+                """,
+                    (function_name, vector, model_name, dim),
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -56,7 +58,7 @@ class VectorDB:
 
                 return [
                     ScoredPoint(
-                        id=r[0], # function_name
+                        id=r[0],  # function_name
                         score=r[4],
                         payload={
                             "name": r[0],
@@ -88,6 +90,7 @@ class VectorDB:
 
 
 _vector_db = None
+
 
 def get_vector_db():
     global _vector_db

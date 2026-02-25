@@ -1,8 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import httpx
 import git
@@ -34,11 +33,13 @@ class GitHubSyncEngine:
 
         try:
             if not (self.local_dir / ".git").exists():
-                logger.info(f"Sync: Initializing local hub cache at {self.local_dir}...")
+                logger.info(
+                    f"Sync: Initializing local hub cache at {self.local_dir}..."
+                )
                 self._repo = git.Repo.clone_from(self.repo_url, self.local_dir, depth=1)
             else:
                 self._repo = git.Repo(self.local_dir)
-            
+
             self._initialized = True
             self.functions_dir.mkdir(parents=True, exist_ok=True)
             return True
@@ -194,14 +195,16 @@ class GitHubSyncEngine:
             rows = conn.execute(
                 "SELECT name FROM functions WHERE status != 'deleted'"
             ).fetchall()
-            
+
             success_count = 0
             for r in rows:
                 name = r[0]
                 if self.push(name):
                     success_count += 1
-            
-            logger.info(f"Sync: Bulk publish complete. {success_count}/{len(rows)} functions pushed.")
+
+            logger.info(
+                f"Sync: Bulk publish complete. {success_count}/{len(rows)} functions pushed."
+            )
             return True
         except Exception as e:
             logger.error(f"Sync: Bulk publish failed: {e}")

@@ -135,14 +135,20 @@ def main():
             if args.ship:
                 msg = args.message or "chore: ship via dev_tools"
                 print(f"\n[INFO] Shipping: {msg}...")
-                
+
                 # Safety check: Ensure docs/ and private dirs are NOT staged
                 check_cmd = "git status --porcelain"
-                res = subprocess.run(check_cmd, shell=True, capture_output=True, text=True, cwd=root_dir)
+                res = subprocess.run(
+                    check_cmd, shell=True, capture_output=True, text=True, cwd=root_dir
+                )
                 if "docs/" in res.stdout or "dev_tools/" in res.stdout:
-                    if "dev_tools/dev.py" not in res.stdout: # Allow the tool itself
-                        print("[ERROR] Private directories (docs/ or dev_tools/) detected in git status.")
-                        print("[ERROR] Please ensure they are ignored and removed from the index before shipping.")
+                    if "dev_tools/dev.py" not in res.stdout:  # Allow the tool itself
+                        print(
+                            "[ERROR] Private directories (docs/ or dev_tools/) detected in git status."
+                        )
+                        print(
+                            "[ERROR] Please ensure they are ignored and removed from the index before shipping."
+                        )
                         sys.exit(1)
 
                 if run_command("git add -A", "Git Add"):

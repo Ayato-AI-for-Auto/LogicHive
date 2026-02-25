@@ -9,6 +9,7 @@ from core.embedding import embedding_service
 
 try:
     import msvcrt
+
     _HAS_MSVCRT = True
 except ImportError:
     _HAS_MSVCRT = False
@@ -120,13 +121,13 @@ def init_db():
                     value VARCHAR
                 )
             """)
-            
+
             # Simple migration for embeddings if needed
             columns_res = conn.execute("DESCRIBE embeddings").fetchall()
             cols = [r[0] for r in columns_res]
             if "function_id" in cols and "function_name" not in cols:
                 conn.execute("ALTER TABLE embeddings ADD COLUMN function_name VARCHAR")
-            
+
             _check_model_version_internal(conn)
             recover_embeddings_internal(conn)
         finally:
@@ -137,12 +138,15 @@ def recover_embeddings_internal(conn):
     try:
         current_model = embedding_service.model_name
         expected_dim = embedding_service.get_model_info()["dimension"]
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT f.name, f.description, f.tags, f.metadata, f.code
             FROM functions f
             LEFT JOIN embeddings e ON f.name = e.function_name
             WHERE e.model_name != ? OR e.dimension != ? OR e.function_name IS NULL
-        """, (current_model, expected_dim)).fetchall()
+        """,
+            (current_model, expected_dim),
+        ).fetchall()
         for row in rows:
             name, desc, tags_j, meta_j, code = row
             tags = json.loads(tags_j) if tags_j else []
@@ -150,10 +154,13 @@ def recover_embeddings_internal(conn):
             deps = meta.get("dependencies", [])
             text = f"Name: {name}\nDesc: {desc}\nTags: {tags}\nDeps: {deps}\nCode:\n{code[:500]}"
             emb = embedding_service.get_embedding(text)
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO embeddings (function_name, vector, model_name, dimension, encoded_at)
                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (name, emb, current_model, len(emb)))
+            """,
+                (name, emb, current_model, len(emb)),
+            )
         conn.commit()
     except Exception as e:
         logger.error(f"Recovery failed: {e}")
@@ -161,18 +168,25 @@ def recover_embeddings_internal(conn):
 
 def _check_model_version_internal(conn):
     try:
-        row = conn.execute("SELECT value FROM config WHERE key = 'embedding_model'").fetchone()
+        row = conn.execute(
+            "SELECT value FROM config WHERE key = 'embedding_model'"
+        ).fetchone()
         current = embedding_service.model_name
         if not row:
             conn.execute("INSERT INTO config VALUES ('embedding_model', ?)", (current,))
         elif row[0] != current:
-            conn.execute("UPDATE config SET value = ? WHERE key = 'embedding_model'", (current,))
+            conn.execute(
+                "UPDATE config SET value = ? WHERE key = 'embedding_model'", (current,)
+            )
         conn.commit()
     except Exception as e:
         logger.error(f"Model version check failed: {e}")
 
+
 def recover_embeddings():
     with DBWriteLock():
         conn = get_db_connection()
-        try: recover_embeddings_internal(conn)
-        finally: conn.close()
+        try:
+            recover_embeddings_internal(conn)
+        finally:
+            conn.close()

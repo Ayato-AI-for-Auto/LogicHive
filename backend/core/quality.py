@@ -49,9 +49,11 @@ class RuffProcessor:
         tmp_path = None
         try:
             ruff_bin = RuffProcessor._get_ruff_bin()
-            
+
             # Use temp file instead of stdin to avoid Windows pipe hangs
-            with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8") as tmp:
+            with tempfile.NamedTemporaryFile(
+                suffix=".py", delete=False, mode="w", encoding="utf-8"
+            ) as tmp:
                 tmp.write(code)
                 tmp_path = tmp.name
 
@@ -95,8 +97,10 @@ class RuffProcessor:
             return False, [f"Ruff Lint Exception: {str(e)}"]
         finally:
             if tmp_path and os.path.exists(tmp_path):
-                try: os.remove(tmp_path)
-                except: pass
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
 
     @staticmethod
     def format_check(code: str) -> Tuple[bool, str]:
@@ -104,8 +108,10 @@ class RuffProcessor:
         tmp_path = None
         try:
             ruff_bin = RuffProcessor._get_ruff_bin()
-            
-            with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8") as tmp:
+
+            with tempfile.NamedTemporaryFile(
+                suffix=".py", delete=False, mode="w", encoding="utf-8"
+            ) as tmp:
                 tmp.write(code)
                 tmp_path = tmp.name
 
@@ -126,8 +132,10 @@ class RuffProcessor:
             return False, f"Ruff Format Exception: {str(e)}"
         finally:
             if tmp_path and os.path.exists(tmp_path):
-                try: os.remove(tmp_path)
-                except: pass
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
 
 
 class QualityGate:
@@ -151,7 +159,7 @@ class QualityGate:
             "reliability": "high",
             "linter": {"passed": True, "errors": []},
             "formatter": {"passed": True, "feedback": ""},
-            "metadata": {"quality_feedback": ""}
+            "metadata": {"quality_feedback": ""},
         }
 
         # 1. Linter (Normalized by Error Density: errors / lines)
@@ -204,24 +212,34 @@ class QualityGate:
             f"Output format: JSON with 'feedback' and 'score' keys."
         )
 
-    def finalize_verification(self, name: str, code: str, llm_output: str, description: str = "", dependencies: List[str] = None) -> Dict[str, Any]:
+    def finalize_verification(
+        self,
+        name: str,
+        code: str,
+        llm_output: str,
+        description: str = "",
+        dependencies: List[str] = None,
+    ) -> Dict[str, Any]:
         """Combines Ruff static analysis with LLM-provided qualitative score."""
         # 1. Static Analysis (Hub-safe)
         report = self.check_score_only(name, code, description, dependencies)
-        
+
         # 2. Extract LLM quantitative/qualitative data
         try:
             # Simple extractor for markdown JSON or raw JSON
             import re
-            json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+
+            json_match = re.search(r"\{.*\}", llm_output, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group())
                 ai_score = data.get("score", 50)
                 ai_feedback = data.get("feedback", "")
-                
+
                 # Combine scores (Static 50% + AI 50%)
                 report["final_score"] = int((report["final_score"] + ai_score) / 2)
-                report["metadata"]["quality_feedback"] = f"AI: {ai_feedback} | Hub: {report['formatter']['feedback']}"
+                report["metadata"]["quality_feedback"] = (
+                    f"AI: {ai_feedback} | Hub: {report['formatter']['feedback']}"
+                )
         except Exception as e:
             logger.warning(f"QualityGate: Failed to parse LLM finalization: {e}")
 
@@ -232,5 +250,5 @@ class QualityGate:
             report["reliability"] = "medium"
         else:
             report["reliability"] = "low"
-            
+
         return report

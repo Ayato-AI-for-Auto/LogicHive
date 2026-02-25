@@ -78,18 +78,20 @@ def main():
     if os.path.exists("token_secret.txt"):
         with open("token_secret.txt", "r") as f:
             github_token = f.read().strip()
-    
+
     if not github_token:
         github_token = os.getenv("FS_GITHUB_TOKEN", "").strip()
-    
-    github_repo = os.getenv("FS_GITHUB_STORAGE_REPO", "Ayato-AI-for-Auto/LogicHive-Storage")
+
+    github_repo = os.getenv(
+        "FS_GITHUB_STORAGE_REPO", "Ayato-AI-for-Auto/LogicHive-Storage"
+    )
 
     env_vars = [
         "FS_TRANSPORT=http",
         "DATABASE_PATH=:memory:",
         "FS_MODEL_TYPE=gemini",
         f"FS_GITHUB_TOKEN={github_token}",
-        f"FS_GITHUB_STORAGE_REPO={github_repo}"
+        f"FS_GITHUB_STORAGE_REPO={github_repo}",
     ]
 
     deploy_cmd = [
