@@ -5,6 +5,7 @@ import os
 import sys
 import ctypes
 from pathlib import Path
+from typing import List, Dict
 
 from mcp.server.fastmcp import FastMCP
 from core.config import TRANSPORT
