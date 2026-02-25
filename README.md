@@ -13,8 +13,6 @@ LogicHive は、この「コードの書き捨て」を防ぐための MCP (Mode
 ## 主な特徴
 
 - **AI Code Retention (資産の定着化)**: AIが生成した不完全な「コードの種」を即座にローカルへ保存（Draft-First）。プロジェクトをまたいで再利用可能な資産へと育て上げます。
-- **Local-First & Zero Latency**: ベクトル検索エンジン（DuckDB/Qdrant Local）はユーザーのPC上で稼働するため、検索レイテンシはほぼゼロ。機密コードも意図的に共有するまでは完全にプライベートです。
-- **Cloud-Verified Intelligence**: コードの品質検証、セキュリティチェック、セマンティック検索のリランクなど、重厚なAI処理はクラウド（GCP Cloud Run）にデプロイされたステートレスAPIが担当。ローカルリソースを枯渇させません。
 - **Smart Get & Cognitive Logic**: `smart_search_and_get` ツールにより、AIエージェントが「自然言語での検索 -> 最適解の選別 -> プロジェクトへの自動配置」を1回の呼び出しで完結させます。
 - **BYOK (Bring Your Own Key)**: ユーザー自身の Gemini API やローカルの Ollama を推論エンジンとして柔軟に選択可能です。
 
@@ -28,40 +26,37 @@ LogicHive は、この「コードの書き捨て」を防ぐための MCP (Mode
 
 ---
 
-## インストール方法 (Zero Friction)
+## インストール方法 (Fast & Zero-Config)
 
-本システムは **TypeScript プロキシ** を介して提供されるため、複雑なバックエンド環境の構築は意識させません。<br>
-Node.js (v18+) がインストールされていれば、以下のコマンドだけでエディタに登録・使用可能です。
+手動の設定（URLのコピーやパスの入力）を完全に排除しました。ダウンロードして1つのコマンドを叩くだけで準備完了です。
 
-### 1. クラウドハブへ接続する場合（推奨：SaaSモード）
-
-GCP Cloud Run などでホストされている LogicHive Hub に接続します。
-詳細な手順は、[**SETUP_GUIDE.md**](./SETUP_GUIDE.md) をご覧ください。
-
-Cursor の場合：
-- **Name**: `LogicHive`
-- **Type**: `command`
-- **Command**: `npx -y @ayato-ai/function-store-mcp@latest --hub-url https://api.hive.ayato-studio.ai`
-
-### 2. 自分専用のクラウドハブを構築する場合 (BYOK)
-
-提供されている自動デプロイツールを使って、ご自身の GCP プロジェクトに数分でデプロイできます。
-
-**Step 1: 設定の準備**
-`.env.example` を `.env` にコピーし、ご自身の `FS_GEMINI_API_KEY` などを設定します。
+### 1. リポジトリをダウンロード
 ```bash
-cp .env.example .env
+git clone https://github.com/Ayato-AI-for-Auto/LogicHive.git
+cd function-store-mcp
 ```
 
-**Step 2: デプロイ**
-```powershell
-# GCPにログイン
-gcloud auth login
+### 2. セットアップの実行
+`npm` を使用して、設定ファイルを自動生成します（内部で `uv` を呼び出してPython環境をセットアップします）。
 
-# デプロイ (ご自身のプロジェクトIDを指定。APIキーは.envから読み込まれます)
-python dev_tools/deploy.py --project <YOUR_PROJECT_ID>
+```bash
+npm run setup
 ```
-デプロイ後に出力されるURLを、上記のエディタ設定(`--hub-url`)に使用してください。
+
+### 3. エディタ（Cursor / Gemini Desktop）への登録
+実行後、リポジトリルートに **`mcp_config_logic_hive.json`** が生成されます。
+
+1. Cursor等の設定画面 (Settings -> MCP) を開きます。
+2. 新しいサーバーを追加します。
+3. `mcp_config_logic_hive.json` に記載されている「Command」「Args」「Env」をそれぞれコピーして入力するか、JSONファイルをそのまま読み込ませてください。
+
+### 4. プロフェッショナル配布（Windows EXE / 爆速セットアップ）
+Python環境を手動で構築したくない場合は、GitHubのリリースページから **`LogicHive-Windows.zip`** をダウンロードして展開し、中にある **`LogicHive.exe`** をダブルクリックするだけです。
+
+1. **`LogicHive.exe` をクリック**: 初回起動時に設定が足りない場合、自動的にその場のパスを解析・セットアップし、完了メッセージを表示します。
+2. **エディタに登録**: 同じフォルダに生成された `mcp_config_logic_hive.json` を Cursor 等の設定画面に貼り付ける。
+
+**「ダウンロードして、クリックして、貼り付ける」だけの30秒体験** を提供します。
 
 ---
 

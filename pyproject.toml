@@ -5,41 +5,29 @@ description = "Draft-First Function Store MCP Server"
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=0.1.0",
-    "numpy",
     "duckdb",
-    "psutil", # For process management
-    "tqdm>=4.66.0", # Fix for TMonitor import error
-    "keyring", # For secure storage of API keys
-    "ruff>=0.1.0", # Quality Gate: Linter & Formatter
-    "pytest>=8.0.0", # Testing
+    "psutil",
+    "tqdm>=4.66.0",
+    "ruff>=0.1.0",
     "fastapi",
+    "uvicorn",
     "httpx",
-    "pytest-asyncio",
     "google-genai",
-    "bandit", # Security: Static analysis
-    "safety", # Security: Dependency vulnerability check
-    "qdrant-client", # High performance vector search
-    "python-dotenv", # BYOK: Load .env files
+    "bandit",
+    "safety",
+    "python-dotenv",
 ]
 
 [project.scripts]
-mcp-server-function-store = "mcp_core.server:main"
+mcp-server-function-store = "edge.mcp_server:main"
+logic-hive-setup = "dev_tools.setup_mcp:main"
 
-[tool.ruff]
-line-length = 88
-target-version = "py310"
-exclude = ["mcp_servers", ".gemini", ".agent", ".venv", "env_test_draft"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "W"]
-ignore = ["W292", "E501", "W291", "W293"]
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["core", "hub", "edge"]
 
 [tool.pytest.ini_options]
 testpaths = ["dev_tools/tests"]
 pythonpath = ["backend"]
 asyncio_mode = "auto"
 addopts = "--basetemp=dev_tools/tests/test_data"
-
-[tool.setuptools.packages.find]
-where = ["backend"]
-include = ["mcp_core*"]

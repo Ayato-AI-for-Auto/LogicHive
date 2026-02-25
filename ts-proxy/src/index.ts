@@ -7,10 +7,46 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import duckdb from "duckdb";
+import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "../../");
 const DB_PATH = path.join(ROOT_DIR, "functions.duckdb");
+
+// Load local .env from project root
+const ROOT_ENV_PATH = path.join(ROOT_DIR, ".env");
+if (fs.existsSync(ROOT_ENV_PATH)) {
+    dotenv.config({ path: ROOT_ENV_PATH });
+}
+
+// Hub URL and API Key
+const GEMINI_API_KEY = process.env.FS_GEMINI_API_KEY || "";
+
+/**
+ * Calls Gemini API locally using the user's key.
+ * Used for Reverse Intelligence Flow.
+ */
+async function callGeminiLocally(prompt: string): Promise<string> {
+    if (!GEMINI_API_KEY) {
+        throw new Error("Local Gemini API Key (FS_GEMINI_API_KEY) is missing.");
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+        })
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Local Gemini Call Failed: ${err}`);
+    }
+
+    const data: any = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
 
 // Hub URL from arguments or environment
 const args = process.argv.slice(2);
@@ -247,25 +283,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 // 1. Initial Local Save (Pending)
                 await localDb.saveFunction({ ...args, status: "pending" });
 
-                // 2. Cloud Intelligence (Verification, Quality, Dependency Analysis)
+                // 2. Cloud Intelligence - Step A: Get Verification Prompt
                 try {
-                    const response = await fetch(`${HUB_URL}/api/v1/intelligence/verify`, {
+                    const promptRes = await fetch(`${HUB_URL}/api/v1/intelligence/verify/get-prompt`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(args)
                     });
-                    if (response.ok) {
-                        const intellectResult = await response.json();
-                        // 3. Update Local DB with Intelligence results
+                    if (!promptRes.ok) throw new Error("Could not retrieve verification prompt.");
+                    const { prompt } = await promptRes.json();
+
+                    // 3. Local Execution - Execute verification locally
+                    const llmOutput = await callGeminiLocally(prompt);
+
+                    // 4. Cloud Intelligence - Step B: Finalize Verification
+                    const finalizeRes = await fetch(`${HUB_URL}/api/v1/intelligence/verify/finalize`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: args?.name,
+                            code: args?.code,
+                            llm_output: llmOutput,
+                            description: args?.description,
+                            dependencies: args?.dependencies
+                        })
+                    });
+
+                    if (finalizeRes.ok) {
+                        const intellectResult = await finalizeRes.json();
+                        // 5. Update Local DB with Intelligence results
                         await localDb.saveFunction({
                             name: args?.name,
-                            ...intellectResult,
+                            ...intellectResult.metadata,
                             status: intellectResult.status || "verified"
                         });
-                        return { content: [{ type: "text", text: `SUCCESS: Function '${args?.name}' saved and verified via Cloud.` }] };
+                        return { content: [{ type: "text", text: `SUCCESS (Reverse Intelligence): Function '${args?.name}' saved and verified safely.` }] };
                     }
                 } catch (e) {
-                    return { content: [{ type: "text", text: `WARNING: Saved locally as 'pending', but Cloud verification failed: ${e}` }] };
+                    return { content: [{ type: "text", text: `WARNING: Saved locally as 'pending', but Cloud Verification failed: ${e instanceof Error ? e.message : String(e)}` }] };
                 }
                 return { content: [{ type: "text", text: `SUCCESS: Saved locally as 'pending'.` }] };
             }
@@ -277,21 +332,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     return { content: [{ type: "text", text: "No matching functions found locally." }] };
                 }
 
-                // 2. Cloud Intelligence (Semantic Reranking)
-                const cloudRes = await fetch(`${HUB_URL}/api/v1/intelligence/rerank`, {
+                // 2. Cloud Intelligence - Step A: Get Secret Prompt (Zero-Trust)
+                const promptRes = await fetch(`${HUB_URL}/api/v1/intelligence/rerank/get-prompt`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ query: args?.query, candidates })
                 });
 
-                if (!cloudRes.ok) throw new Error("Cloud Reranking failed.");
+                if (!promptRes.ok) throw new Error("Could not retrieve Rerank Prompt from Cloud Hub.");
+                const { prompt } = await promptRes.json();
+
+                // 3. Local Execution - Execution: Client calls LLM locally (API Key safe!)
+                const llmOutput = await callGeminiLocally(prompt);
+
+                // 4. Cloud Intelligence - Step B: Finalize Decision (Zero-Trust)
+                const cloudRes = await fetch(`${HUB_URL}/api/v1/intelligence/rerank/finalize`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ candidates, llm_output: llmOutput })
+                });
+
+                if (!cloudRes.ok) throw new Error("Cloud Reranking finalization failed.");
                 const { selected_name } = await cloudRes.json();
 
-                // 3. Local Retrieval & Injection
+                if (!selected_name || selected_name === "NONE") {
+                    return { content: [{ type: "text", text: "Cloud Intelligence could not find a definitive match." }] };
+                }
+
+                // 5. Local Retrieval & Injection
                 const details = await localDb.getFunctionDetails(selected_name);
                 if (!details) throw new Error("Selected function disappeared from Local DB.");
 
-                // Fake injection for now (simulating do_inject_impl)
                 const targetDir = (args?.target_dir as string) || "./";
                 const pkgDir = path.join(process.cwd(), targetDir, "local_pkg");
                 if (!fs.existsSync(pkgDir)) fs.mkdirSync(pkgDir, { recursive: true });
@@ -300,7 +371,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                         type: "text",
-                        text: `SUCCESS: Selected '${selected_name}' via Cloud Intelligence.\nInjected into ${targetDir}/local_pkg/`
+                        text: `SUCCESS (Reverse Intelligence): Selected '${selected_name}' via Hub logic.\nInjected into ${targetDir}/local_pkg/\n[Security Note: API Key remained local throughout.]`
                     }]
                 };
             }
@@ -318,6 +389,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function main() {
     await localDb.init();
+
+    // Security check: Warn if remote Hub is used without HTTPS
+    if (HUB_URL.startsWith("http://") && !HUB_URL.includes("localhost") && !HUB_URL.includes("127.0.0.1")) {
+        console.warn("\x1b[33m%s\x1b[0m", "SECURITY WARNING: You are connecting to a remote Hub via insecure HTTP.");
+        console.warn("\x1b[33m%s\x1b[0m", "Your API Key will be sent unencrypted. Please use HTTPS for remote deployments.");
+    }
+
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error(`Function Store Hybrid Proxy running. Hub: ${HUB_URL}`);
