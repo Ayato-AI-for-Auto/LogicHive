@@ -1,40 +1,30 @@
 # --- Stage 1: Builder ---
-FROM python:3.12-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
+ENV UV_COMPILE_BYTECODE=1    
 WORKDIR /app
 
-# Install uv
-RUN pip install uv
-
-# Copy only dependency and source files needed for installation
-COPY pyproject.toml .
-COPY backend ./backend
-
-# Install dependencies (system-wide inside the builder, we will copy the packages)
-# Note: uv pip install --system is usually easiest, but we want a venv for clean copying
-RUN uv venv && . .venv/bin/activate && uv pip install .
+# Pure Stateless Hub requires strictly minimal dependencies.
+# We explicitly EXCLUDE heavy Edge packages like duckdb, google-genai, and fastmcp.
+RUN uv venv && uv pip install fastapi uvicorn PyGithub python-dotenv ruff bandit safety httpx
 
 # --- Stage 2: Runtime ---
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy the pre-built, ultra-light virtual environment
 COPY --from=builder /app/.venv /app/.venv
 
-# Copy the backend source code
+# Copy only the necessary backend source logic
 COPY backend /app/backend
 
-# Set environment variables
+# Configure Env
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/backend"
 ENV FS_HOST=0.0.0.0
 ENV FS_PORT=8080
-ENV FS_TRANSPORT=http
-ENV FS_DATA_DIR=/tmp/logic_hive
 
-# Expose the Cloud Run default port
 EXPOSE 8080
 
-# Run the backend server as a module
 CMD ["python", "-m", "hub.app"]
