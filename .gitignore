@@ -89,7 +89,5 @@ Thumbs.db
 !*.bat
 !*.sh
 
-# Hub Confidential Intelligence (IP Protection)
-backend/hub/
+# Core Secrets (IP Protection)
 backend/core/config.py
-backend/core/models.py
