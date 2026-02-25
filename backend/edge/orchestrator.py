@@ -123,44 +123,98 @@ def do_save_impl(
 def run_background_maintenance(
     f_name, f_code, f_desc, f_tags, f_deps, f_tests, skip_verify
 ):
-    """Local indexing + background tasks."""
+    """Local indexing + background tasks (Test Execution)."""
     try:
+        # 1. Vector Database Indexing
         txt = f"Name: {f_name}\nDesc: {f_desc}\nTags: {f_tags}\nCode:\n{f_code[:500]}"
         emb = embedding_service.get_embedding(txt)
         v_list = emb.tolist()
-
         get_vector_db().upsert_function(f_name, v_list, {"name": f_name})
 
+        # 2. Test Execution (Phase 2: Verified-First Enforcement)
+        status = "verified"
+        if f_tests and not skip_verify:
+            logger.info(f"Running verification tests for '{f_name}'...")
+            try:
+                # Assuming main.py is running on 8080 locally for verification
+                exec_url = "http://localhost:8080/execute" 
+                # Note: In a real deploy, orchestration might point to a specific internal URL
+                
+                with httpx.Client(timeout=35.0) as client:
+                    resp = client.post(
+                        exec_url,
+                        json={"code": f_code, "test_cases": f_tests},
+                        headers={"X-API-Key": "PRO-MOCK-KEY-123"} # Mock key for local verification
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("status") == "success":
+                            logger.info(f"Tests passed for '{f_name}'.")
+                            status = "verified"
+                        else:
+                            logger.warning(f"Tests failed for '{f_name}': {data.get('error')}")
+                            status = "failed"
+                    else:
+                        logger.error(f"Execution server error ({resp.status_code}) for '{f_name}'")
+                        status = "error_internal"
+            except Exception as e:
+                logger.error(f"Failed to call execution server: {e}")
+                status = "error_internal"
+        elif not f_tests and not skip_verify:
+            # If no tests provided, we can't fully "verify" in the new policy, but let's mark as pending_tests
+            status = "pending_tests"
+
+        # 3. Update DuckDB Status
         with DBWriteLock():
             conn = get_db_connection()
             try:
                 conn.execute(
-                    "UPDATE functions SET status = 'verified', updated_at = CURRENT_TIMESTAMP WHERE name = ?",
-                    (f_name,),
+                    "UPDATE functions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?",
+                    (status, f_name),
                 )
                 conn.commit()
             finally:
                 conn.close()
+                
     except Exception as e:
-        logger.error(f"Background Error: {e}")
+        logger.error(f"Background Maintenance Error for '{f_name}': {e}")
 
 
 def do_search_impl(query: str, limit: int = 5) -> List[Dict]:
-    """Pure local search."""
+    """Pure local search with 'Verified' boosting."""
     emb = embedding_service.get_embedding(query).tolist()
     search_results = get_vector_db().search(emb, limit=limit)
 
     results = []
-    for point in search_results:
-        p = point.payload
-        results.append(
-            {
-                "name": p.get("name"),
-                "score": float(point.score),
-                "description": p.get("description", ""),
-            }
-        )
-    return results
+    conn = get_db_connection()
+    try:
+        for point in search_results:
+            p = point.payload
+            name = p.get("name")
+            
+            # Fetch status for badge/boosting
+            row = conn.execute("SELECT status FROM functions WHERE name = ?", (name,)).fetchone()
+            status = row[0] if row else "unknown"
+            
+            # Boost score if verified
+            score = float(point.score)
+            if status == "verified":
+                score *= 1.2 # 20% boost for verified functions
+
+            results.append(
+                {
+                    "name": name,
+                    "score": score,
+                    "status": status,
+                    "description": p.get("description", ""),
+                }
+            )
+        
+        # Re-sort based on boosted score
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:limit]
+    finally:
+        conn.close()
 
 
 def _resolve_bundle(name: str, visited: Set[str], codes: List[str]):
@@ -259,11 +313,29 @@ def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
 
     selected_name = candidates[0]["name"]
     try:
-        with httpx.Client(timeout=10.0) as client:
-            # Hub logic would go here in full production
-            pass
+        hub_rerank_url = f"{HUB_URL.rstrip('/')}/api/v1/intelligence/rerank/direct"
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(
+                hub_rerank_url,
+                json={
+                    "query": query,
+                    "candidates": [
+                        {"name": c["name"], "description": c.get("description", ""), "tags": c.get("tags", [])}
+                        for c in candidates
+                    ]
+                }
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("selected_name"):
+                    selected_name = data["selected_name"]
+                    logger.info(f"Edge: Hub selected '{selected_name}' as best match.")
+            elif resp.status_code == 429:
+                logger.warning("Edge: Hub is rate limited. Falling back to local top match.")
+            else:
+                logger.error(f"Edge: Hub rerank failed ({resp.status_code}): {resp.text}")
     except Exception as e:
-        logger.warning(f"Hub Hub Rerank skipped: {e}")
+        logger.warning(f"Edge: Hub Rerank failed (network/other): {e}. Falling back to local top match.")
 
     from edge.generator import PackageGenerator
 

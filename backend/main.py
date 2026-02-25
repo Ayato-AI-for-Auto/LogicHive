@@ -100,6 +100,21 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
             status_code=403, detail="Invalid API Key or Pro Subscription Required"
         )
 
+    # --- Phase 1: Security Enforcement ---
+    from core.security import ASTSecurityChecker, _contains_secrets
+
+    # 1. Secret Detection
+    has_secret, secret_val = _contains_secrets(request.code)
+    if has_secret:
+        logger.warning(f"Execution blocked: Secret detected.")
+        return ExecutionResponse(status="error", error="Security Violation: Secrets/API Keys detected in code.")
+
+    # 2. AST Static Analysis
+    is_safe, reason = ASTSecurityChecker.check(request.code)
+    if not is_safe:
+        logger.warning(f"Execution blocked: {reason}")
+        return ExecutionResponse(status="error", error=f"Security Violation: {reason}")
+
     logger.info(
         f"Executing code (len: {len(request.code)}) with {len(request.test_cases)} test cases."
     )
@@ -111,8 +126,10 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
         runner_path.write_text(runner_code, encoding="utf-8")
 
         try:
+            # Note: subprocess.run is still used because this is a separate process runner.
+            # The code inside the runner is exec'd in the runner's own namespace.
             result = subprocess.run(
-                [sys.executable, str(runner_path)],
+                [sys.executable, "-S", str(runner_path)],  # "-S" disables site-packages for minimal isolation
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -125,7 +142,12 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
                 )
 
             try:
-                output = json.loads(result.stdout.strip().splitlines()[-1])
+                # Expect JSON output from the runner
+                raw_out = result.stdout.strip()
+                if not raw_out:
+                    return ExecutionResponse(status="error", error="No output from runner.")
+                
+                output = json.loads(raw_out.splitlines()[-1])
                 return ExecutionResponse(**output)
             except (json.JSONDecodeError, IndexError) as e:
                 logger.error(f"JSON Parse Error: {result.stdout}")
