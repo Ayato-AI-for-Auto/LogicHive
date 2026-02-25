@@ -99,6 +99,8 @@ def main():
         args.service,
         "--source",
         ".",
+        "--dockerfile",
+        "backend/hub/Dockerfile",
         "--region",
         args.region,
         "--platform",
