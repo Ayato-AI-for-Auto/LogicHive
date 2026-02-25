@@ -1,7 +1,7 @@
 [project]
-name = "function-store-mcp"
+name = "logic-hive"
 version = "0.1.0"
-description = "Draft-First Function Store MCP Server"
+description = "LogicHive: Draft-First AI-Native Function Repository"
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=0.1.0",
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-server-function-store = "edge.mcp_server:main"
+logic-hive = "edge.mcp_server:main"
 logic-hive-setup = "dev_tools.setup_mcp:main"
 
 [tool.setuptools.packages.find]

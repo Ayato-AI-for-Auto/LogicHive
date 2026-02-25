@@ -35,7 +35,7 @@ from edge.orchestrator import (
 )
 
 # Initialize FastMCP
-mcp = FastMCP("function-store", dependencies=["duckdb", "fastembed"])
+mcp = FastMCP("LogicHive", dependencies=["duckdb", "fastembed"])
 
 # ----------------------------------------------------------------------
 # MCP Tools (Direct Local Execution)

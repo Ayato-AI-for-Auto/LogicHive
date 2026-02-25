@@ -10,7 +10,7 @@ from core.config import HOST, PORT
 logger = logging.getLogger("hub_app")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="LogicHive Hub: Pure Stateless Logic Engine")
+app = FastAPI(title="LogicHive Hub")
 
 # --- DATA MODELS ---
 

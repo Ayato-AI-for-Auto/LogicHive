@@ -13,9 +13,9 @@ from pydantic import BaseModel
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("solo-mcp-executor")
+logger = logging.getLogger("LogicHive")
 
-app = FastAPI(title="Solo-MCP Cloud Executor")
+app = FastAPI(title="LogicHive")
 
 
 class ExecutionRequest(BaseModel):
