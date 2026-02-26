@@ -12,6 +12,7 @@ from core.quality import QualityGate
 from core.sanitizer import DataSanitizer
 from edge.worker import task_worker
 import httpx
+from edge.global_search import global_search
 
 logger = logging.getLogger(__name__)
 
@@ -306,12 +307,21 @@ def do_list_impl(limit: int = 100) -> List[Dict]:
 
 
 def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
-    """Hybrid: Local Search -> Hub Rerank -> Local Injection."""
-    candidates = do_search_impl(query, limit=5)
+    """Hybrid: Global Search -> Hub Rerank -> Local Injection."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    
+    # 1. Global Semantic Search (Metadata Only)
+    candidates = loop.run_until_complete(global_search.search(query, limit=5))
     if not candidates:
-        return {"status": "error", "message": "No local candidates found."}
+        logger.warning("Edge: No global candidates found. Trying local...")
+        candidates = do_search_impl(query, limit=5)
+        
+    if not candidates:
+        return {"status": "error", "message": "No candidates found (Global or Local)."}
 
     selected_name = candidates[0]["name"]
+    # 2. Hub Rerank
     try:
         hub_rerank_url = f"{HUB_URL.rstrip('/')}/api/v1/intelligence/rerank/direct"
         with httpx.Client(timeout=30.0) as client:
@@ -329,17 +339,23 @@ def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
                 data = resp.json()
                 if data.get("selected_name"):
                     selected_name = data["selected_name"]
-                    logger.info(f"Edge: Hub selected '{selected_name}' as best match.")
             elif resp.status_code == 429:
-                logger.warning("Edge: Hub is rate limited. Falling back to local top match.")
-            else:
-                logger.error(f"Edge: Hub rerank failed ({resp.status_code}): {resp.text}")
+                logger.warning("Edge: Hub reranker rate limited.")
     except Exception as e:
-        logger.warning(f"Edge: Hub Rerank failed (network/other): {e}. Falling back to local top match.")
+        logger.warning(f"Edge: Hub Rerank failed: {e}")
+
+    # 3. Retrieve FULL CODE (New Step for Security Masking)
+    full_data = loop.run_until_complete(global_search.get_details(selected_name))
+    if not full_data or "code" not in full_data:
+        # Check local if hub fails
+        code = do_get_impl(selected_name)
+    else:
+        code = full_data["code"]
+
+    if not code or "not found" in str(code).lower():
+         return {"status": "error", "message": f"Could not retrieve code for '{selected_name}'"}
 
     from edge.generator import PackageGenerator
-
-    code = do_get_impl(selected_name)
     inject_res = PackageGenerator.inject_package(
         target_dir, [{"name": selected_name, "code": code}]
     )

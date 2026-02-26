@@ -17,6 +17,7 @@ dependencies = [
     "safety",
     "python-dotenv",
     "gitpython",
+    "supabase",
 ]
 
 [project.scripts]

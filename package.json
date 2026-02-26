@@ -1,17 +1,16 @@
 {
     "name": "logic-hive-mcp",
     "version": "2.0.0",
-    "description": "LogicHive Hybrid MCP Server (Local DB + Cloud Logic)",
+    "description": "LogicHive AI-Native Function Repository (Python FastMCP)",
     "scripts": {
         "setup": "uv run logic-hive-setup",
-        "build": "cd ts-proxy && npm install && npm run build",
-        "start": "cd ts-proxy && npm run start"
+        "start": "uv run logic-hive"
     },
     "keywords": [
         "mcp",
         "python",
-        "typescript",
-        "hybrid-ai"
+        "fastmcp",
+        "logic-hive"
     ],
     "author": "Ayato AI",
     "license": "ISC"

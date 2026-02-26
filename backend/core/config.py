@@ -104,3 +104,6 @@ GITHUB_TOKEN = get_setting("FS_GITHUB_TOKEN", "")
 GITHUB_STORAGE_REPO = get_setting(
     "FS_GITHUB_STORAGE_REPO", "Ayato-AI-for-Auto/LogicHive-Storage"
 )
+# Supabase Storage (LogicHive Hub persistence)
+SUPABASE_URL = get_setting("SUPABASE_URL", "")
+SUPABASE_SERVICE_ROLE_KEY = get_setting("SUPABASE_SERVICE_ROLE_KEY", "")
