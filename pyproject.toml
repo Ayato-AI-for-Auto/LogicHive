@@ -18,6 +18,8 @@ dependencies = [
     "python-dotenv",
     "gitpython",
     "supabase",
+    "pytest",
+    "pytest-asyncio",
 ]
 
 [project.scripts]
@@ -29,7 +31,7 @@ where = ["backend"]
 include = ["core", "hub", "edge"]
 
 [tool.pytest.ini_options]
-testpaths = ["dev_tools/tests"]
+testpaths = ["dev_tools/testing/tests"]
 pythonpath = ["backend"]
 asyncio_mode = "auto"
 addopts = "--basetemp=dev_tools/tests/test_data"
