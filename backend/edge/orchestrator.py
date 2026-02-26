@@ -138,14 +138,16 @@ def run_background_maintenance(
             logger.info(f"Running verification tests for '{f_name}'...")
             try:
                 # Assuming main.py is running on 8080 locally for verification
-                exec_url = "http://localhost:8080/execute" 
+                exec_url = "http://localhost:8080/execute"
                 # Note: In a real deploy, orchestration might point to a specific internal URL
-                
+
                 with httpx.Client(timeout=35.0) as client:
                     resp = client.post(
                         exec_url,
                         json={"code": f_code, "test_cases": f_tests},
-                        headers={"X-API-Key": "PRO-MOCK-KEY-123"} # Mock key for local verification
+                        headers={
+                            "X-API-Key": "PRO-MOCK-KEY-123"
+                        },  # Mock key for local verification
                     )
                     if resp.status_code == 200:
                         data = resp.json()
@@ -153,10 +155,14 @@ def run_background_maintenance(
                             logger.info(f"Tests passed for '{f_name}'.")
                             status = "verified"
                         else:
-                            logger.warning(f"Tests failed for '{f_name}': {data.get('error')}")
+                            logger.warning(
+                                f"Tests failed for '{f_name}': {data.get('error')}"
+                            )
                             status = "failed"
                     else:
-                        logger.error(f"Execution server error ({resp.status_code}) for '{f_name}'")
+                        logger.error(
+                            f"Execution server error ({resp.status_code}) for '{f_name}'"
+                        )
                         status = "error_internal"
             except Exception as e:
                 logger.error(f"Failed to call execution server: {e}")
@@ -176,7 +182,7 @@ def run_background_maintenance(
                 conn.commit()
             finally:
                 conn.close()
-                
+
     except Exception as e:
         logger.error(f"Background Maintenance Error for '{f_name}': {e}")
 
@@ -192,15 +198,17 @@ def do_search_impl(query: str, limit: int = 5) -> List[Dict]:
         for point in search_results:
             p = point.payload
             name = p.get("name")
-            
+
             # Fetch status for badge/boosting
-            row = conn.execute("SELECT status FROM functions WHERE name = ?", (name,)).fetchone()
+            row = conn.execute(
+                "SELECT status FROM functions WHERE name = ?", (name,)
+            ).fetchone()
             status = row[0] if row else "unknown"
-            
+
             # Boost score if verified
             score = float(point.score)
             if status == "verified":
-                score *= 1.2 # 20% boost for verified functions
+                score *= 1.2  # 20% boost for verified functions
 
             results.append(
                 {
@@ -210,7 +218,7 @@ def do_search_impl(query: str, limit: int = 5) -> List[Dict]:
                     "description": p.get("description", ""),
                 }
             )
-        
+
         # Re-sort based on boosted score
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]
@@ -309,14 +317,15 @@ def do_list_impl(limit: int = 100) -> List[Dict]:
 def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
     """Hybrid: Global Search -> Hub Rerank -> Local Injection."""
     import asyncio
+
     loop = asyncio.get_event_loop()
-    
+
     # 1. Global Semantic Search (Metadata Only)
     candidates = loop.run_until_complete(global_search.search(query, limit=5))
     if not candidates:
         logger.warning("Edge: No global candidates found. Trying local...")
         candidates = do_search_impl(query, limit=5)
-        
+
     if not candidates:
         return {"status": "error", "message": "No candidates found (Global or Local)."}
 
@@ -330,10 +339,14 @@ def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
                 json={
                     "query": query,
                     "candidates": [
-                        {"name": c["name"], "description": c.get("description", ""), "tags": c.get("tags", [])}
+                        {
+                            "name": c["name"],
+                            "description": c.get("description", ""),
+                            "tags": c.get("tags", []),
+                        }
                         for c in candidates
-                    ]
-                }
+                    ],
+                },
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -353,9 +366,13 @@ def do_smart_get_impl(query: str, target_dir: str = "./") -> Dict:
         code = full_data["code"]
 
     if not code or "not found" in str(code).lower():
-         return {"status": "error", "message": f"Could not retrieve code for '{selected_name}'"}
+        return {
+            "status": "error",
+            "message": f"Could not retrieve code for '{selected_name}'",
+        }
 
     from edge.generator import PackageGenerator
+
     inject_res = PackageGenerator.inject_package(
         target_dir, [{"name": selected_name, "code": code}]
     )

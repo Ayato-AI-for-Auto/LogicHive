@@ -8,6 +8,15 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from core.config import TRANSPORT
+from edge.orchestrator import (
+    do_save_impl,
+    do_search_impl,
+    do_get_impl,
+    do_get_details_impl,
+    do_delete_impl,
+    do_list_impl,
+    do_smart_get_impl,
+)
 
 
 def setup_logging(is_frozen: bool, project_root: Path):
@@ -24,17 +33,6 @@ def setup_logging(is_frozen: bool, project_root: Path):
         logging.getLogger().addHandler(file_handler)
         logging.info(f"Logging initialized. Log file: {log_file}")
 
-
-# Import local stateful orchestrator
-from edge.orchestrator import (
-    do_save_impl,
-    do_search_impl,
-    do_get_impl,
-    do_get_details_impl,
-    do_delete_impl,
-    do_list_impl,
-    do_smart_get_impl,
-)
 
 # Initialize FastMCP
 mcp = FastMCP("LogicHive", dependencies=["duckdb", "fastembed"])

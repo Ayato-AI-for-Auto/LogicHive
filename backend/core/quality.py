@@ -99,7 +99,7 @@ class RuffProcessor:
             if tmp_path and os.path.exists(tmp_path):
                 try:
                     os.remove(tmp_path)
-                except:
+                except Exception:
                     pass
 
     @staticmethod
@@ -134,7 +134,7 @@ class RuffProcessor:
             if tmp_path and os.path.exists(tmp_path):
                 try:
                     os.remove(tmp_path)
-                except:
+                except Exception:
                     pass
 
 

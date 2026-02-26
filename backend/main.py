@@ -106,8 +106,11 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
     # 1. Secret Detection
     has_secret, secret_val = _contains_secrets(request.code)
     if has_secret:
-        logger.warning(f"Execution blocked: Secret detected.")
-        return ExecutionResponse(status="error", error="Security Violation: Secrets/API Keys detected in code.")
+        logger.warning("Execution blocked: Secret detected.")
+        return ExecutionResponse(
+            status="error",
+            error="Security Violation: Secrets/API Keys detected in code.",
+        )
 
     # 2. AST Static Analysis
     is_safe, reason = ASTSecurityChecker.check(request.code)
@@ -129,7 +132,11 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
             # Note: subprocess.run is still used because this is a separate process runner.
             # The code inside the runner is exec'd in the runner's own namespace.
             result = subprocess.run(
-                [sys.executable, "-S", str(runner_path)],  # "-S" disables site-packages for minimal isolation
+                [
+                    sys.executable,
+                    "-S",
+                    str(runner_path),
+                ],  # "-S" disables site-packages for minimal isolation
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -145,8 +152,10 @@ async def execute(request: ExecutionRequest, x_api_key: Optional[str] = Header(N
                 # Expect JSON output from the runner
                 raw_out = result.stdout.strip()
                 if not raw_out:
-                    return ExecutionResponse(status="error", error="No output from runner.")
-                
+                    return ExecutionResponse(
+                        status="error", error="No output from runner."
+                    )
+
                 output = json.loads(raw_out.splitlines()[-1])
                 return ExecutionResponse(**output)
             except (json.JSONDecodeError, IndexError) as e:
