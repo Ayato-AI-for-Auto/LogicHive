@@ -5,7 +5,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.absolute()
 sys.path.append(str(project_root / "backend"))
 
-from core.setup import generate_config
+from core.setup import generate_config  # noqa: E402
 
 
 def main():

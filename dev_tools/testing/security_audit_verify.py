@@ -17,8 +17,8 @@ if str(backend_dir) not in sys.path:
 os.environ["FS_DB_NAME"] = "test_audit.duckdb"
 os.environ["FS_SYNC_LOCAL_DIR"] = str(repo_root / "data" / "test_hub_cache")
 
-from edge.sync import GitHubSyncEngine
-from core.database import init_db
+from edge.sync import GitHubSyncEngine  # noqa: E402
+from core.database import init_db  # noqa: E402
 
 # Configure logging to see what's happening
 logging.basicConfig(level=logging.INFO)
