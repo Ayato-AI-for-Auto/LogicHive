@@ -34,4 +34,4 @@ include = ["core", "hub", "edge"]
 testpaths = ["dev_tools/testing/tests"]
 pythonpath = ["backend"]
 asyncio_mode = "auto"
-addopts = "--basetemp=dev_tools/tests/test_data"
+addopts = "--basetemp=dev_tools/testing/tests/test_data"
