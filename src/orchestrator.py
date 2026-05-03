@@ -213,12 +213,12 @@ async def do_save_async(
     name: str,
     code: str,
     description: str = "",
-    tags: list[str] = [],
+    tags: list[str] | None = None,
     language: str = "python",
-    dependencies: list[str] = [],
+    dependencies: list[str] | None = None,
     test_code: str = "",
     project: str = "default",
-    mock_imports: list[str] = [],
+    mock_imports: list[str] | None = None,
     timeout: int | None = None,
 ):
     """
@@ -227,6 +227,12 @@ async def do_save_async(
     2. Saves with 'pending' status.
     3. Kicks off background verification and returns immediately.
     """
+    if tags is None:
+        tags = []
+    if dependencies is None:
+        dependencies = []
+    if mock_imports is None:
+        mock_imports = []
     # 1. Deduplication Check
     code_hash = calculate_code_hash(code)
     existing = await sqlite_storage.get_function_by_hash(code_hash, project)
