@@ -1,21 +1,24 @@
 # Function Store REST API (Simplified Personal MVP)
 
+import time
+import uuid
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
-import uuid
-import time
-from core.logging_config import current_run_id, get_logger
-
-logger = get_logger(__name__)
 
 from core.exceptions import LogicHiveError, ValidationError
+from core.logging_config import current_run_id, get_logger
 from orchestrator import (
     do_get_async,
     do_save_async,
     do_search_async,
 )
+
+logger = get_logger(__name__)
+
 
 app = FastAPI(
     title="LogicHive API",
@@ -23,15 +26,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
 class TraceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         token = current_run_id.set(req_id)
         start_time = time.perf_counter()
-        
+
         # We don't use bound logger here directly because the patcher will pick up the context var
         logger.info(f"API Request START: {request.method} {request.url.path}")
-        
+
         try:
             response = await call_next(request)
             latency = time.perf_counter() - start_time
@@ -45,6 +49,7 @@ class TraceMiddleware(BaseHTTPMiddleware):
         finally:
             if token:
                 current_run_id.reset(token)
+
 
 app.add_middleware(TraceMiddleware)
 
@@ -114,8 +119,10 @@ async def get_function(function_name: str):
         if not result:
             raise HTTPException(status_code=404, detail="Not found")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.post("/functions/search")
@@ -125,7 +132,7 @@ async def search(query: SearchQuery):
         results = await do_search_async(query.query, query.limit or 5)
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
