@@ -26,3 +26,15 @@ class DependencyExtractionError(LogicHiveError):
     """Raised when dependency extraction fails critically."""
 
     pass
+
+
+class QualityGateError(ValidationError):
+    """Raised when a code asset fails the Quality Gate check."""
+
+    pass
+
+
+class SyntaxValidationError(QualityGateError):
+    """Raised specifically for syntax errors detected during pre-save validation."""
+
+    pass

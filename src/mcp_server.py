@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 
 import orchestrator
-from core.exceptions import LogicHiveError, ValidationError
+from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
 from orchestrator import (
     do_delete_async,
     do_get_verification_status,
@@ -206,6 +206,25 @@ async def save_function(
             if success
             else "Failed to initiate save (Unknown Error)"
         )
+    except SyntaxValidationError as e:
+        # User feedback Tip #3: Prominent Syntax Error Reporting
+        details = e.details or {}
+        eval_details = details.get("eval_details", {}).get("static_analysis", {})
+        inner_details = eval_details.get("details", {})
+        
+        line = inner_details.get("line", "?")
+        offset = inner_details.get("offset", "?")
+        text = inner_details.get("text", "N/A")
+        
+        md = [
+            f"### ❌ IMMEDIATE REJECTION: Syntax Error",
+            f"**Message**: {str(e)}",
+            f"- **Line**: {line}",
+            f"- **Offset**: {offset}",
+            f"\n**Context**:\n```python\n{text.strip()}\n```",
+            "\nPlease correct the syntax before attempting to save again."
+        ]
+        return "\n".join(md)
     except ValidationError as e:
         # Extract rich details for better transparency (User feedback Tip #1)
         details = e.details or {}
@@ -354,18 +373,21 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
         # 2. Vector Store Check
         faiss_exists = os.path.exists(FAISS_INDEX_PATH)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Loaded' if faiss_exists else '⚠️ Missing (Will rebuild on search)'}"
+            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
         )
 
         if faiss_exists and db_exists:
-            # Check for sync (simplified count check)
-            idx_size = vector_manager.index.ntotal if vector_manager.index else 0
-            if idx_size != count:
-                status.append(
-                    f"- **Desync Detected**: DB({count}) vs FAISS({idx_size}). Rebuild recommended."
-                )
+            # Check for memory sync (Silent check for initialization)
+            if not vector_manager._initialized:
+                status.append("- **Memory State**: 💤 Uninitialized (Will load on first search)")
             else:
-                status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors)")
+                idx_size = vector_manager.index.ntotal if vector_manager.index else 0
+                if idx_size != count:
+                    status.append(
+                        f"- **Desync Detected**: DB({count}) vs FAISS-Memory({idx_size}). Rebuild recommended."
+                    )
+                else:
+                    status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
 
         # 3. Environment Pool Check
         from core.execution.pool import PoolManager
@@ -436,6 +458,23 @@ async def get_verification_status(
         return md
     except Exception as e:
         return f"Error retrieving status: {str(e)}"
+
+
+@mcp.tool()
+async def rebuild_index(wait_for_previous: bool = False) -> str:
+    """
+    Forcefully rebuilds the FAISS vector index from all embeddings stored in the database.
+    Use this if 'check_integrity' reports a desync between DB and Vector Store.
+    """
+    from storage.vector_store import vector_manager
+
+    try:
+        logger.info("[TRACE] MCP: Tool 'rebuild_index' called.")
+        await vector_manager.rebuild_index()
+        return "Vector index has been successfully rebuilt from database records."
+    except Exception as e:
+        logger.error(f"MCP Server: Error in rebuild_index: {e}")
+        return f"LogicHive Error: Failed to rebuild index. Detail: {str(e)}"
 
 
 if __name__ == "__main__":

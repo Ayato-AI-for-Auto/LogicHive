@@ -138,7 +138,7 @@ class EvaluationManager:
             if struct_res.score == 0:
                 return {
                     "score": 0.0,
-                    "reason": f"Critical Failure: {struct_res.reason}",
+                    "reason": f"CRITICAL STRUCTURAL ERROR: {struct_res.reason}",
                     "details": {"structural": struct_res},
                     "is_system_error": struct_res.is_system_error,
                 }
@@ -219,6 +219,18 @@ class EvaluationManager:
         if det_res:
             det_score = det_res.score
             if det_score == 0:
+                # ABSOLUTE VETO: If PythonStatic found a syntax error, prioritize it over 'No assertions'
+                python_static = results.get("python_static")
+                if python_static and python_static.score == 0 and "Syntax Error" in python_static.reason:
+                    return {
+                        "score": 0.0,
+                        "reason": f"CRITICAL SYNTAX ERROR: {python_static.reason}",
+                        "details": {
+                            k: {"score": v.score, "reason": v.reason, "details": v.details}
+                            for k, v in results.items()
+                        },
+                    }
+
                 return {
                     "score": 0.0,
                     "reason": f"DETERMINISTIC REJECTION: {det_res.reason}",
@@ -240,6 +252,7 @@ class EvaluationManager:
                         k: {"score": v.score, "reason": v.reason, "details": v.details}
                         for k, v in results.items()
                     },
+                    "is_system_error": runtime_res.is_system_error,
                 }
             parts.append((runtime_score, 0.30, f"Runtime: {runtime_res.reason}"))
 

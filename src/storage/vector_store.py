@@ -86,7 +86,7 @@ class VectorIndexManager:
             await self.save_to_disk()
             logger.info("FAISS: Rebuilt index from DB.")
 
-    async def add_vector(self, name: str, embedding: list[float], project: str = "default"):
+    async def upsert_vector(self, name: str, embedding: list[float], project: str = "default"):
         async with self._lock:
             full_key = f"{project}:{name}"
             # 1. Basic validation

@@ -125,7 +125,7 @@ class SqliteStorage:
             emb = function_data.get("embedding")
             if emb is not None and isinstance(emb, list) and len(emb) > 0:
                 logger.info(f"[TRACE] SQLite: Adding vector for '{name}' to index.")
-                await vector_manager.add_vector(name, emb, project=project)
+                await vector_manager.upsert_vector(name, emb, project=project)
             else:
                 logger.debug(
                     f"[TRACE] SQLite: Skipping vector addition for '{name}' (no embedding provided)."

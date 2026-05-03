@@ -14,12 +14,16 @@ from core.config import (
 )
 from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
-from core.exceptions import ValidationError
+from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
 from storage.sqlite_api import sqlite_storage
 from storage.vector_store import vector_manager
 
 logger = logging.getLogger(__name__)
+
+# --- Resource Constraints ---
+# Limit concurrent search requests to prevent LLM pipeline instability
+search_semaphore = asyncio.Semaphore(3)
 
 # --- Helpers ---
 
@@ -227,7 +231,28 @@ async def do_save_async(
             f"Asset with identical logic is already registered as '{existing['name']}' in project '{project}'."
         )
 
-    # 2. Immediate Save (Pending)
+    # 2. Synchronous Syntax Check (Quality Gate Tip #1: Early Rejection)
+    if language.lower() == "python":
+        try:
+            ast.parse(code)
+        except SyntaxError as e:
+            logger.warning(f"Orchestrator: Synchronous syntax check failed for '{name}': {e}")
+            raise SyntaxValidationError(
+                f"Python Syntax Error: {e.msg} (Line {e.lineno})",
+                details={
+                    "score": 0.0,
+                    "reason": "Immediate Rejection: Invalid Python syntax.",
+                    "eval_details": {
+                        "static_analysis": {
+                            "score": 0.0,
+                            "reason": f"Syntax Error: {str(e)}",
+                            "details": {"line": e.lineno, "offset": e.offset, "text": e.text},
+                        }
+                    },
+                },
+            )
+
+    # 3. Immediate Save (Pending)
     from core.system_info import SystemFingerprint
 
     # Automatic Dependency Extraction (Immediate)
@@ -291,14 +316,15 @@ async def do_search_async(
     query: str, limit: int = 5, language: str | None = None, project: str = "default"
 ):
     """Asynchronous implementation for searching functions with Query Expansion and Re-ranking."""
-    intel = LogicIntelligence(GEMINI_API_KEY)
+    async with search_semaphore:
+        intel = LogicIntelligence(GEMINI_API_KEY)
 
-    expanded_query = await intel.expand_query(query)
-    query_emb = await intel.generate_embedding(expanded_query)
+        expanded_query = await intel.expand_query(query)
+        query_emb = await intel.generate_embedding(expanded_query)
 
-    logger.info(
-        f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project})"
-    )
+        logger.info(
+            f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project})"
+        )
 
     # 1. Fetch more candidates than requested for re-ranking (limit * 3)
     # Note: passing project to vector_manager for future-proofing internal filtering
