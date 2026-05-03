@@ -1,0 +1,21 @@
+# .lefthook/pre-commit/lint.yml
+pre-commit:
+  parallel: false
+  commands:
+    lint:
+      glob: "*.py"
+      run: ruff check --no-fix {staged_files}
+    format:
+      glob: "*.py"
+      run: ruff format --check {staged_files}
+    file-length-check:
+      run: |
+        for file in $(git diff --cached --name-only --diff-filter=ACM | grep '\.py$'); do
+          lines=$(wc -l < "$file")
+          if [ "$lines" -gt 800 ]; then
+            echo "Error: $file exceeds 800 lines ($lines lines)."
+            exit 1
+          elif [ "$lines" -gt 500 ]; then
+            echo "Warning: $file is large ($lines lines)."
+          fi
+        done

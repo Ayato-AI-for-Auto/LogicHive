@@ -68,7 +68,7 @@ class PoolManager:
 
         def _async_cleanup_orchestrator():
             """
-            Synchronous cleanup logic moved to a thread. 
+            Synchronous cleanup logic moved to a thread.
             Uses a 'rename-then-delete' strategy to make startup near-instant.
             """
             try:
@@ -77,10 +77,14 @@ class PoolManager:
                     cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
                     try:
                         self.base_dir.rename(cleanup_path)
-                        logger.info(f"PoolManager: Old pools moved to {cleanup_path.name} for background cleanup.")
+                        logger.info(
+                            f"PoolManager: Old pools moved to {cleanup_path.name} for background cleanup."
+                        )
                         # Now delete the renamed folder
                         shutil.rmtree(cleanup_path, ignore_errors=True)
-                        logger.info(f"PoolManager: Background cleanup of {cleanup_path.name} complete.")
+                        logger.info(
+                            f"PoolManager: Background cleanup of {cleanup_path.name} complete."
+                        )
                     except OSError:
                         # Fallback if rename fails (e.g. files in use)
                         logger.warning("PoolManager: Rename failed, performing standard cleanup.")
@@ -95,6 +99,7 @@ class PoolManager:
         # Fire and forget the heavy cleanup in a separate thread so it doesn't block FastMCP lifespan
         # We don't 'await' it here to ensure the MCP server becomes ready immediately.
         import threading
+
         cleanup_thread = threading.Thread(target=_async_cleanup_orchestrator, daemon=True)
         cleanup_thread.start()
 

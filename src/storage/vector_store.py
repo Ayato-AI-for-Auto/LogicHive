@@ -59,6 +59,7 @@ class VectorIndexManager:
             # Rebuild from DB rows
             embeddings = []
             names = []
+            skipped_dim = 0
             for row in db_rows:
                 if "embedding" in row and row["embedding"]:
                     try:
@@ -69,6 +70,11 @@ class VectorIndexManager:
                         if len(vec) == self.dimension:
                             embeddings.append(vec)
                             names.append(full_key)
+                        else:
+                            skipped_dim += 1
+                            logger.warning(
+                                f"FAISS: Skipping '{full_key}' due to dimension mismatch (Expected {self.dimension}, got {len(vec)})"
+                            )
                     except (json.JSONDecodeError, TypeError, KeyError) as e:
                         logger.warning(f"FAISS: Skipping row due to invalid embedding: {e}")
                         continue
@@ -84,9 +90,12 @@ class VectorIndexManager:
 
             self._initialized = True
             await self.save_to_disk()
-            logger.info("FAISS: Rebuilt index from DB.")
+            msg = f"FAISS: Rebuilt index from DB. Loaded: {len(names)}, Skipped (dim): {skipped_dim}"
+            logger.info(msg)
 
-    async def upsert_vector(self, name: str, embedding: list[float], project: str = "default"):
+    async def upsert_vector(
+        self, name: str, embedding: list[float], metadata: dict[str, Any] = None, project: str = "default"
+    ):
         async with self._lock:
             full_key = f"{project}:{name}"
             # 1. Basic validation
@@ -104,7 +113,7 @@ class VectorIndexManager:
                     del self.id_to_name[old_id]
 
                 ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
+                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:     
                     needs_rebuild = True
 
             vec = np.array([embedding]).astype("float32")
@@ -136,7 +145,7 @@ class VectorIndexManager:
                 await self.save_to_disk()
 
                 ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
+                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:     
                     logger.info(
                         f"FAISS: Ghost vectors exceeded threshold during removal of '{full_key}', rebuilding."
                     )
@@ -148,12 +157,12 @@ class VectorIndexManager:
             await self._rebuild_internal()
 
     async def _rebuild_internal(self):
-        """Internal rebuild logic (assumes lock is held)."""
-        logger.info("FAISS: Rebuilding index to clear bloat...")
+        """Internal rebuild logic (assumes lock is held)."""        
+        logger.info("FAISS: Rebuilding index to clear bloat...")    
         try:
             db = await get_db_connection()
             async with db.execute(
-                "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL"
+                "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
             ) as cursor:
                 rows = await cursor.fetchall()
 
@@ -164,6 +173,7 @@ class VectorIndexManager:
 
             embeddings = []
             names = []
+            skipped_dim = 0
             for row in rows:
                 try:
                     vec = json.loads(row["embedding"])
@@ -173,6 +183,11 @@ class VectorIndexManager:
                     if len(vec) == self.dimension:
                         embeddings.append(vec)
                         names.append(full_key)
+                    else:
+                        skipped_dim += 1
+                        logger.warning(
+                            f"FAISS: Rebuild skipping '{full_key}' due to dimension mismatch (Expected {self.dimension}, got {len(vec)})"
+                        )
                 except (json.JSONDecodeError, TypeError, KeyError) as e:
                     logger.warning(f"FAISS: Skipping row due to invalid embedding: {e}")
                     continue
@@ -187,7 +202,7 @@ class VectorIndexManager:
                 self._current_id = len(names)
 
             await self.save_to_disk()
-            logger.info(f"FAISS: Rebuild complete. Active vectors: {self.index.ntotal}")
+            logger.info(f"FAISS: Rebuild complete. Active vectors: {self.index.ntotal}, Skipped (dim): {skipped_dim}")
         except Exception as e:
             logger.error(f"FAISS: Rebuild failed: {e}")
             raise StorageError(f"Vector Index Rebuild failed: {e}") from e

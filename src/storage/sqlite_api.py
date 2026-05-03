@@ -313,6 +313,7 @@ class SqliteStorage:
             sql = (
                 f"UPDATE logichive_functions SET {', '.join(fields)} WHERE project = ? AND name = ?"
             )
+            logger.info(f"[DEBUG] SQLite Update: sql={sql}, params={params}")
             await db.execute(sql, params)
             await db.commit()
             return True

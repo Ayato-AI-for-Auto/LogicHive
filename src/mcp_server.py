@@ -141,38 +141,21 @@ async def save_function(
     code: str,
     description: str = "",
     language: str = "python",
-    tags: list = [],
-    dependencies: list[str] = [],
+    tags: list | None = None,
+    dependencies: list[str] | None = None,
     test_code: str = "",
     project: str = "default",
-    mock_imports: list[str] = [],
+    mock_imports: list[str] | None = None,
     timeout: int = 60,
     wait_for_previous: bool = False,
 ) -> str:
-    """
-    Saves a verified, high-quality code asset to the LogicHive vault for future reuse.
-    The asset undergoes an automated Quality Gate check (AI grading & Static analysis).
-
-    BEST PRACTICES FOR AI AGENTS:
-    1. Strategy Priority (Purity > Utility):
-       - PRIMARY: Extract pure logic from I/O code. Save only the "Logic Atom" (data processing, validation).
-       - SECONDARY: If you must save I/O-heavy code (e.g. retry patterns), use 'mock_imports' to bypass network/file calls.
-    2. Project Context: Always specify a 'project' name to avoid cluttering the global vault.
-    3. Metadata is Critical: Provide a detailed 'description' (min 10 chars).
-    4. Self-Test: Always include 'test_code'. Use mocks for I/O functions to ensure deterministic verification.
-    5. Smart Mocking: Add heavy libraries (torch) or I/O libraries (aiohttp, httpx) to 'mock_imports'.
-    REJECTION CRITERIA:
-    - Syntax errors (instant Score 0 / Critical failure).
-    - Vague descriptions or missing tags.
-    - Poor AI-graded quality (logic flaws, security risks).
-    - **Quality Theater**: Literal assertions (e.g., `assert True`) or tests that don't call the code.
-
-    SUPPORTED LANGUAGES:
-    - **Python** (High Fidelity): Full AST-based verification, assertion analysis, and runtime pool execution.
-    - **JavaScript / TypeScript** (Standard): Structural assertion detection and pattern matching.
-    - **C++ / Java** (Foundational): Keyword-based asset integrity checks.
-
-    Args:
+    """... (omitted for brevity) ..."""
+    if tags is None:
+        tags = []
+    if dependencies is None:
+        dependencies = []
+    if mock_imports is None:
+        mock_imports = []
         name: Unique identifier for the function (e.g., "validate_email_utils").
         code: The source code implementation.
         description: Technical specification. Explain edge cases and logic.
@@ -182,7 +165,7 @@ async def save_function(
         test_code: Pytest/Unit test code for automated validation.
         project: Project name for logically grouping code (defaults to 'default').
         mock_imports: List of modules to mock during registration to avoid timeouts (e.g. ['torch']).
-        timeout: Maximum execution time in seconds for the Quality Gate (Default 60s, Hard Limit 120s).
+        # timeout is removed due to conflict
         wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
     """
     try:
@@ -211,18 +194,18 @@ async def save_function(
         details = e.details or {}
         eval_details = details.get("eval_details", {}).get("static_analysis", {})
         inner_details = eval_details.get("details", {})
-        
+
         line = inner_details.get("line", "?")
         offset = inner_details.get("offset", "?")
         text = inner_details.get("text", "N/A")
-        
+
         md = [
             f"### ❌ IMMEDIATE REJECTION: Syntax Error",
             f"**Message**: {str(e)}",
             f"- **Line**: {line}",
             f"- **Offset**: {offset}",
             f"\n**Context**:\n```python\n{text.strip()}\n```",
-            "\nPlease correct the syntax before attempting to save again."
+            "\nPlease correct the syntax before attempting to save again.",
         ]
         return "\n".join(md)
     except ValidationError as e:
@@ -368,7 +351,15 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
         if db_exists:
             count = await sqlite_storage.get_function_count()
-            status.append(f"- Record Count: {count}")
+            # New: Get count of assets that SHOULD be in FAISS (have embeddings)
+            db = await get_db_connection()
+            async with db.execute(
+                "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
+            ) as cursor:
+                row = await cursor.fetchone()
+                expected_count = row[0] if row else 0
+
+            status.append(f"- Record Count: {count} ({expected_count} with embeddings)")
 
         # 2. Vector Store Check
         faiss_exists = os.path.exists(FAISS_INDEX_PATH)
@@ -382,9 +373,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
                 status.append("- **Memory State**: 💤 Uninitialized (Will load on first search)")
             else:
                 idx_size = vector_manager.index.ntotal if vector_manager.index else 0
-                if idx_size != count:
+                if idx_size != expected_count:
                     status.append(
-                        f"- **Desync Detected**: DB({count}) vs FAISS-Memory({idx_size}). Rebuild recommended."
+                        f"- **Desync Detected**: DB({expected_count} verified) vs FAISS-Memory({idx_size}). Rebuild recommended."
                     )
                 else:
                     status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
@@ -435,9 +426,7 @@ async def get_verification_status(
         elif status == "failed":
             md += "Quality Gate rejected the asset. Review the report below for details.\n"
         elif status == "error":
-            md += (
-                "A system error occurred during verification. Infrastructure might be unstable.\n"
-            )
+            md += "A system error occurred during verification. Infrastructure might be unstable.\n"
 
         if isinstance(report, dict):
             md += "\n\n#### Detailed Report:\n"

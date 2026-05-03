@@ -141,8 +141,10 @@ async def _run_async_verification_pipeline(
 ):
     """Background task to run Quality Gate, metadata enrichment and embedding generation."""
     try:
-        logger.info(f"[TRACE] Orchestrator: Starting background verification for {name} [{project}]")
-        
+        logger.info(
+            f"[TRACE] Orchestrator: Starting background verification for {name} [{project}]"
+        )
+
         # 1. Quality Gate
         eval_manager = EvaluationManager()
         eval_res = await eval_manager.evaluate_all(
@@ -158,6 +160,9 @@ async def _run_async_verification_pipeline(
 
         final_score = float(eval_res["score"])
         is_system_error = eval_res.get("is_system_error", False)
+        logger.info(
+            f"[DEBUG] Orchestrator Verification: score={final_score}, is_system_error={is_system_error}"
+        )
         status = "verified" if final_score >= QUALITY_GATE_THRESHOLD else "failed"
         if is_system_error:
             status = "error"
@@ -179,7 +184,7 @@ async def _run_async_verification_pipeline(
             project,
             status=status,
             report=eval_res,
-            reliability_score=final_score / 100.0,
+            reliability_score=final_score,
         )
 
         # 5. Sync to Vector Store (if verified)
@@ -191,7 +196,9 @@ async def _run_async_verification_pipeline(
                 project=project,
             )
 
-        logger.info(f"[TRACE] Orchestrator: Async verification FINISHED for '{name}' with status: {status}")
+        logger.info(
+            f"[TRACE] Orchestrator: Async verification FINISHED for '{name}' with status: {status}"
+        )
 
     except Exception as e:
         logger.error(
@@ -231,26 +238,39 @@ async def do_save_async(
             f"Asset with identical logic is already registered as '{existing['name']}' in project '{project}'."
         )
 
-    # 2. Synchronous Syntax Check (Quality Gate Tip #1: Early Rejection)
-    if language.lower() == "python":
-        try:
-            ast.parse(code)
-        except SyntaxError as e:
-            logger.warning(f"Orchestrator: Synchronous syntax check failed for '{name}': {e}")
+    # 2. Synchronous Critical Checks (Quality Gate Tip #1: Early Rejection)
+    # We run 'structural' and 'python_static' synchronously to provide immediate feedback.
+    # These are fast, pure-python checks.
+    eval_manager = EvaluationManager()
+
+    # Structural Check (Language-Agnostic)
+    structural = eval_manager.get_evaluator("structural")
+    if structural:
+        struct_res = await structural.evaluate(code, language)
+        if struct_res.score == 0:
             raise SyntaxValidationError(
-                f"Python Syntax Error: {e.msg} (Line {e.lineno})",
+                f"Structural Error: {struct_res.reason}",
                 details={
                     "score": 0.0,
-                    "reason": "Immediate Rejection: Invalid Python syntax.",
-                    "eval_details": {
-                        "static_analysis": {
-                            "score": 0.0,
-                            "reason": f"Syntax Error: {str(e)}",
-                            "details": {"line": e.lineno, "offset": e.offset, "text": e.text},
-                        }
-                    },
+                    "reason": "Immediate Rejection: Structural integrity failed.",
+                    "eval_details": {"structural": struct_res},
                 },
             )
+
+    # Python-Specific Static Check
+    if language.lower() == "python":
+        python_static = eval_manager.get_evaluator("python_static")
+        if python_static:
+            static_res = await python_static.evaluate(code, language)
+            if static_res.score == 0:
+                raise SyntaxValidationError(
+                    f"Python Static Error: {static_res.reason}",
+                    details={
+                        "score": 0.0,
+                        "reason": "Immediate Rejection: Critical static check failed.",
+                        "eval_details": {"python_static": static_res},
+                    },
+                )
 
     # 3. Immediate Save (Pending)
     from core.system_info import SystemFingerprint
@@ -282,12 +302,11 @@ async def do_save_async(
     logger.info(
         f"[TRACE] Orchestrator: Saving initial 'pending' record for '{name}' [project={project}]"
     )
-    await sqlite_storage.upsert_function(data)
     save_result = await sqlite_storage.upsert_function(data)
     if not save_result:
         raise Exception("Failed to perform initial save to LogicHive vault.")
 
-    # 3. Kick off Background Verification
+    # 4. Kick off Background Verification
     asyncio.create_task(
         _run_async_verification_pipeline(
             name,
@@ -316,55 +335,68 @@ async def do_search_async(
     query: str, limit: int = 5, language: str | None = None, project: str = "default"
 ):
     """Asynchronous implementation for searching functions with Query Expansion and Re-ranking."""
-    async with search_semaphore:
-        intel = LogicIntelligence(GEMINI_API_KEY)
+    max_retries = 3
+    last_error = None
 
-        expanded_query = await intel.expand_query(query)
-        query_emb = await intel.generate_embedding(expanded_query)
+    for attempt in range(max_retries):
+        try:
+            async with search_semaphore:
+                intel = LogicIntelligence(GEMINI_API_KEY)
 
-        logger.info(
-            f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project})"
-        )
+                expanded_query = await intel.expand_query(query)
+                query_emb = await intel.generate_embedding(expanded_query)
 
-    # 1. Fetch more candidates than requested for re-ranking (limit * 3)
-    # Note: passing project to vector_manager for future-proofing internal filtering
-    initial_results = await sqlite_storage.find_similar_functions(
-        query_emb,
-        query_text=query,
-        limit=limit * 3,
-        language=language,
-        project=project,
-        include_code=False,
-    )
+                logger.info(
+                    f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project}, Attempt: {attempt + 1})"
+                )
 
-    # 2. Re-rank using LLM
-    logger.info(f"Orchestrator: Re-ranking {len(initial_results)} candidates...")
-    reranked_results = await intel.rerank_results(query, initial_results, limit=limit)
+                # 1. Fetch more candidates than requested for re-ranking (limit * 3)
+                initial_results = await sqlite_storage.find_similar_functions(
+                    query_emb,
+                    query_text=query,
+                    limit=limit * 3,
+                    language=language,
+                    project=project,
+                    include_code=False,
+                )
 
-    # 3. Fallback: Auto-Draft Generation (Experimental)
-    # Trigger ONLY if top match is weak AND it looks like a generation request
-    top_score = reranked_results[0].get("similarity", 0) if reranked_results else 0
-    generation_keywords = ["create", "generate", "make", "implement", "write", "how to"]
-    is_generation_request = any(k in query.lower() for k in generation_keywords)
+                if not initial_results:
+                    # If absolutely no results, maybe fallback or return empty
+                    return []
 
-    if top_score < 0.45 and is_generation_request:
-        logger.info(
-            f"Orchestrator: Weak results (Score: {top_score:.2f}) and Generation intent detected. Triggering..."
-        )
-        from core.plugins.draft_generator import DraftGenerator
+                # 2. Re-rank using LLM
+                logger.info(f"Orchestrator: Re-ranking {len(initial_results)} candidates...")
+                reranked_results = await intel.rerank_results(query, initial_results, limit=limit)
 
-        generator = DraftGenerator(intel)
-        draft = await generator.generate_draft(
-            query, initial_results, language=language or "python"
-        )
-        if draft:
-            # Ensure draft has consistency metadata
-            draft["similarity"] = 0.4
-            draft["project"] = project or "default"
-            # Prepend draft to results
-            return [draft] + reranked_results
+                # 3. Fallback: Auto-Draft Generation (Experimental)
+                top_score = reranked_results[0].get("similarity", 0) if reranked_results else 0
+                generation_keywords = ["create", "generate", "make", "implement", "write", "how to"]
+                is_generation_request = any(k in query.lower() for k in generation_keywords)
 
-    return reranked_results
+                if top_score < 0.45 and is_generation_request:
+                    logger.info(
+                        f"Orchestrator: Weak results (Score: {top_score:.2f}) and Generation intent detected. Triggering..."
+                    )
+                    from core.plugins.draft_generator import DraftGenerator
+
+                    generator = DraftGenerator(intel)
+                    draft = await generator.generate_draft(
+                        query, initial_results, language=language or "python"
+                    )
+                    if draft:
+                        draft["similarity"] = 0.4
+                        draft["project"] = project or "default"
+                        return [draft] + reranked_results
+
+                return reranked_results
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Orchestrator: Search attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1.0 * (attempt + 1))  # Exponential-ish backoff
+            else:
+                logger.error(f"Orchestrator: All search retries exhausted for '{query}'")
+                raise last_error
 
 
 async def do_list_async(
@@ -405,8 +437,6 @@ async def check_integrity() -> dict[str, Any]:
     return {"status": status, "details": details}
 
 
-
-
 async def do_get_verification_status(name: str, project: str = "default") -> dict[str, Any]:
     """Retrieves the verification status and report for a function."""
     logger.info(
@@ -424,10 +454,9 @@ async def do_get_verification_status(name: str, project: str = "default") -> dic
         "name": name,
         "project": project,
         "status": func.get("verification_status", "unknown"),
+        "score": func.get("reliability_score", 0),
         "report": func.get("verification_report"),
     }
-
-
 
 
 # --- End of Orchestrator ---

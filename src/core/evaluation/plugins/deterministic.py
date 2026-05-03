@@ -100,16 +100,26 @@ class DeterministicEvaluator(BaseEvaluator):
                     is_assert_func = False
                     if (
                         isinstance(node.func, ast.Name)
-                        and node.func.id.startswith("assert")
+                        and any(
+                            node.func.id.startswith(p)
+                            for p in ["assert", "expect", "assume", "verify", "should"]
+                        )
                         or isinstance(node.func, ast.Attribute)
-                        and node.func.attr.startswith("assert")
+                        and any(
+                            node.func.attr.startswith(p)
+                            for p in ["assert", "expect", "assume", "verify", "should"]
+                        )
                     ):
                         is_assert_func = True
 
                     if is_assert_func:
-                        # Skip if all arguments are constants
-                        if all(self._is_constant_expr(arg) for arg in node.args):
-                            continue
+                        # Skip ONLY if arguments are present and ALL of them are trivial constants
+                        has_args = len(node.args) > 0 or len(node.keywords) > 0
+                        if has_args:
+                            if all(self._is_constant_expr(arg) for arg in node.args) and all(
+                                self._is_constant_expr(kw.value) for kw in node.keywords
+                            ):
+                                continue
                         count += 1
             return count
         except SyntaxError:
@@ -162,13 +172,13 @@ class DeterministicEvaluator(BaseEvaluator):
         import re
 
         patterns = {
-            "javascript": r"(expect|assert)\(.*\)",
-            "typescript": r"(expect|assert)\(.*\)",
-            "cpp": r"(assert|EXPECT_|ASSERT_)\(.*\)",
-            "java": r"assert(True|False|Equals|NotNull|Same)\(.*\)",
+            "javascript": r"(expect|assert)\(.*?\)",
+            "typescript": r"(expect|assert)\(.*?\)",
+            "cpp": r"(assert|EXPECT_|ASSERT_)\(.*?\)",
+            "java": r"assert(True|False|Equals|NotNull|Same)\(.*?\)",
         }
 
-        pattern = patterns.get(lang.lower(), r"assert.*\(.*\)")
+        pattern = patterns.get(lang.lower(), r"(assert|expect|assume).*?\(.*?\)")
         matches = re.findall(pattern, test_code)
 
         # Basic constant filtering via heuristic

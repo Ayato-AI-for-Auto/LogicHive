@@ -54,9 +54,11 @@ async def test_weight_calculation_correctness(fake_intel):
         elif ev.name == "structural":
             ev.evaluate = AsyncMock(return_value=EvaluationResult(score=100.0, reason="Struct ok"))
 
-    # Expected: (100*0.4) + (80*0.3) + (90*0.2) + (100*0.1) = 40 + 24 + 18 + 10 = 92.0
+    # Updated Weights: Det (30%), Run (30%), Static (20%), AI (15%), Metrics (5%)
+    # (100*0.3) + (80*0.3) + (100*0.2) + (90*0.15) + (100*0.05)
+    # 30 + 24 + 20 + 13.5 + 5 = 92.5
     result = await manager.evaluate_all("def f(): pass", "python", is_draft=True)
-    assert result["score"] == pytest.approx(92.0)
+    assert result["score"] == pytest.approx(92.5)
 
 
 @pytest.mark.asyncio
