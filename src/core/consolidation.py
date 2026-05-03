@@ -93,7 +93,7 @@ class LogicIntelligence:
             logger.error(
                 f"[TRACE] LogicIntelligence: Gemini Embedding (001) failed: {e}", exc_info=True
             )
-            raise AIProviderError(f"Embedding generation failed: {e}")
+            raise AIProviderError(f"Embedding generation failed: {e}") from e
 
     async def _call_llm_async(self, prompt: str, use_json: bool = True) -> Any:
         """
