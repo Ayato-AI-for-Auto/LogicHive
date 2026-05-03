@@ -1,10 +1,9 @@
 import pytest
 import asyncio
 import json
-import sqlite3
-import os
-from orchestrator import do_search_async, do_save_async
-from storage.vector_store import vector_manager
+import pytest
+import asyncio
+from orchestrator import do_search_async
 from mcp_server import check_integrity
 
 @pytest.mark.asyncio
@@ -13,7 +12,7 @@ async def test_search_concurrency_stress():
     # Launch 10 simultaneous searches
     tasks = [do_search_async(query="test", limit=1) for _ in range(10)]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     # Check that we didn't crash
     for res in results:
         assert not isinstance(res, Exception)
@@ -26,7 +25,7 @@ async def test_corrupt_embedding_resilience():
     await db.execute("INSERT INTO logichive_functions (id, name, embedding) VALUES (?, ?, ?)", 
                      ("corrupt_id", "corrupt_func", '{"broken": json'))
     await db.commit()
-    
+
     # Check if integrity check still works
     report = await check_integrity()
     assert "Integrity Check Failed" not in report
@@ -38,10 +37,15 @@ async def test_lefthook_size_enforcement_simulation():
     dummy_file = "scratch/dummy_large.py"
     with open(dummy_file, "w") as f:
         f.write("def func(): pass\n" * 600)
-    
+
     # Run a manual check mirroring Lefthook logic
-    lines = sum(1 for _ in open(dummy_file))
+    with open(dummy_file, "r") as f:
+        lines = sum(1 for _ in f)
     assert lines > 500
-    
+
+    # Cleanup
+    os.remove(dummy_file)
+
+
     # Cleanup
     os.remove(dummy_file)

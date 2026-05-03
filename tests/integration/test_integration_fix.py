@@ -1,9 +1,8 @@
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
+from unittest.mock import patch, AsyncMock
+
+from core.exceptions import AIProviderError, SyntaxValidationError
 from orchestrator import do_save_async, do_search_async
-from core.exceptions import SyntaxValidationError, AIProviderError
-from core.consolidation import LogicIntelligence
 
 
 @pytest.mark.asyncio
