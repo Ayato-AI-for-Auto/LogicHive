@@ -1,4 +1,4 @@
-import logging
+from core.logging_config import get_logger
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
@@ -11,7 +11,7 @@ from orchestrator import (
     do_save_async,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -148,29 +148,10 @@ async def save_function(
     mock_imports: list[str] | None = None,
     timeout: int = 60,
     wait_for_previous: bool = False,
-) -> str:
-    """... (omitted for brevity) ..."""
-    if tags is None:
-        tags = []
-    if dependencies is None:
-        dependencies = []
     if mock_imports is None:
         mock_imports = []
-        name: Unique identifier for the function (e.g., "validate_email_utils").
-        code: The source code implementation.
-        description: Technical specification. Explain edge cases and logic.
-        language: Programming language (lowercase, e.g., 'python', 'javascript').
-        tags: Categorization labels for discovery.
-        dependencies: External libraries required (e.g., ['pandas', 'pydantic']).
-        test_code: Pytest/Unit test code for automated validation.
-        project: Project name for logically grouping code (defaults to 'default').
-        mock_imports: List of modules to mock during registration to avoid timeouts (e.g. ['torch']).
-        # timeout is removed due to conflict
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
-    """
     try:
         success = await do_save_async(
-            name=name,
             code=code,
             description=description,
             tags=tags,
