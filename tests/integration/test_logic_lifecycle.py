@@ -1,8 +1,9 @@
-import pytest
 import asyncio
-from orchestrator import do_save_async, do_get_verification_status
+
+import pytest
+
 from core.exceptions import SyntaxValidationError, ValidationError
-from storage.sqlite_api import sqlite_storage
+from orchestrator import do_get_verification_status, do_save_async
 
 
 @pytest.mark.asyncio

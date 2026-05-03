@@ -1,7 +1,7 @@
-import pytest
 import asyncio
-from orchestrator import do_save_async, do_get_verification_status
-from core.exceptions import ValidationError
+
+import pytest
+from orchestrator import do_get_verification_status, do_save_async
 
 
 @pytest.mark.asyncio

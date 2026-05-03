@@ -1,7 +1,7 @@
 import pytest
-import os
+
+from core.config import GEMINI_API_KEY, VECTOR_DIMENSION
 from core.consolidation import LogicIntelligence
-from core.config import GEMINI_API_KEY, EMBEDDING_MODEL_ID, VECTOR_DIMENSION
 
 
 @pytest.mark.use_real_intelligence
