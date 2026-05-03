@@ -95,98 +95,58 @@ class LogicIntelligence:
             )
             raise AIProviderError(f"Embedding generation failed: {e}") from e
 
+    async def _call_gemini(self, prompt: str, use_json: bool) -> Any:
+        if not self.gemini_client:
+            return {} if use_json else ""
+        
+        use_json_mode = use_json and "gemma" not in self.model_id.lower()
+        config = types.GenerateContentConfig(response_mime_type="application/json") if use_json_mode else None
+        
+        try:
+            response = self.gemini_client.models.generate_content(
+                model=self.model_id, contents=[prompt], config=config
+            )
+            text = response.text
+            if not use_json:
+                return text.strip()
+
+            start_idx = text.find("{")
+            end_idx = text.rfind("}")
+            if start_idx != -1 and end_idx != -1:
+                parsed = json.loads(text[start_idx : end_idx + 1])
+                return (parsed[0] if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) else parsed) if isinstance(parsed, dict) else {}
+            return {}
+        except (json.JSONDecodeError, ValueError) as e:
+            raise AIProviderError(f"JSON parsing failed: {e}") from e
+        except Exception as e:
+            raise AIProviderError(f"Gemini generation failed: {e}") from e
+
+    async def _call_ollama(self, prompt: str, use_json: bool) -> Any:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": self.ollama_model,
+                        "prompt": prompt + ("\nRespond ONLY with JSON." if use_json else ""),
+                        "stream": False,
+                        "format": "json" if use_json else None,
+                    },
+                )
+                if resp.status_code != 200:
+                    raise AIProviderError(f"Ollama returned status {resp.status_code}")
+                raw_text = resp.json().get("response", "")
+                return raw_text.strip() if not use_json else json.loads(raw_text)
+            except Exception as e:
+                raise AIProviderError(f"Ollama generation failed: {e}") from e
+
     async def _call_llm_async(self, prompt: str, use_json: bool = True) -> Any:
-        """
-        Internal helper to route LLM calls to Gemini or Ollama and handle JSON extraction.
-        """
-        import time
-
-        start_time = time.perf_counter()
         provider = await self._get_optimal_provider()
-        logger.info(
-            f"[TRACE] LogicIntelligence: Routing LLM call to '{provider}' (use_json={use_json})"
-        )
-
+        logger.info(f"[TRACE] LogicIntelligence: Routing LLM call to '{provider}'")
         if provider == "gemini":
-            if not self.gemini_client:
-                return {} if use_json else ""
-
-            try:
-                # Gemma models often don't support response_mime_type="application/json"
-                use_json_mode = use_json and "gemma" not in self.model_id.lower()
-
-                config = (
-                    types.GenerateContentConfig(response_mime_type="application/json")
-                    if use_json_mode
-                    else None
-                )
-
-                response = self.gemini_client.models.generate_content(
-                    model=self.model_id,
-                    contents=[prompt],
-                    config=config,
-                )
-                text = response.text
-
-                if not use_json:
-                    return text.strip()
-
-                # Robust JSON extraction
-                try:
-                    start_idx = text.find("{")
-                    end_idx = text.rfind("}")
-                    if start_idx != -1 and end_idx != -1:
-                        json_str = text[start_idx : end_idx + 1]
-                        parsed = json.loads(json_str)
-
-                        duration = time.perf_counter() - start_time
-                        logger.info(
-                            f"[TRACE] LogicIntelligence: Gemini response parsed in {duration:.4f}s"
-                        )
-
-                        if isinstance(parsed, list):
-                            return (
-                                parsed[0] if len(parsed) > 0 and isinstance(parsed[0], dict) else {}
-                            )
-                        return parsed if isinstance(parsed, dict) else {}
-
-                    logger.warning(
-                        f"[TRACE] LogicIntelligence: No JSON found in response from {self.model_id}"
-                    )
-                    return {}
-                except (json.JSONDecodeError, ValueError) as e:
-                    logger.error(
-                        f"[TRACE] LogicIntelligence: Failed to parse JSON from {self.model_id}: {e}. Raw content: {text[:500]}...",
-                        exc_info=True,
-                    )
-                    raise AIProviderError(f"JSON parsing failed: {e}")
-            except Exception as e:
-                logger.error(f"[TRACE] LogicIntelligence: Gemini call failed: {e}", exc_info=True)
-                raise AIProviderError(f"Gemini generation failed: {e}")
-
+            return await self._call_gemini(prompt, use_json)
         elif provider == "ollama":
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.post(
-                        f"{self.ollama_url}/api/generate",
-                        json={
-                            "model": self.ollama_model,
-                            "prompt": prompt + ("\nRespond ONLY with JSON." if use_json else ""),
-                            "stream": False,
-                            "format": "json" if use_json else None,
-                        },
-                    )
-                    if resp.status_code != 200:
-                        raise AIProviderError(f"Ollama returned status {resp.status_code}")
-
-                    raw_text = resp.json().get("response", "")
-                    if not use_json:
-                        return raw_text.strip()
-                    return json.loads(raw_text)
-            except Exception as e:
-                logger.error(f"Consolidation: Ollama call failed: {e}")
-                raise AIProviderError(f"Ollama generation failed: {e}")
-
+            return await self._call_ollama(prompt, use_json)
         raise AIProviderError("No valid AI provider available.")
 
     async def evaluate_quality(self, code: str, test_code: str = "") -> dict[str, Any]:
@@ -216,9 +176,8 @@ class LogicIntelligence:
 
         try:
             res = await self._call_llm_async(prompt, use_json=True)
-        except AIProviderError as e:
-            logger.error(f"Quality Gate: AI Provider failed during evaluation: {e}")
-            # Fallback for transient AI issues if needed, or re-raise
+        except AIProviderError:
+            logger.error("Quality Gate: AI Provider failed during evaluation.")
             raise
 
         # Robust Score Coercion
