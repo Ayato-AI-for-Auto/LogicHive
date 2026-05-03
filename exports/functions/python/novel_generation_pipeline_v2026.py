@@ -10,7 +10,7 @@ class ScenePlanSchema(BaseModel):
 class PlannerOutputSchema(BaseModel):
     scene_plan: list[ScenePlanSchema] = Field(..., description="シーンごとの詳細計画")
     key_events: list[str] = Field(..., description="発生すべき重要な出来事")
-    cliffhanger: str = Field(..., description="今回の引き（クリフハンガー）")
+    cliffhanger: str = Field(..., description="今回の引き(クリフハンガー)")
     emotional_arc: str = Field(..., description="感情の起伏")
 
 
