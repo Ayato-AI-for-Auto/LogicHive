@@ -68,11 +68,11 @@ async def create_function(func: FunctionCreate):
         raise HTTPException(
             status_code=422,
             detail={"message": str(e), "details": getattr(e, "details", {})},
-        )
+        ) from e
     except LogicHiveError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/functions/{function_name}")
