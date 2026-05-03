@@ -3,6 +3,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+import uuid
+import time
+from core.logging_config import current_run_id, get_logger
+
+logger = get_logger(__name__)
 
 from core.exceptions import LogicHiveError, ValidationError
 from orchestrator import (
@@ -16,6 +22,31 @@ app = FastAPI(
     description="Minimalist API for personal code asset management",
     version="1.0.0",
 )
+
+class TraceMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        token = current_run_id.set(req_id)
+        start_time = time.perf_counter()
+        
+        # We don't use bound logger here directly because the patcher will pick up the context var
+        logger.info(f"API Request START: {request.method} {request.url.path}")
+        
+        try:
+            response = await call_next(request)
+            latency = time.perf_counter() - start_time
+            logger.info(f"API Request SUCCESS: {response.status_code}", latency_sec=latency)
+            response.headers["X-Request-ID"] = req_id
+            return response
+        except Exception as e:
+            latency = time.perf_counter() - start_time
+            logger.exception(f"API Request ERROR: {e}", latency_sec=latency)
+            raise
+        finally:
+            if token:
+                current_run_id.reset(token)
+
+app.add_middleware(TraceMiddleware)
 
 # CORS for local usage
 app.add_middleware(

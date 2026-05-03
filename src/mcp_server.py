@@ -11,6 +11,8 @@ from orchestrator import (
     do_save_async,
 )
 
+from core.tracer import trace_execution
+
 logger = get_logger(__name__)
 
 
@@ -32,6 +34,7 @@ mcp = FastMCP("LogicHive", lifespan=lifespan)
 
 
 @mcp.tool()
+@trace_execution
 async def search_functions(
     query: str,
     limit: int = 5,
@@ -98,6 +101,7 @@ async def search_functions(
 
 
 @mcp.tool()
+@trace_execution
 async def get_function(name: str, project: str = "default", wait_for_previous: bool = False) -> str:
     """
     Fetch the full source code and metadata of a specific function by its exact name and project.
@@ -136,6 +140,7 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
 
 
 @mcp.tool()
+@trace_execution
 async def save_function(
     name: str,
     code: str,
@@ -148,10 +153,12 @@ async def save_function(
     mock_imports: list[str] | None = None,
     timeout: int = 60,
     wait_for_previous: bool = False,
+) -> str:
     if mock_imports is None:
         mock_imports = []
     try:
         success = await do_save_async(
+            name=name,
             code=code,
             description=description,
             tags=tags,
@@ -221,6 +228,7 @@ async def save_function(
 
 
 @mcp.tool()
+@trace_execution
 async def debug_db(wait_for_previous: bool = False) -> str:
     """
     Debug tool to inspect LogicHive database configuration and table structure.
@@ -250,6 +258,7 @@ async def debug_db(wait_for_previous: bool = False) -> str:
 
 
 @mcp.tool()
+@trace_execution
 async def delete_function(
     name: str, project: str = "default", wait_for_previous: bool = False
 ) -> str:
@@ -270,6 +279,7 @@ async def delete_function(
 
 
 @mcp.tool()
+@trace_execution
 async def list_functions(
     project: str = None, tags: list[str] = None, limit: int = 50, wait_for_previous: bool = False
 ) -> str:
@@ -307,6 +317,7 @@ async def list_functions(
 
 
 @mcp.tool()
+@trace_execution
 async def check_integrity(wait_for_previous: bool = False) -> str:
     """
     Performs a comprehensive integrity check of the LogicHive system,
@@ -320,6 +331,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
+    from core.db import get_db_connection
 
     status = ["## LogicHive Integrity Report\n"]
 
@@ -377,6 +389,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
 
 @mcp.tool()
+@trace_execution
 async def get_verification_status(
     name: str, project: str = "default", wait_for_previous: bool = False
 ):
@@ -431,6 +444,7 @@ async def get_verification_status(
 
 
 @mcp.tool()
+@trace_execution
 async def rebuild_index(wait_for_previous: bool = False) -> str:
     """
     Forcefully rebuilds the FAISS vector index from all embeddings stored in the database.

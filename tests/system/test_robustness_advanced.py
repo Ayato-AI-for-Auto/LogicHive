@@ -1,13 +1,12 @@
-import pytest
-import asyncio
-import json
+import os
 import pytest
 import asyncio
 from orchestrator import do_search_async
 from mcp_server import check_integrity
 
+
 @pytest.mark.asyncio
-async def test_search_concurrency_stress():
+async def test_search_concurrency_stress(test_db):
     """Verify system handles simultaneous requests via semaphore."""
     # Launch 10 simultaneous searches
     tasks = [do_search_async(query="test", limit=1) for _ in range(10)]
@@ -17,22 +16,28 @@ async def test_search_concurrency_stress():
     for res in results:
         assert not isinstance(res, Exception)
 
+
 @pytest.mark.asyncio
-async def test_corrupt_embedding_resilience():
+async def test_corrupt_embedding_resilience(test_db):
     """Verify system survives invalid JSON data in embedding column."""
     from core.db import get_db_connection
+
     db = await get_db_connection()
-    await db.execute("INSERT INTO logichive_functions (id, name, embedding) VALUES (?, ?, ?)", 
-                     ("corrupt_id", "corrupt_func", '{"broken": json'))
+    await db.execute(
+        "INSERT INTO logichive_functions (id, name, embedding, code) VALUES (?, ?, ?, ?)",
+        ("corrupt_id", "corrupt_func", '{"broken": json', 'def pass(): pass'),
+    )
     await db.commit()
 
     # Check if integrity check still works
     report = await check_integrity()
     assert "Integrity Check Failed" not in report
 
+
 @pytest.mark.asyncio
 async def test_lefthook_size_enforcement_simulation():
     """Simulate size check logic to ensure enforcement is possible."""
+    import os
     # Write dummy file > 500 lines
     dummy_file = "scratch/dummy_large.py"
     with open(dummy_file, "w") as f:
@@ -44,8 +49,5 @@ async def test_lefthook_size_enforcement_simulation():
     assert lines > 500
 
     # Cleanup
-    os.remove(dummy_file)
-
-
-    # Cleanup
-    os.remove(dummy_file)
+    if os.path.exists(dummy_file):
+        os.remove(dummy_file)

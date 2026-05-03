@@ -18,6 +18,7 @@ from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
 from storage.sqlite_api import sqlite_storage
 from storage.vector_store import vector_manager
+from core.tracer import trace_execution
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ def extract_dependencies(code: str, language: str = "python") -> list[str]:
     return sorted(list(dependencies - std_lib))
 
 
+@trace_execution
 async def do_delete_async(name: str, project: str = "default") -> bool:
     """
     Orchestrates deletion from DB, Vector index, and archiving in Backup.
@@ -127,6 +129,7 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
 # --- MCP / REST API Implementation Wrappers ---
 
 
+@trace_execution
 async def _run_async_verification_pipeline(
     name: str,
     project: str,
@@ -209,6 +212,7 @@ async def _run_async_verification_pipeline(
         )
 
 
+@trace_execution
 async def do_save_async(
     name: str,
     code: str,
@@ -332,11 +336,13 @@ async def do_save_async(
     return True
 
 
+@trace_execution
 async def do_get_async(name: str, project: str = "default") -> dict[str, Any] | None:
     """Asynchronous implementation for getting a function."""
     return await sqlite_storage.get_function_by_name(name, project=project)
 
 
+@trace_execution
 async def do_search_async(
     query: str, limit: int = 5, language: str | None = None, project: str = "default"
 ):
@@ -405,6 +411,7 @@ async def do_search_async(
                 raise last_error
 
 
+@trace_execution
 async def do_list_async(
     project: str | None = None, tags: list[str] | None = None, limit: int = 50
 ) -> list[dict[str, Any]]:
@@ -412,6 +419,7 @@ async def do_list_async(
     return await sqlite_storage.get_functions(project=project, tags=tags, limit=limit)
 
 
+@trace_execution
 async def check_integrity() -> dict[str, Any]:
     """
     Checks the health of various components (Database, Vector Index, Pool).
@@ -443,6 +451,7 @@ async def check_integrity() -> dict[str, Any]:
     return {"status": status, "details": details}
 
 
+@trace_execution
 async def do_get_verification_status(name: str, project: str = "default") -> dict[str, Any]:
     """Retrieves the verification status and report for a function."""
     logger.info(
