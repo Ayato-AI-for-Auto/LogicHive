@@ -1,17 +1,29 @@
-from core.logging_config import get_logger
+# Copyright (C) 2026 ayato-labs
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 
 import orchestrator
+from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
+from core.logging_config import get_logger
+from core.tracer import trace_execution
 from orchestrator import (
     do_delete_async,
     do_get_verification_status,
     do_save_async,
 )
-
-from core.tracer import trace_execution
+from storage.sqlite_api import sqlite_storage
+from storage.vector_store import vector_manager
 
 logger = get_logger(__name__)
 
@@ -188,7 +200,7 @@ async def save_function(
         text = inner_details.get("text", "N/A")
 
         md = [
-            f"### ❌ IMMEDIATE REJECTION: Syntax Error",
+            "### ❌ IMMEDIATE REJECTION: Syntax Error",
             f"**Message**: {str(e)}",
             f"- **Line**: {line}",
             f"- **Offset**: {offset}",
@@ -329,9 +341,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     import os
 
     from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+    from core.db import get_db_connection
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
-    from core.db import get_db_connection
 
     status = ["## LogicHive Integrity Report\n"]
 

@@ -1,3 +1,10 @@
+# Copyright (C) 2026 ayato-labs
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 import ast
 import asyncio
 import logging
@@ -16,9 +23,9 @@ from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
 from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
+from core.tracer import trace_execution
 from storage.sqlite_api import sqlite_storage
 from storage.vector_store import vector_manager
-from core.tracer import trace_execution
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +101,7 @@ def extract_dependencies(code: str, language: str = "python") -> list[str]:
         "https",
         "crypto",
     }
-    return sorted(list(dependencies - std_lib))
+    return sorted(dependencies - std_lib)
 
 
 @trace_execution
@@ -249,8 +256,6 @@ async def do_save_async(
         )
 
     # 2. Synchronous Critical Checks (Quality Gate Tip #1: Early Rejection)
-    # We run 'structural' and 'python_static' synchronously to provide immediate feedback.
-    # These are fast, pure-python checks.
     eval_manager = EvaluationManager()
 
     # Structural Check (Language-Agnostic)
@@ -373,7 +378,6 @@ async def do_search_async(
                 )
 
                 if not initial_results:
-                    # If absolutely no results, maybe fallback or return empty
                     return []
 
                 # 2. Re-rank using LLM
@@ -408,7 +412,7 @@ async def do_search_async(
                 await asyncio.sleep(1.0 * (attempt + 1))  # Exponential-ish backoff
             else:
                 logger.error(f"Orchestrator: All search retries exhausted for '{query}'")
-                raise last_error
+                raise last_error from e
 
 
 @trace_execution
@@ -424,7 +428,7 @@ async def check_integrity() -> dict[str, Any]:
     """
     Checks the health of various components (Database, Vector Index, Pool).
     """
-    from core.execution.pool import pool_manager
+    from core.execution.pool import PoolManager
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
 
@@ -439,6 +443,7 @@ async def check_integrity() -> dict[str, Any]:
     details["vector_store"] = vector_health
 
     # 3. Pool Check
+    pool_manager = PoolManager.get_instance()
     pool_health = await pool_manager.check_health()
     details["pool_manager"] = pool_health
 
@@ -472,6 +477,3 @@ async def do_get_verification_status(name: str, project: str = "default") -> dic
         "score": func.get("reliability_score", 0),
         "report": func.get("verification_report"),
     }
-
-
-# --- End of Orchestrator ---

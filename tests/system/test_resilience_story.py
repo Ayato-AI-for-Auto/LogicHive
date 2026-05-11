@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from src.core.execution.pool import PoolManager
-from src.orchestrator import check_integrity, do_save_async, do_search_async
+from core.execution.pool import PoolManager
+from orchestrator import check_integrity, do_save_async, do_search_async
 
 
 @pytest.mark.usefixtures("test_db")

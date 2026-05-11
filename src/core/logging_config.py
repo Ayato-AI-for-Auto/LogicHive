@@ -1,45 +1,37 @@
-import sys
-from loguru import logger
-from pathlib import Path
 import os
+import sys
 from contextvars import ContextVar
-import uuid
+
+from loguru import logger
 
 # Context variable for tracing request/execution flows
-current_run_id: ContextVar[str] = ContextVar("current_run_id", default="system")
-
-# Create logs directory if not exists
-log_dir = Path("logs")
-log_dir.mkdir(exist_ok=True)
-
-# Remove default logger
-logger.remove()
+current_run_id: ContextVar[str] = ContextVar("run_id", default="system")
 
 
-# Inject run_id into every log record
-def add_run_id(record):
-    record["extra"]["run_id"] = current_run_id.get()
+def get_logger(name: str):
+    """Returns a configured logger with run_id propagation."""
+    # Ensure logs directory exists
+    os.makedirs("logs", exist_ok=True)
 
+    # Configure Loguru (if not already configured)
+    # Note: We use a sink that outputs JSONL for traceability
+    logger.remove()  # Remove default handler
+    logger.add(
+        sys.stderr,
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[name]}:{function}:{line}</cyan> - [RunID: <yellow>{extra[run_id]}</yellow>] - <level>{message}</level>",
+        level="INFO",
+        enqueue=True,
+    )
+    logger.add(
+        "logs/logichive.jsonl",
+        format="{message}",
+        serialize=True,  # This makes it JSON
+        level="DEBUG",
+        rotation="10 MB",
+        retention="1 week",
+    )
 
-# Apply the patcher globally
-logger = logger.patch(add_run_id)
-
-# Add JSON logging for production/traceability
-log_file = log_dir / "logichive.jsonl"
-logger.add(
-    log_file,
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",  # Format is mostly ignored due to serialize=True
-    serialize=True,
-    level="DEBUG",  # Capture all intermediate logic for traceability
-)
-
-# Add colored logging for development console
-logger.add(
-    sys.stderr,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | [RunID: <magenta>{extra[run_id]}</magenta>] - <level>{message}</level>",
-    level=os.getenv("LOG_LEVEL", "INFO"),
-)
-
-
-def get_logger(name):
-    return logger.bind(name=name)
+    # Return a logger with the name injected into extra
+    return logger.bind(name=name).patch(
+        lambda record: record["extra"].update(run_id=current_run_id.get())
+    )

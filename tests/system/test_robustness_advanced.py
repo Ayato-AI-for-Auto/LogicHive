@@ -25,7 +25,7 @@ async def test_corrupt_embedding_resilience(test_db):
     db = await get_db_connection()
     await db.execute(
         "INSERT INTO logichive_functions (id, name, embedding, code) VALUES (?, ?, ?, ?)",
-        ("corrupt_id", "corrupt_func", '{"broken": json', 'def pass(): pass'),
+        ("corrupt_id", "corrupt_func", '{"broken": json', "def pass(): pass"),
     )
     await db.commit()
 
@@ -38,6 +38,7 @@ async def test_corrupt_embedding_resilience(test_db):
 async def test_lefthook_size_enforcement_simulation():
     """Simulate size check logic to ensure enforcement is possible."""
     import os
+
     # Write dummy file > 500 lines
     dummy_file = "scratch/dummy_large.py"
     with open(dummy_file, "w") as f:
