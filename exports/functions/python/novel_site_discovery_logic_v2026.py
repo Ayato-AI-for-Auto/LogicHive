@@ -8,7 +8,7 @@ async def run_strategic_site_scan(
 ):
     """
     「なろう」「ハーメルン」等の複数小説投稿サイトに対し、
-    ランキング種別（通常・R18）や条件を組み合わせて戦略的に広域スキャンを行う。
+    ランキング種別(通常・R18)や条件を組み合わせて戦略的に広域スキャンを行う。
     サーバー負荷に配慮したランダムウェイト付きのクロール制御ロジック。
     """
     results = []
@@ -17,7 +17,7 @@ async def run_strategic_site_scan(
         if not client:
             continue
 
-        # サイトごとのランキング取得（実装に依存）
+        # サイトごとのランキング取得(実装に依存)
         novels = await client.get_ranking(limit=limit, is_r18=is_r18)
         results.extend(novels)
 

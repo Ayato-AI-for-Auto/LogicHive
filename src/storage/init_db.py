@@ -34,6 +34,8 @@ async def init_db():
         dependencies TEXT,
         test_code TEXT,
         env_fingerprint TEXT,
+        verification_status TEXT DEFAULT 'pending',
+        verification_report TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(project, name)

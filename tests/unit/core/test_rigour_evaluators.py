@@ -3,9 +3,9 @@ import tempfile
 
 import pytest
 
-from src.core.evaluation.plugins.dependency_vouch import DependencyVouchEvaluator
-from src.core.evaluation.plugins.metrics_gate import MetricsGateEvaluator
-from src.core.evaluation.plugins.security_static import SecurityStaticEvaluator
+from core.evaluation.plugins.dependency_vouch import DependencyVouchEvaluator
+from core.evaluation.plugins.metrics_gate import MetricsGateEvaluator
+from core.evaluation.plugins.security_static import SecurityStaticEvaluator
 
 
 @pytest.mark.asyncio

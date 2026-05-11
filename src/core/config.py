@@ -10,7 +10,7 @@ load_dotenv()
 # 🛡️ LogicHive: User Configuration Section
 # ==========================================
 # 機密情報や環境固有の設定を一箇所にまとめます。
-# 必要に応じて環境変数での上書き（Override）も可能です。
+# 必要に応じて環境変数での上書き(Override)も可能です。
 
 # 1. AI & Models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # デフォルト値を削除

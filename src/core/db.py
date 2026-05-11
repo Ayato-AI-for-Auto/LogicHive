@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from functools import wraps
 
 import aiosqlite
 
 from core.config import SQLITE_DB_PATH
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Single global connection to avoid "threads can only be started once" on Windows
 _global_db = None
@@ -58,7 +58,7 @@ async def close_db_connection():
                 if _creator_loop is asyncio.get_running_loop():
                     await _global_db.close()
             except Exception as e:
-                logger.warning(f"Error closing shared DB: {e}")
+                logger.exception(f"Error closing shared DB: {e}")
             finally:
                 _global_db = None
                 _creator_loop = None
@@ -86,6 +86,7 @@ def retry_on_db_lock(max_retries: int = 5, base_delay: float = 0.1):
                         await asyncio.sleep(delay)
                         retries += 1
                     else:
+                        logger.exception("DB operation failed after retries")
                         raise
 
         return wrapper

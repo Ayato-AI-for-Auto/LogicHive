@@ -1,3 +1,10 @@
+# Copyright (C) 2026 ayato-labs
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 import asyncio
 import importlib
 import importlib.util
@@ -138,7 +145,7 @@ class EvaluationManager:
             if struct_res.score == 0:
                 return {
                     "score": 0.0,
-                    "reason": f"Critical Failure: {struct_res.reason}",
+                    "reason": f"CRITICAL STRUCTURAL ERROR: {struct_res.reason}",
                     "details": {"structural": struct_res},
                     "is_system_error": struct_res.is_system_error,
                 }
@@ -169,6 +176,10 @@ class EvaluationManager:
             else:
                 results[name] = res
 
+        # Check for system errors in critical gates even if score isn't 0
+        aggregate_system_error = any(v.is_system_error for v in results.values())
+        logger.info(f"[DEBUG] EvaluationManager: aggregate_system_error={aggregate_system_error}")
+
         # 3. Final Scoring Logic (Hybrid Architecture: Fact over Opinion)
         final_score = 0.0
         reasons = []
@@ -194,6 +205,7 @@ class EvaluationManager:
                 "score": 0.0,
                 "reason": f"SECURITY REJECTION: {sec_static.reason}",
                 "details": {k: {"score": v.score, "reason": v.reason} for k, v in results.items()},
+                "is_system_error": aggregate_system_error,
             }
 
         # If dependency check finds hallucinations, it's a 'garbage' logic. reject.
@@ -205,11 +217,8 @@ class EvaluationManager:
                     k: {"score": v.score, "reason": v.reason, "is_system_error": v.is_system_error}
                     for k, v in results.items()
                 },
-                "is_system_error": any(v.is_system_error for v in results.values()),
+                "is_system_error": aggregate_system_error,
             }
-
-        # Check for system errors in critical gates even if score isn't 0
-        aggregate_system_error = any(v.is_system_error for v in results.values())
 
         # 4. Weighted Calculation
         # Weights: Deterministic (30%), Runtime (30%), Static/Security (20%), AI (15%), Metrics (5%)
@@ -219,6 +228,23 @@ class EvaluationManager:
         if det_res:
             det_score = det_res.score
             if det_score == 0:
+                # ABSOLUTE VETO: If PythonStatic found a syntax error, prioritize it over 'No assertions'
+                python_static = results.get("python_static")
+                if (
+                    python_static
+                    and python_static.score == 0
+                    and "Syntax Error" in python_static.reason
+                ):
+                    return {
+                        "score": 0.0,
+                        "reason": f"CRITICAL SYNTAX ERROR: {python_static.reason}",
+                        "details": {
+                            k: {"score": v.score, "reason": v.reason, "details": v.details}
+                            for k, v in results.items()
+                        },
+                        "is_system_error": aggregate_system_error,
+                    }
+
                 return {
                     "score": 0.0,
                     "reason": f"DETERMINISTIC REJECTION: {det_res.reason}",
@@ -226,6 +252,7 @@ class EvaluationManager:
                         k: {"score": v.score, "reason": v.reason, "details": v.details}
                         for k, v in results.items()
                     },
+                    "is_system_error": aggregate_system_error,
                 }
             parts.append((det_score, 0.30, f"Facts: {det_res.reason}"))
 
@@ -240,6 +267,7 @@ class EvaluationManager:
                         k: {"score": v.score, "reason": v.reason, "details": v.details}
                         for k, v in results.items()
                     },
+                    "is_system_error": runtime_res.is_system_error,
                 }
             parts.append((runtime_score, 0.30, f"Runtime: {runtime_res.reason}"))
 

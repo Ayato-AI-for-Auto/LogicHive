@@ -28,6 +28,7 @@ dependencies = [
     "psutil",
     "aiohttp>=3.13.5",
     "pydantic>=2.12.5",
+    "loguru>=0.7.3",
 ]
 
 [tool.setuptools.packages.find]

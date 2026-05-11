@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.evaluation.plugins.security_static import SecurityStaticEvaluator
+from core.evaluation.plugins.security_static import SecurityStaticEvaluator
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,7 @@ class NovelLLMClient:
     """
     小説執筆支援システム向けの堅牢なLLMクライアント。
     Google Gemini APIを使用し、マルチモデルフォールバック、プリセット解決、
-    非同期（aio）呼び出し、および構造化出力（JSON Schema）をサポートします。
+    非同期(aio)呼び出し、および構造化出力(JSON Schema)をサポートします。
     """
 
     def __init__(self, api_key: str | None = None, presets: dict | None = None):

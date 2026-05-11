@@ -7,26 +7,27 @@ from core.evaluation.plugins.deterministic import DeterministicEvaluator
 async def test_count_assertions():
     evaluator = DeterministicEvaluator()
 
-    # Direct assert
-    assert evaluator._count_assertions("assert 1 == 1") == 1
+    # Direct assert (non-constant)
+    assert evaluator._count_assertions_python("assert x == 1") == 1
+
+    # Constant assert (should be 0)
+    assert evaluator._count_assertions_python("assert 1 == 1") == 0
 
     # Multiple asserts
-    assert evaluator._count_assertions("assert 1\nassert 2") == 2
+    assert evaluator._count_assertions_python("assert x\nassert y") == 2
 
     # Pytest / Unittest style calls
     test_code = """
 import pytest
-def test_func():
-    pytest.assume(True)
-    self.assertEqual(1, 1)
-    unittest.TestCase().assertTrue(True)
-    assert_called_with(x=1)
+def test_func(x):
+    assert x > 0
+    self.assertEqual(x, 1)
+    self.assertTrue(x == 1)
+    # Use non-constant keyword value to pass anti-theater check
+    assert_called_with(val=x)
 """
-    # self.assertEqual -> assert prefix (1)
-    # assertTrue -> assert prefix (1)
-    # assert_called_with -> assert prefix (1)
-    # Total = 3
-    assert evaluator._count_assertions(test_code) == 3
+    # Total = 4
+    assert evaluator._count_assertions_python(test_code) == 4
 
 
 @pytest.mark.asyncio
@@ -64,14 +65,16 @@ async def test_deterministic_evaluate_python_scores():
     assert "CRITICAL" in res_zero.reason
 
     # Low density case (1 assertion)
-    res_low = await evaluator.evaluate("def f(): return 1", "python", test_code="assert f() == 1")
+    # Must call the function 'f' to avoid theater penalty
+    res_low = await evaluator.evaluate("def f(x): return 1", "python", test_code="assert f(1) == 1")
     # 100 - (3-1)*20 = 60
     assert res_low.score == 60.0
 
     # Hollow logic penalty
-    code_hollow = "def hollow(): pass"
-    test_hollow = "assert True\nassert True\nassert True"  # 3 assertions (100)
-    res_hollow = await evaluator.evaluate(code_hollow, "python", test_code=test_hollow)
+    code_hollow = "def hollow(x): pass"
+    # Use non-constant assertions and CALL the function
+    test_valid = "assert hollow(x) is None\nassert x == 1\nassert y == 2"  # 3 assertions (100)
+    res_hollow = await evaluator.evaluate(code_hollow, "python", test_code=test_valid)
     # 100 - 30 = 70
     assert res_hollow.score == 70.0
 
@@ -79,6 +82,9 @@ async def test_deterministic_evaluate_python_scores():
 @pytest.mark.asyncio
 async def test_deterministic_skip_non_python():
     evaluator = DeterministicEvaluator()
-    res = await evaluator.evaluate("function f() {}", "javascript")
+    # Now requires assertions even for non-python to pass deterministic gate
+    # Use 3 assertions to get 100 score
+    test_code = "expect(f(1)).toBe(1); expect(f(2)).toBe(2); expect(f(3)).toBe(3);"
+    res = await evaluator.evaluate("function f(x) { return x; }", "javascript", test_code=test_code)
     assert res.score == 100.0
-    assert "Skipped" in res.reason
+    assert "structural pattern matching" in res.reason

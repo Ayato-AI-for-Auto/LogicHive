@@ -25,7 +25,7 @@ Fetch Org Error details: {message: 'column organizations.user_id does not exist'
 フロントエンド (`api.ts`) の `ensureOrganization()` が `organizations` テーブルを `user_id` カラムでフィルタリングしていたが、Supabase 上のテーブルにはこのカラムが存在していなかった。
 
 ### 解決策
-Supabase SQL Editor で以下を実行：
+Supabase SQL Editor で以下を実行:
 ```sql
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
@@ -39,7 +39,7 @@ CREATE POLICY "Service role access" ON organizations
 ```
 
 ### 再発防止策
-- マイグレーションスクリプト（`scripts/migrate.py`）にスキーマ変更を必ず含める。
+- マイグレーションスクリプト(`scripts/migrate.py`)にスキーマ変更を必ず含める。
 - フロントエンドのコードがDBカラムを参照する場合、事前にスキーマの存在を確認する。
 
 ---
@@ -47,7 +47,7 @@ CREATE POLICY "Service role access" ON organizations
 ## 問題 2: `stripe` ライブラリ未インストール
 
 ### 症状
-Hub バックエンドが `500 Internal Server Error` を返し、ログにも何も残らない（`import stripe` で即クラッシュ）。
+Hub バックエンドが `500 Internal Server Error` を返し、ログにも何も残らない(`import stripe` で即クラッシュ)。
 
 ### 原因
 `LogicHive-Hub-Private/pyproject.toml` の `dependencies` に `stripe` が含まれていなかった。
@@ -99,7 +99,7 @@ Hub は `.env` で `PORT=8000` を指定して起動していたが、Portal 側
 
 ---
 
-## 問題 4: CORS ブロック（ブラウザ → Hub 直接通信）
+## 問題 4: CORS ブロック(ブラウザ → Hub 直接通信)
 
 ### 症状
 ```
@@ -107,18 +107,18 @@ Access to fetch at 'http://localhost:8000/...' from origin 'http://localhost:300
 has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present
 ```
 
-### 原因（複合的）
+### 原因(複合的)
 1. `allow_origins=["*"]` + `allow_credentials=True` の組み合わせは、ブラウザの仕様上無効。
-2. Hub バックエンドで 500 エラーが発生した場合、FastAPI の `CORSMiddleware` はエラーレスポンスに CORS ヘッダーを付与しない。そのため、真の原因（DB エラー）が CORS エラーとしてマスクされていた。
+2. Hub バックエンドで 500 エラーが発生した場合、FastAPI の `CORSMiddleware` はエラーレスポンスに CORS ヘッダーを付与しない。そのため、真の原因(DB エラー)が CORS エラーとしてマスクされていた。
 3. `localhost` と `127.0.0.1` はブラウザ上では別オリジンとして扱われる場合がある。
 
-### 解決策（アーキテクチャ変更）
+### 解決策(アーキテクチャ変更)
 **ブラウザから Hub への直接通信を廃止し、Next.js API Route によるサーバーサイドプロキシを導入。**
 
 ```
 [ブラウザ] --同一オリジン--> [Next.js API /api/logichive/checkout]
                                |
-                       サーバー間通信（CORS不要）
+                       サーバー間通信(CORS不要)
                                |
                            [Hub API]
 ```
@@ -128,7 +128,7 @@ has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is pres
 
 ### 再発防止策
 - **ブラウザから外部バックエンドへの直接通信は避ける。** Next.js の API Route をプロキシとして活用する。
-- Hub 側の CORS 設定は、明示的なオリジンリストで管理する（ワイルドカード `*` は使わない）。
+- Hub 側の CORS 設定は、明示的なオリジンリストで管理する(ワイルドカード `*` は使わない)。
 
 ---
 
@@ -143,7 +143,7 @@ Billing error: {'message': 'column organizations.stripe_customer_id does not exi
 問題 1 と同じく、Billing 用のカラム (`stripe_customer_id`, `plan_type`, `request_limit` 等) が Supabase 上に未作成だった。Hub のコード (`billing_checkout`) はこれらのカラムの存在を前提としていた。
 
 ### 解決策
-Supabase SQL Editor で以下を実行：
+Supabase SQL Editor で以下を実行:
 ```sql
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan_type TEXT DEFAULT 'free';
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
@@ -167,7 +167,7 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan_start_date TIMESTAMPTZ D
 | `LogicHive-Hub-Private/backend/hub/app.py` | CORS 明示化、`billing_checkout` にエラーハンドリング追加、`config` からポート読込 |
 | `ayato_studio_portal/.env.local` | Hub URL を `http://127.0.0.1:8000` に修正 |
 | `ayato_studio_portal/src/lib/api.ts` | プロキシ経由に変更、`logicHiveHubUrl` の定義位置修正 |
-| `ayato_studio_portal/src/app/api/logichive/checkout/route.ts` | 新規作成（サーバーサイドプロキシ） |
+| `ayato_studio_portal/src/app/api/logichive/checkout/route.ts` | 新規作成(サーバーサイドプロキシ) |
 | Supabase `organizations` テーブル | `user_id`, `stripe_customer_id` 等のカラム追加、RLS ポリシー設定 |
 
 ---
@@ -176,5 +176,5 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan_start_date TIMESTAMPTZ D
 
 1. **「CORS エラー」は表面的な症状に過ぎない場合がある。** バックエンドの 500 エラーが CORS ヘッダーなしで返却されると、ブラウザは CORS 違反として報告する。真の原因はサーバーログで確認すること。
 2. **スキーマ変更は必ずバージョン管理する。** コードが参照するカラムが DB に存在しない場合、実行時エラーとなり、デバッグが困難になる。
-3. **ブラウザ→外部サービス間通信にはプロキシパターンを採用する。** CORS の設定漏れやブラウザ固有の制約（Private Network Access等）を回避できる。
+3. **ブラウザ→外部サービス間通信にはプロキシパターンを採用する。** CORS の設定漏れやブラウザ固有の制約(Private Network Access等)を回避できる。
 4. **依存関係は `pyproject.toml` で一元管理する。** ライブラリの未インストールはログに痕跡を残さず 500 エラーを引き起こすため、発見が困難。

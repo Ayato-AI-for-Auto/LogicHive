@@ -22,7 +22,7 @@ class FullAnalysisExtraction(BaseModel):
 
 async def extract_novel_knowledge(client, text: str, model: str = "gemini-2.0-flash"):
     """
-    小説本文から設定知識（世界観・キャラ・プロット）を抽出し、構造化データとして返却する。
+    小説本文から設定知識(世界観・キャラ・プロット)を抽出し、構造化データとして返却する。
     物語の整合性を維持するための「World Bible」構築のコアロジック。
     """
     prompt = f"""
