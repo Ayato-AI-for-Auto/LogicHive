@@ -1,14 +1,31 @@
+# Copyright (C) 2026 ayato-labs
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 
 import orchestrator
-from core.exceptions import LogicHiveError, ValidationError
+from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+from core.db import get_db_connection
+from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
+from core.logging_config import get_logger
+from core.tracer import trace_execution
 from orchestrator import (
     do_delete_async,
     do_get_verification_status,
     do_save_async,
 )
+from storage.sqlite_api import sqlite_storage
+from storage.vector_store import vector_manager
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -29,6 +46,7 @@ mcp = FastMCP("LogicHive", lifespan=lifespan)
 
 
 @mcp.tool()
+@trace_execution
 async def search_functions(
     query: str,
     limit: int = 5,
@@ -95,6 +113,7 @@ async def search_functions(
 
 
 @mcp.tool()
+@trace_execution
 async def get_function(name: str, project: str = "default", wait_for_previous: bool = False) -> str:
     """
     Fetch the full source code and metadata of a specific function by its exact name and project.
@@ -133,55 +152,22 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
 
 
 @mcp.tool()
+@trace_execution
 async def save_function(
     name: str,
     code: str,
     description: str = "",
     language: str = "python",
-    tags: list = [],
-    dependencies: list[str] = [],
+    tags: list | None = None,
+    dependencies: list[str] | None = None,
     test_code: str = "",
     project: str = "default",
-    mock_imports: list[str] = [],
+    mock_imports: list[str] | None = None,
     timeout: int = 60,
     wait_for_previous: bool = False,
 ) -> str:
-    """
-    Saves a verified, high-quality code asset to the LogicHive vault for future reuse.
-    The asset undergoes an automated Quality Gate check (AI grading & Static analysis).
-
-    BEST PRACTICES FOR AI AGENTS:
-    1. Strategy Priority (Purity > Utility):
-       - PRIMARY: Extract pure logic from I/O code. Save only the "Logic Atom" (data processing, validation).
-       - SECONDARY: If you must save I/O-heavy code (e.g. retry patterns), use 'mock_imports' to bypass network/file calls.
-    2. Project Context: Always specify a 'project' name to avoid cluttering the global vault.
-    3. Metadata is Critical: Provide a detailed 'description' (min 10 chars).
-    4. Self-Test: Always include 'test_code'. Use mocks for I/O functions to ensure deterministic verification.
-    5. Smart Mocking: Add heavy libraries (torch) or I/O libraries (aiohttp, httpx) to 'mock_imports'.
-    REJECTION CRITERIA:
-    - Syntax errors (instant Score 0 / Critical failure).
-    - Vague descriptions or missing tags.
-    - Poor AI-graded quality (logic flaws, security risks).
-    - **Quality Theater**: Literal assertions (e.g., `assert True`) or tests that don't call the code.
-
-    SUPPORTED LANGUAGES:
-    - **Python** (High Fidelity): Full AST-based verification, assertion analysis, and runtime pool execution.
-    - **JavaScript / TypeScript** (Standard): Structural assertion detection and pattern matching.
-    - **C++ / Java** (Foundational): Keyword-based asset integrity checks.
-
-    Args:
-        name: Unique identifier for the function (e.g., "validate_email_utils").
-        code: The source code implementation.
-        description: Technical specification. Explain edge cases and logic.
-        language: Programming language (lowercase, e.g., 'python', 'javascript').
-        tags: Categorization labels for discovery.
-        dependencies: External libraries required (e.g., ['pandas', 'pydantic']).
-        test_code: Pytest/Unit test code for automated validation.
-        project: Project name for logically grouping code (defaults to 'default').
-        mock_imports: List of modules to mock during registration to avoid timeouts (e.g. ['torch']).
-        timeout: Maximum execution time in seconds for the Quality Gate (Default 60s, Hard Limit 120s).
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
-    """
+    if mock_imports is None:
+        mock_imports = []
     try:
         success = await do_save_async(
             name=name,
@@ -203,6 +189,25 @@ async def save_function(
             if success
             else "Failed to initiate save (Unknown Error)"
         )
+    except SyntaxValidationError as e:
+        # User feedback Tip #3: Prominent Syntax Error Reporting
+        details = e.details or {}
+        eval_details = details.get("eval_details", {}).get("static_analysis", {})
+        inner_details = eval_details.get("details", {})
+
+        line = inner_details.get("line", "?")
+        offset = inner_details.get("offset", "?")
+        text = inner_details.get("text", "N/A")
+
+        md = [
+            "### ❌ IMMEDIATE REJECTION: Syntax Error",
+            f"**Message**: {str(e)}",
+            f"- **Line**: {line}",
+            f"- **Offset**: {offset}",
+            f"\n**Context**:\n```python\n{text.strip()}\n```",
+            "\nPlease correct the syntax before attempting to save again.",
+        ]
+        return "\n".join(md)
     except ValidationError as e:
         # Extract rich details for better transparency (User feedback Tip #1)
         details = e.details or {}
@@ -235,6 +240,7 @@ async def save_function(
 
 
 @mcp.tool()
+@trace_execution
 async def debug_db(wait_for_previous: bool = False) -> str:
     """
     Debug tool to inspect LogicHive database configuration and table structure.
@@ -264,6 +270,7 @@ async def debug_db(wait_for_previous: bool = False) -> str:
 
 
 @mcp.tool()
+@trace_execution
 async def delete_function(
     name: str, project: str = "default", wait_for_previous: bool = False
 ) -> str:
@@ -284,6 +291,7 @@ async def delete_function(
 
 
 @mcp.tool()
+@trace_execution
 async def list_functions(
     project: str = None, tags: list[str] = None, limit: int = 50, wait_for_previous: bool = False
 ) -> str:
@@ -321,6 +329,7 @@ async def list_functions(
 
 
 @mcp.tool()
+@trace_execution
 async def check_integrity(wait_for_previous: bool = False) -> str:
     """
     Performs a comprehensive integrity check of the LogicHive system,
@@ -332,6 +341,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     import os
 
     from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+    from core.db import get_db_connection
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
 
@@ -346,23 +356,34 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
         if db_exists:
             count = await sqlite_storage.get_function_count()
-            status.append(f"- Record Count: {count}")
+            # New: Get count of assets that SHOULD be in FAISS (have embeddings)
+            db = await get_db_connection()
+            async with db.execute(
+                "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
+            ) as cursor:
+                row = await cursor.fetchone()
+                expected_count = row[0] if row else 0
+
+            status.append(f"- Record Count: {count} ({expected_count} with embeddings)")
 
         # 2. Vector Store Check
         faiss_exists = os.path.exists(FAISS_INDEX_PATH)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Loaded' if faiss_exists else '⚠️ Missing (Will rebuild on search)'}"
+            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
         )
 
         if faiss_exists and db_exists:
-            # Check for sync (simplified count check)
-            idx_size = vector_manager.index.ntotal if vector_manager.index else 0
-            if idx_size != count:
-                status.append(
-                    f"- **Desync Detected**: DB({count}) vs FAISS({idx_size}). Rebuild recommended."
-                )
+            # Check for memory sync (Silent check for initialization)
+            if not vector_manager._initialized:
+                status.append("- **Memory State**: 💤 Uninitialized (Will load on first search)")
             else:
-                status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors)")
+                idx_size = vector_manager.index.ntotal if vector_manager.index else 0
+                if idx_size != expected_count:
+                    status.append(
+                        f"- **Desync Detected**: DB({expected_count} verified) vs FAISS-Memory({idx_size}). Rebuild recommended."
+                    )
+                else:
+                    status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
 
         # 3. Environment Pool Check
         from core.execution.pool import PoolManager
@@ -380,6 +401,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
 
 @mcp.tool()
+@trace_execution
 async def get_verification_status(
     name: str, project: str = "default", wait_for_previous: bool = False
 ):
@@ -410,9 +432,7 @@ async def get_verification_status(
         elif status == "failed":
             md += "Quality Gate rejected the asset. Review the report below for details.\n"
         elif status == "error":
-            md += (
-                "A system error occurred during verification. Infrastructure might be unstable.\n"
-            )
+            md += "A system error occurred during verification. Infrastructure might be unstable.\n"
 
         if isinstance(report, dict):
             md += "\n\n#### Detailed Report:\n"
@@ -433,6 +453,24 @@ async def get_verification_status(
         return md
     except Exception as e:
         return f"Error retrieving status: {str(e)}"
+
+
+@mcp.tool()
+@trace_execution
+async def rebuild_index(wait_for_previous: bool = False) -> str:
+    """
+    Forcefully rebuilds the FAISS vector index from all embeddings stored in the database.
+    Use this if 'check_integrity' reports a desync between DB and Vector Store.
+    """
+    from storage.vector_store import vector_manager
+
+    try:
+        logger.info("[TRACE] MCP: Tool 'rebuild_index' called.")
+        await vector_manager.rebuild_index()
+        return "Vector index has been successfully rebuilt from database records."
+    except Exception as e:
+        logger.error(f"MCP Server: Error in rebuild_index: {e}")
+        return f"LogicHive Error: Failed to rebuild index. Detail: {str(e)}"
 
 
 if __name__ == "__main__":

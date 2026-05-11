@@ -1,3 +1,10 @@
+# Copyright (C) 2026 ayato-labs
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 import ast
 import asyncio
 import logging
@@ -14,12 +21,17 @@ from core.config import (
 )
 from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
-from core.exceptions import ValidationError
+from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
+from core.tracer import trace_execution
 from storage.sqlite_api import sqlite_storage
 from storage.vector_store import vector_manager
 
 logger = logging.getLogger(__name__)
+
+# --- Resource Constraints ---
+# Limit concurrent search requests to prevent LLM pipeline instability
+search_semaphore = asyncio.Semaphore(3)
 
 # --- Helpers ---
 
@@ -89,38 +101,42 @@ def extract_dependencies(code: str, language: str = "python") -> list[str]:
         "https",
         "crypto",
     }
-    return sorted(list(dependencies - std_lib))
+    return sorted(dependencies - std_lib)
 
 
+@trace_execution
 async def do_delete_async(name: str, project: str = "default") -> bool:
     """
     Orchestrates deletion from DB, Vector index, and archiving in Backup.
     """
+    logger.info(f"[TRACE] Orchestrator: Initiating deletion of '{name}' [project={project}]")
     try:
         # 1. Local DB deletion
         db_success = await sqlite_storage.delete_function(name, project=project)
         if not db_success:
+            logger.warning(f"[TRACE] Orchestrator: Failed to find/delete '{name}' in DB.")
             return False
 
         # 2. Vector index deletion (background)
         asyncio.create_task(vector_manager.remove_vector(name, project=project))
 
         # 3. Backup Archiving (background)
-        # ユーザーがバックアップを有効にしており、かつトークンが存在する場合のみ実行
         if ENABLE_AUTO_BACKUP and GITHUB_TOKEN:
             from storage.auto_backup import backup_manager
 
             asyncio.create_task(backup_manager.archive_asset(name, project=project))
 
+        logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful.")
         return True
     except Exception as e:
-        logger.error(f"Orchestrator: Deletion failed for '{name}': {e}")
-        return False
+        logger.error(f"[TRACE] Orchestrator: Deletion failed for '{name}': {e}", exc_info=True)
+        raise
 
 
 # --- MCP / REST API Implementation Wrappers ---
 
 
+@trace_execution
 async def _run_async_verification_pipeline(
     name: str,
     project: str,
@@ -135,6 +151,10 @@ async def _run_async_verification_pipeline(
 ):
     """Background task to run Quality Gate, metadata enrichment and embedding generation."""
     try:
+        logger.info(
+            f"[TRACE] Orchestrator: Starting background verification for {name} [{project}]"
+        )
+
         # 1. Quality Gate
         eval_manager = EvaluationManager()
         eval_res = await eval_manager.evaluate_all(
@@ -150,6 +170,9 @@ async def _run_async_verification_pipeline(
 
         final_score = float(eval_res["score"])
         is_system_error = eval_res.get("is_system_error", False)
+        logger.info(
+            f"[DEBUG] Orchestrator Verification: score={final_score}, is_system_error={is_system_error}"
+        )
         status = "verified" if final_score >= QUALITY_GATE_THRESHOLD else "failed"
         if is_system_error:
             status = "error"
@@ -171,12 +194,8 @@ async def _run_async_verification_pipeline(
             project,
             status=status,
             report=eval_res,
-            reliability_score=final_score / 100.0,
+            reliability_score=final_score,
         )
-
-        # Update metadata if enriched
-        # Note: We might need a more general update method if we want to save enriched description/tags
-        # For now, let's just update the status/score/report.
 
         # 5. Sync to Vector Store (if verified)
         if status == "verified":
@@ -187,7 +206,9 @@ async def _run_async_verification_pipeline(
                 project=project,
             )
 
-        logger.info(f"Orchestrator: Async verification FINISHED for '{name}' with status: {status}")
+        logger.info(
+            f"[TRACE] Orchestrator: Async verification FINISHED for '{name}' with status: {status}"
+        )
 
     except Exception as e:
         logger.error(
@@ -198,16 +219,17 @@ async def _run_async_verification_pipeline(
         )
 
 
+@trace_execution
 async def do_save_async(
     name: str,
     code: str,
     description: str = "",
-    tags: list[str] = [],
+    tags: list[str] | None = None,
     language: str = "python",
-    dependencies: list[str] = [],
+    dependencies: list[str] | None = None,
     test_code: str = "",
     project: str = "default",
-    mock_imports: list[str] = [],
+    mock_imports: list[str] | None = None,
     timeout: int | None = None,
 ):
     """
@@ -216,6 +238,12 @@ async def do_save_async(
     2. Saves with 'pending' status.
     3. Kicks off background verification and returns immediately.
     """
+    if tags is None:
+        tags = []
+    if dependencies is None:
+        dependencies = []
+    if mock_imports is None:
+        mock_imports = []
     # 1. Deduplication Check
     code_hash = calculate_code_hash(code)
     existing = await sqlite_storage.get_function_by_hash(code_hash, project)
@@ -227,7 +255,39 @@ async def do_save_async(
             f"Asset with identical logic is already registered as '{existing['name']}' in project '{project}'."
         )
 
-    # 2. Immediate Save (Pending)
+    # 2. Synchronous Critical Checks (Quality Gate Tip #1: Early Rejection)
+    eval_manager = EvaluationManager()
+
+    # Structural Check (Language-Agnostic)
+    structural = eval_manager.get_evaluator("structural")
+    if structural:
+        struct_res = await structural.evaluate(code, language)
+        if struct_res.score == 0:
+            raise SyntaxValidationError(
+                f"Structural Error: {struct_res.reason}",
+                details={
+                    "score": 0.0,
+                    "reason": "Immediate Rejection: Structural integrity failed.",
+                    "eval_details": {"structural": struct_res},
+                },
+            )
+
+    # Python-Specific Static Check
+    if language.lower() == "python":
+        python_static = eval_manager.get_evaluator("python_static")
+        if python_static:
+            static_res = await python_static.evaluate(code, language)
+            if static_res.score == 0:
+                raise SyntaxValidationError(
+                    f"Python Static Error: {static_res.reason}",
+                    details={
+                        "score": 0.0,
+                        "reason": "Immediate Rejection: Critical static check failed.",
+                        "eval_details": {"python_static": static_res},
+                    },
+                )
+
+    # 3. Immediate Save (Pending)
     from core.system_info import SystemFingerprint
 
     # Automatic Dependency Extraction (Immediate)
@@ -257,12 +317,11 @@ async def do_save_async(
     logger.info(
         f"[TRACE] Orchestrator: Saving initial 'pending' record for '{name}' [project={project}]"
     )
-    await sqlite_storage.upsert_function(data)
     save_result = await sqlite_storage.upsert_function(data)
     if not save_result:
         raise Exception("Failed to perform initial save to LogicHive vault.")
 
-    # 3. Kick off Background Verification
+    # 4. Kick off Background Verification
     asyncio.create_task(
         _run_async_verification_pipeline(
             name,
@@ -282,65 +341,81 @@ async def do_save_async(
     return True
 
 
+@trace_execution
 async def do_get_async(name: str, project: str = "default") -> dict[str, Any] | None:
     """Asynchronous implementation for getting a function."""
     return await sqlite_storage.get_function_by_name(name, project=project)
 
 
+@trace_execution
 async def do_search_async(
     query: str, limit: int = 5, language: str | None = None, project: str = "default"
 ):
     """Asynchronous implementation for searching functions with Query Expansion and Re-ranking."""
-    intel = LogicIntelligence(GEMINI_API_KEY)
+    max_retries = 3
+    last_error = None
 
-    expanded_query = await intel.expand_query(query)
-    query_emb = await intel.generate_embedding(expanded_query)
+    for attempt in range(max_retries):
+        try:
+            async with search_semaphore:
+                intel = LogicIntelligence(GEMINI_API_KEY)
 
-    logger.info(
-        f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project})"
-    )
+                expanded_query = await intel.expand_query(query)
+                query_emb = await intel.generate_embedding(expanded_query)
 
-    # 1. Fetch more candidates than requested for re-ranking (limit * 3)
-    # Note: passing project to vector_manager for future-proofing internal filtering
-    initial_results = await sqlite_storage.find_similar_functions(
-        query_emb,
-        query_text=query,
-        limit=limit * 3,
-        language=language,
-        project=project,
-        include_code=False,
-    )
+                logger.info(
+                    f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project}, Attempt: {attempt + 1})"
+                )
 
-    # 2. Re-rank using LLM
-    logger.info(f"Orchestrator: Re-ranking {len(initial_results)} candidates...")
-    reranked_results = await intel.rerank_results(query, initial_results, limit=limit)
+                # 1. Fetch more candidates than requested for re-ranking (limit * 3)
+                initial_results = await sqlite_storage.find_similar_functions(
+                    query_emb,
+                    query_text=query,
+                    limit=limit * 3,
+                    language=language,
+                    project=project,
+                    include_code=False,
+                )
 
-    # 3. Fallback: Auto-Draft Generation (Experimental)
-    # Trigger ONLY if top match is weak AND it looks like a generation request
-    top_score = reranked_results[0].get("similarity", 0) if reranked_results else 0
-    generation_keywords = ["create", "generate", "make", "implement", "write", "how to"]
-    is_generation_request = any(k in query.lower() for k in generation_keywords)
+                if not initial_results:
+                    return []
 
-    if top_score < 0.45 and is_generation_request:
-        logger.info(
-            f"Orchestrator: Weak results (Score: {top_score:.2f}) and Generation intent detected. Triggering..."
-        )
-        from core.plugins.draft_generator import DraftGenerator
+                # 2. Re-rank using LLM
+                logger.info(f"Orchestrator: Re-ranking {len(initial_results)} candidates...")
+                reranked_results = await intel.rerank_results(query, initial_results, limit=limit)
 
-        generator = DraftGenerator(intel)
-        draft = await generator.generate_draft(
-            query, initial_results, language=language or "python"
-        )
-        if draft:
-            # Ensure draft has consistency metadata
-            draft["similarity"] = 0.4
-            draft["project"] = project or "default"
-            # Prepend draft to results
-            return [draft] + reranked_results
+                # 3. Fallback: Auto-Draft Generation (Experimental)
+                top_score = reranked_results[0].get("similarity", 0) if reranked_results else 0
+                generation_keywords = ["create", "generate", "make", "implement", "write", "how to"]
+                is_generation_request = any(k in query.lower() for k in generation_keywords)
 
-    return reranked_results
+                if top_score < 0.45 and is_generation_request:
+                    logger.info(
+                        f"Orchestrator: Weak results (Score: {top_score:.2f}) and Generation intent detected. Triggering..."
+                    )
+                    from core.plugins.draft_generator import DraftGenerator
+
+                    generator = DraftGenerator(intel)
+                    draft = await generator.generate_draft(
+                        query, initial_results, language=language or "python"
+                    )
+                    if draft:
+                        draft["similarity"] = 0.4
+                        draft["project"] = project or "default"
+                        return [draft] + reranked_results
+
+                return reranked_results
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Orchestrator: Search attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1.0 * (attempt + 1))  # Exponential-ish backoff
+            else:
+                logger.error(f"Orchestrator: All search retries exhausted for '{query}'")
+                raise last_error from e
 
 
+@trace_execution
 async def do_list_async(
     project: str | None = None, tags: list[str] | None = None, limit: int = 50
 ) -> list[dict[str, Any]]:
@@ -348,11 +423,12 @@ async def do_list_async(
     return await sqlite_storage.get_functions(project=project, tags=tags, limit=limit)
 
 
+@trace_execution
 async def check_integrity() -> dict[str, Any]:
     """
     Checks the health of various components (Database, Vector Index, Pool).
     """
-    from core.execution.pool import pool_manager
+    from core.execution.pool import PoolManager
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
 
@@ -367,6 +443,7 @@ async def check_integrity() -> dict[str, Any]:
     details["vector_store"] = vector_health
 
     # 3. Pool Check
+    pool_manager = PoolManager.get_instance()
     pool_health = await pool_manager.check_health()
     details["pool_manager"] = pool_health
 
@@ -379,57 +456,7 @@ async def check_integrity() -> dict[str, Any]:
     return {"status": status, "details": details}
 
 
-async def _run_async_verification_pipeline(
-    name: str,
-    project: str,
-    code: str,
-    description: str,
-    tags: list[str],
-    language: str,
-    dependencies: list[str],
-    test_code: str,
-    mock_imports: dict[str, Any] | None = None,
-    timeout: int = 60,
-):
-    """
-    Background task to run the Quality Gate pipeline.
-    """
-    try:
-        logger.info(f"Orchestrator: Starting background verification for {name} [{project}]")
-
-        # 1. Initialize evaluation
-        from core.evaluation import EvaluationManager
-
-        eval_mgr = EvaluationManager()
-
-        # 2. Run Quality Gate (this is the heavy part)
-        report = await eval_mgr.evaluate_all(
-            code, language, name=name, project=project, description=description, tags=tags
-        )
-
-        status = "verified" if report.get("success") else "failed"
-        score = report.get("score", 0.0)
-
-        # 3. Update DB
-        await sqlite_storage.update_verification_status(
-            name=name,
-            project=project,
-            status=status,
-            report=report,
-            reliability_score=score,
-        )
-
-        logger.info(
-            f"Orchestrator: Background verification for {name} completed with status: {status}"
-        )
-
-    except Exception as e:
-        logger.error(f"Orchestrator: Background verification failed for {name}: {e}", exc_info=True)
-        await sqlite_storage.update_verification_status(
-            name=name, project=project, status="error", report={"error": str(e)}
-        )
-
-
+@trace_execution
 async def do_get_verification_status(name: str, project: str = "default") -> dict[str, Any]:
     """Retrieves the verification status and report for a function."""
     logger.info(
@@ -447,30 +474,6 @@ async def do_get_verification_status(name: str, project: str = "default") -> dic
         "name": name,
         "project": project,
         "status": func.get("verification_status", "unknown"),
+        "score": func.get("reliability_score", 0),
         "report": func.get("verification_report"),
     }
-
-
-async def do_delete_async(name: str, project: str = "default") -> bool:
-    """
-    Asynchronously deletes a function and its vector matches.
-    """
-    logger.info(f"[TRACE] Orchestrator: Initiating deletion of '{name}' [project={project}]")
-    try:
-        # 1. Delete from SQLite (this should also handle history if needed)
-        success = await sqlite_storage.delete_function(name, project)
-
-        # 2. Delete from Vector Store
-        from storage.vector_store import vector_manager
-
-        await vector_manager.remove_vector(name, project)
-
-        logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful: {success}")
-        return success
-    except Exception as e:
-        logger.error(f"[TRACE] Orchestrator: Failed to delete '{name}': {e}", exc_info=True)
-        # We re-raise to avoid swallowing the error as per user request
-        raise
-
-
-# --- End of Orchestrator ---

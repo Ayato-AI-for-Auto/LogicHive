@@ -1,0 +1,43 @@
+# LogicHive Lefthook Configuration (AI Hygiene & Rules Adaptation)
+pre-commit:
+  parallel: false
+  commands:
+    # 1. Static Analysis & Formatting
+    lint:
+      glob: "*.py"
+      run: ruff check --no-fix {staged_files}
+    format:
+      glob: "*.py"
+      run: ruff format --check {staged_files}
+
+    # 2. File Length Check (Discipline Rules)
+    file-length-check:
+      run: |
+        for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$|\.sh$'); do
+          lines=$(wc -l < "$file")
+          if [ "$lines" -gt 800 ]; then
+            echo "Error: $file exceeds 800 lines ($lines lines). Commit blocked."
+            exit 1
+          elif [ "$lines" -gt 500 ]; then
+            echo "Warning: $file is large ($lines lines)."
+          fi
+        done
+
+    # 3. Secret Detection (AI Hygiene)
+    secret-check:
+      run: |
+        git diff --cached --name-only | xargs grep -E "AI[a-zA-Z0-9]{32}|sk-[a-zA-Z0-9]{48}|ghp_[a-zA-Z0-9]{36}" && {
+          echo "Error: Potential API keys or secrets detected in staged files."
+          exit 1
+        } || exit 0
+
+    # 4. Large File Check (Discipline Rules)
+    large-file-check:
+      run: |
+        for file in $(git diff --cached --name-only); do
+          size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
+          if [ "$size" -gt 52428800 ]; then # 50MB
+            echo "Error: $file exceeds 50MB. Large files must not be committed."
+            exit 1
+          fi
+        done
