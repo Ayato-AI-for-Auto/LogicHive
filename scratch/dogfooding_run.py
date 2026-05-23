@@ -29,7 +29,7 @@ async def resilient_fetch(url: str, config_dict: Optional[Dict[str, Any]] = None
     Fetches data from a URL with retry logic and validation.
     \"\"\"
     cfg = FetchConfig(url=url, **(config_dict or {}))
-    
+
     async with aiohttp.ClientSession() as session:
         for attempt in range(cfg.retries):
             try:
@@ -56,7 +56,7 @@ async def test_fetch():
         mock_response.json = MagicMock(return_value={"status": "ok", "data": 123})
         mock_response.__aenter__.return_value = mock_response
         mock_get.return_value = mock_response
-        
+
         result = await resilient_fetch("https://api.example.com/data")
         assert result["status"] == "ok"
         assert result["data"] == 123

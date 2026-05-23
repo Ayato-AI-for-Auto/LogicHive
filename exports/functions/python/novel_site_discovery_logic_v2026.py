@@ -12,7 +12,7 @@ async def run_strategic_site_scan(
     サーバー負荷に配慮したランダムウェイト付きのクロール制御ロジック。
     """
     results = []
-    for site_id, is_r18, job_type in scan_jobs:
+    for site_id, is_r18, _job_type in scan_jobs:
         client = site_clients.get(site_id)
         if not client:
             continue

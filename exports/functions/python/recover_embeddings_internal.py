@@ -15,7 +15,7 @@ def recover_embeddings_internal(conn):
             name, desc, tags_j, meta_j, code = row
             tags = json.loads(tags_j) if tags_j else []
             meta = json.loads(meta_j) if meta_j else {}
-            deps = meta.get("dependencies", [])
+            meta.get("dependencies", [])
             from core.consolidation import LogicIntelligence
 
             intel = LogicIntelligence()

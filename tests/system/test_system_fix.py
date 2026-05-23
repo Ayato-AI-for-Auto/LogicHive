@@ -1,10 +1,10 @@
-import pytest
-import os
 import asyncio
-from pathlib import Path
-from mcp_server import save_function, check_integrity, rebuild_index
+import os
+
+import pytest
+
+from mcp_server import check_integrity, rebuild_index, save_function
 from storage.vector_store import vector_manager
-from core.config import DATA_DIR
 
 
 @pytest.mark.asyncio
@@ -71,8 +71,8 @@ async def test_harsh_index_corruption_recovery_system():
 @pytest.mark.asyncio
 async def test_database_lock_resilience_harsh():
     """Simulates a locked database during integrity check (Harsh)."""
-    from storage.sqlite_api import sqlite_storage
     import sqlite3
+
     from core.config import SQLITE_DB_PATH
 
     # Manually lock the DB using a separate connection in a transaction

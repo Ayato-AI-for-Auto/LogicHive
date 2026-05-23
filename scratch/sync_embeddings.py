@@ -1,22 +1,20 @@
 
 import asyncio
 import json
-import logging
 import os
 import sys
-from pathlib import Path
 
 # Add src to path
 sys.path.append(os.path.abspath("src"))
 
-from core.embedding import embedding_service
-from storage.sqlite_api import sqlite_storage
-from storage.vector_store import vector_manager
 from core.db import get_db_connection
+from core.embedding import embedding_service
+from storage.vector_store import vector_manager
+
 
 async def sync_embeddings():
     print("--- LogicHive Embedding Recovery & Sync ---")
-    
+
     # 1. Initialize DB and find records missing embeddings
     db = await get_db_connection()
     async with db.execute(
@@ -28,22 +26,22 @@ async def sync_embeddings():
         print("✅ No records missing embeddings found.")
     else:
         print(f"🔍 Found {len(rows)} records missing embeddings. Starting generation...")
-        
+
         for row in rows:
             func_id = row[0]
             name = row[1]
             description = row[2] or ""
             code = row[3]
-            project = row[4]
-            
+            row[4]
+
             # Construct search document (logic similar to orchestrator)
             doc = f"Name: {name}\nDescription: {description}\nCode: {code}"
-            
+
             print(f"  - Generating embedding for '{name}'...")
             try:
                 emb = embedding_service.get_embedding(doc)
                 emb_json = json.dumps(emb)
-                
+
                 await db.execute(
                     "UPDATE logichive_functions SET embedding = ? WHERE id = ?",
                     (emb_json, func_id)
@@ -62,9 +60,9 @@ async def sync_embeddings():
             all_rows = await cursor.fetchall()
             # Convert sqlite3.Row to dict for vector_manager
             db_dicts = [dict(r) for r in all_rows]
-            
+
         await vector_manager.ensure_initialized(db_dicts)
-        
+
         # Even if initialized, we want to force a rebuild to pick up the new embeddings
         print("🔄 Forcing FAISS index rebuild...")
         await vector_manager.rebuild_index()

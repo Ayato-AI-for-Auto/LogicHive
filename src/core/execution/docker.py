@@ -148,7 +148,7 @@ def run():
     try:
         # Execute Main Code
         exec({json.dumps(code)}, globals())
-        
+
         # Execute Test Code
         if {json.dumps(test_code)}:
             exec({json.dumps(test_code)}, globals())

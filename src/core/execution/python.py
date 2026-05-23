@@ -336,10 +336,10 @@ def run_user_code():
         # 0. Apply runtime sandbox & mocks
         apply_sandbox()
         apply_mocks({json.dumps(mock_imports)})
-        
+
         # 1. Execute the main code (defines functions/classes)
         exec({json.dumps(code)}, globals())
-        
+
         # 2. Execute test code if provided
         if {json.dumps(test_code)}:
             # Tests are expected to raise AssertionError on failure
@@ -348,7 +348,7 @@ def run_user_code():
         else:
             # If no tests, we just check if it imports/defines correctly
             results["main_result"] = "Execution Successful"
-            
+
     except Exception as e:
         type_name = type(e).__name__
         results["error"] = {{

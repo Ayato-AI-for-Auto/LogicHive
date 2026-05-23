@@ -9,10 +9,9 @@ def extract_python_dependencies(code: str) -> list[str]:
                 for alias in node.names:
                     base = alias.name.split(".")[0]
                     dependencies.add(base)
-            elif isinstance(node, ast.ImportFrom):
-                if node.level == 0 and node.module:
-                    base = node.module.split(".")[0]
-                    dependencies.add(base)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                base = node.module.split(".")[0]
+                dependencies.add(base)
     except SyntaxError:
         return []
 
@@ -30,4 +29,4 @@ def extract_python_dependencies(code: str) -> list[str]:
         "uuid",
         "abc",
     }
-    return sorted(list(dependencies - std_lib))
+    return sorted(dependencies - std_lib)

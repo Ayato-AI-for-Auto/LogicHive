@@ -40,7 +40,7 @@ async def test_complete_asset_lifecycle_story(test_db):
     test_code = """
 def test_factorial():
     from math import factorial
-    # This is a bit recursive since we're testing the fake, 
+    # This is a bit recursive since we're testing the fake,
     # but in a real scenario the draft_code would have the implementation.
     # For testing, we ensure the sandbox can run what's provided.
     pass

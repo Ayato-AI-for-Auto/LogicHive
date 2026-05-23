@@ -1,5 +1,5 @@
 # Copyright (C) 2026 ayato-labs
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -52,7 +52,7 @@ class EvaluationManager:
             for pkg_name in [p for p in package_names if p]:
                 try:
                     pkg = importlib.import_module(pkg_name)
-                    for loader, name, is_pkg in pkgutil.walk_packages(
+                    for _loader, name, _is_pkg in pkgutil.walk_packages(
                         pkg.__path__, pkg.__name__ + "."
                     ):
                         try:

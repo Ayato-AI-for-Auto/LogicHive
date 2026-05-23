@@ -1,12 +1,9 @@
-import pytest
-import asyncio
-import json
 import sqlite3
-import os
-from pathlib import Path
-from core.evaluation.plugins.static import StructuralEvaluator, PythonStaticEvaluator
+
+import pytest
+
+from core.evaluation.plugins.static import PythonStaticEvaluator, StructuralEvaluator
 from storage.vector_store import VectorIndexManager
-from core.exceptions import SyntaxValidationError
 
 
 @pytest.mark.asyncio

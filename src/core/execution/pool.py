@@ -51,8 +51,7 @@ class PoolManager:
             # Quick check using nvidia-smi
             result = subprocess.run(
                 ["nvidia-smi"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=False,
             )

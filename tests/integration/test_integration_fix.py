@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 
 from core.exceptions import AIProviderError, SyntaxValidationError
 from orchestrator import do_save_async, do_search_async

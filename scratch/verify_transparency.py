@@ -29,7 +29,6 @@ async def verify():
 
         print(f"Full Details: {json.dumps(e.details, indent=2)}")
 
-        details = e.details or {}
         # ... (rest of the checks)
 
     print("\n[2] Testing 'Unverified' Score (No tests)")

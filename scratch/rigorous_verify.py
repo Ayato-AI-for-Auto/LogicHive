@@ -1,27 +1,25 @@
 
 import asyncio
-import sys
 import os
-import json
+import sys
 
 # Add src to path
 sys.path.append(os.path.abspath("src"))
 
 import orchestrator
-from storage.vector_store import vector_manager
-from storage.sqlite_api import sqlite_storage
+
 
 async def rigorous_verify():
     print("=== LogicHive Rigorous Verification Report ===\n")
-    
+
     # 1. Integrity Check (System-wide)
     print("[Step 1: System Integrity]")
-    from core.config import SQLITE_DB_PATH, FAISS_INDEX_PATH
+    from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
     db_exists = os.path.exists(SQLITE_DB_PATH)
     faiss_exists = os.path.exists(FAISS_INDEX_PATH)
     print(f"  - DB File: {'✅' if db_exists else '❌'}")
     print(f"  - FAISS File: {'✅' if faiss_exists else '❌'}")
-    
+
     # 2. Semantic Search Test
     print("\n[Step 2: Semantic Search Test]")
     query = "logic isolation and security"
@@ -50,7 +48,7 @@ async def rigorous_verify():
     test_name = f"verify_logic_{os.urandom(2).hex()}"
     test_code = "def verify_me(x: int): return x * 2"
     test_desc = "Verification asset for system health check. [AI-DRAFT]" # Use draft to pass with minimal testing
-    
+
     print(f"  - Attempting to save '{test_name}'...")
     try:
         success = await orchestrator.do_save_async(

@@ -1,8 +1,10 @@
-import os
-import pytest
 import asyncio
-from orchestrator import do_search_async
+import os
+
+import pytest
+
 from mcp_server import check_integrity
+from orchestrator import do_search_async
 
 
 @pytest.mark.asyncio
@@ -37,7 +39,6 @@ async def test_corrupt_embedding_resilience(test_db):
 @pytest.mark.asyncio
 async def test_lefthook_size_enforcement_simulation():
     """Simulate size check logic to ensure enforcement is possible."""
-    import os
 
     # Write dummy file > 500 lines
     dummy_file = "scratch/dummy_large.py"
@@ -45,7 +46,7 @@ async def test_lefthook_size_enforcement_simulation():
         f.write("def func(): pass\n" * 600)
 
     # Run a manual check mirroring Lefthook logic
-    with open(dummy_file, "r") as f:
+    with open(dummy_file) as f:
         lines = sum(1 for _ in f)
     assert lines > 500
 

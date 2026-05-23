@@ -29,10 +29,9 @@ class StructuralEvaluator(BaseEvaluator):
         for char in code:
             if char in pairs:
                 stack.append(char)
-            elif char in pairs.values():
-                if not stack or pairs[stack.pop()] != char:
-                    unbalanced.append(char)
-                    break
+            elif char in pairs.values() and (not stack or pairs[stack.pop()] != char):
+                unbalanced.append(char)
+                break
 
         if stack or unbalanced:
             return EvaluationResult(
@@ -67,10 +66,9 @@ class PythonStaticEvaluator(BaseEvaluator):
                         if "." in alias.name:
                             score -= 5
                             reasons.append(f"Deep import detected: {alias.name}")
-                elif isinstance(node, ast.ImportFrom):
-                    if node.level > 0:
-                        score -= 10
-                        reasons.append("Relative import detected.")
+                elif isinstance(node, ast.ImportFrom) and node.level > 0:
+                    score -= 10
+                    reasons.append("Relative import detected.")
 
             # Additional heuristic: check for too many functions in one asset
             func_count = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))

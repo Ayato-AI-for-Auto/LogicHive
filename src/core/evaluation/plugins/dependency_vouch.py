@@ -141,9 +141,8 @@ class DependencyVouchEvaluator(BaseEvaluator):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.add(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                if node.level == 0 and node.module:
-                    imports.add(node.module)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imports.add(node.module)
         return imports
 
     def _load_manifest_dependencies(self, cwd: str) -> set[str]:

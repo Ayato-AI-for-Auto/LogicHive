@@ -1,5 +1,5 @@
 # Copyright (C) 2026 ayato-labs
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -141,12 +141,7 @@ class DeterministicEvaluator(BaseEvaluator):
         if isinstance(node, (ast.Num, ast.Str, ast.Bytes, ast.NameConstant)):
             return True
         # Handle common trivial comparisons: 1 == 1, True is True
-        if isinstance(node, ast.Compare):
-            if self._is_constant_expr(node.left) and all(
-                self._is_constant_expr(comp) for comp in node.comparators
-            ):
-                return True
-        return False
+        return bool(isinstance(node, ast.Compare) and self._is_constant_expr(node.left) and all(self._is_constant_expr(comp) for comp in node.comparators))
 
     def _verify_test_calls_code_python(self, code: str, test_code: str) -> bool:
         """Checks if test_code calls any function or class defined in code."""
@@ -245,11 +240,10 @@ class DeterministicEvaluator(BaseEvaluator):
                         base_mod = alias.name.split(".")[0]
                         if base_mod in HEAVY_LIBS:
                             heavy_found.append(base_mod)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        base_mod = node.module.split(".")[0]
-                        if base_mod in HEAVY_LIBS:
-                            heavy_found.append(base_mod)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    base_mod = node.module.split(".")[0]
+                    if base_mod in HEAVY_LIBS:
+                        heavy_found.append(base_mod)
             return list(set(heavy_found))
         except SyntaxError:
             return []

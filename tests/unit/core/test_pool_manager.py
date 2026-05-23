@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -41,10 +42,8 @@ async def pool_manager():
         await manager.shutdown()
         # Ensure task is really gone
         if manager._worker_task:
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await manager._worker_task
-            except asyncio.CancelledError:
-                pass
 
     force_rmtree(test_pool_dir)
 

@@ -24,7 +24,7 @@ class ExecutorFactory:
             package_name = __package__
             package = importlib.import_module(package_name)
 
-            for loader, name, is_pkg in pkgutil.walk_packages(
+            for _loader, name, _is_pkg in pkgutil.walk_packages(
                 package.__path__, package.__name__ + "."
             ):
                 if name.endswith("__init__") or name.endswith(".base") or name.endswith(".factory"):

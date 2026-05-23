@@ -74,4 +74,4 @@ async def test_duplicate_logic_rejection(test_db):
         )
 
     assert "Asset with identical logic is already registered" in str(excinfo.value)
-    print(f"\n[INTEGRATION TEST] Correctly rejected duplicate logic.")
+    print("\n[INTEGRATION TEST] Correctly rejected duplicate logic.")

@@ -1,6 +1,6 @@
 import asyncio
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 # Ensure we can import from src
@@ -11,6 +11,7 @@ from core.evaluation.manager import EvaluationManager
 from core.evaluation.plugins.ai import AIGateEvaluator
 from core.evaluation.plugins.security_static import SecurityStaticEvaluator
 from storage.sqlite_api import sqlite_storage
+
 
 async def verify_hardening():
     print("=== LogicHive Hardening Verification ===\n")
@@ -33,7 +34,7 @@ async def verify_hardening():
     # Mock LogicIntelligence to simulate an API failure
     mock_intel = MagicMock()
     mock_intel.evaluate_quality = MagicMock(side_effect=Exception("Simulated API Down"))
-    
+
     ai_gate = AIGateEvaluator(api_key="fake", intel=mock_intel)
     try:
         res = await ai_gate.evaluate("def test(): pass", "python")
@@ -72,9 +73,9 @@ async def verify_hardening():
             # We must provide some code that passes structural check
             good_code = "def foo():\n  return 1"
             good_test = "def test_foo():\n  assert foo() == 1"
-            
+
             agg_res = await manager.evaluate_all(good_code, "python", test_code=good_test)
-            if agg_res.get("is_system_error") == True:
+            if agg_res.get("is_system_error"):
                 print("   [SUCCESS] Manager correctly aggregated is_system_error flag.")
             else:
                 print(f"   [FAILURE] Manager failed to aggregate error flag: {agg_res}")

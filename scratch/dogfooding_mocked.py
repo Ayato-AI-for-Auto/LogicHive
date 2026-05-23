@@ -7,8 +7,8 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath("src"))
 
-from orchestrator import do_save_async
 from core.exceptions import ValidationError
+from orchestrator import do_save_async
 
 # Configure logging to see the instrumentation
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -46,15 +46,15 @@ async def test_mocked_fetch():
     mock_resp = AsyncMock()
     mock_resp.json.return_value = {"status": "success", "val": 100}
     mock_resp.__aenter__.return_value = mock_resp
-    
+
     # Setup the mock session
     mock_session = MagicMock()
     mock_session.get.return_value = mock_resp
     mock_session.__aenter__.return_value = mock_session
-    
+
     # Patch the ClientSession constructor
     aiohttp.ClientSession = MagicMock(return_value=mock_session)
-    
+
     # Execute and verify
     result = await resilient_fetch_logic("http://anything.com")
     assert result.data["val"] == 100

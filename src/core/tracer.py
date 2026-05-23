@@ -2,7 +2,6 @@ import time
 import uuid
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
 
 from core.logging_config import current_run_id, get_logger
 

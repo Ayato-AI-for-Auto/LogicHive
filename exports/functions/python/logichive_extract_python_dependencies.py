@@ -12,10 +12,9 @@ def extract_python_dependencies(code: str) -> List[str]:
                     # Get base package name (e.g., 'os' from 'os.path')
                     base = alias.name.split(".")[0]
                     dependencies.add(base)
-            elif isinstance(node, ast.ImportFrom):
-                if node.level == 0 and node.module:
-                    base = node.module.split(".")[0]
-                    dependencies.add(base)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                base = node.module.split(".")[0]
+                dependencies.add(base)
     except SyntaxError as e:
         logger.error(f"Orchestrator: Syntax error during dependency extraction: {e}")
         # For personal use, we assume code is generally correct, but syntax error is a hard failure.
@@ -41,4 +40,4 @@ def extract_python_dependencies(code: str) -> List[str]:
         "uuid",
         "abc",
     }
-    return sorted(list(dependencies - std_lib))
+    return sorted(dependencies - std_lib)

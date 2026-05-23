@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+
 from orchestrator import do_get_verification_status, do_save_async
 
 
@@ -65,7 +66,6 @@ async def test_chaos_timeout_handling(test_db, monkeypatch):
     Chaos Test: Simulates an infrastructure timeout during verification.
     """
     from core.evaluation.manager import EvaluationManager
-    from core.evaluation.base import EvaluationResult
 
     async def mock_eval_all(*args, **kwargs):
         # Return a result that specifically triggers 'error' status
@@ -89,4 +89,4 @@ async def test_chaos_timeout_handling(test_db, monkeypatch):
             break
 
     assert status["status"] == "error"
-    print(f"\n[CHAOS TEST] Correctly reported infrastructure error on timeout.")
+    print("\n[CHAOS TEST] Correctly reported infrastructure error on timeout.")
