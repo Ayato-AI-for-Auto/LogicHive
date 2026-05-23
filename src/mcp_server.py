@@ -1,5 +1,5 @@
 # Copyright (C) 2026 ayato-labs
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -248,8 +248,6 @@ async def debug_db(wait_for_previous: bool = False) -> str:
     Args:
         wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
     """
-    import os
-    import sqlite3
 
     from core.config import SQLITE_DB_PATH
 
@@ -338,11 +336,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     Args:
         wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
     """
-    import os
 
-    from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
-    from core.db import get_db_connection
-    from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
 
     status = ["## LogicHive Integrity Report\n"]
@@ -462,7 +456,6 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
     Forcefully rebuilds the FAISS vector index from all embeddings stored in the database.
     Use this if 'check_integrity' reports a desync between DB and Vector Store.
     """
-    from storage.vector_store import vector_manager
 
     try:
         logger.info("[TRACE] MCP: Tool 'rebuild_index' called.")
@@ -474,4 +467,8 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    from core.config import HOST, PORT
+    from core import __version__
+
+    logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
+    mcp.run(transport="sse", host=HOST, port=PORT)

@@ -1,5 +1,4 @@
 import json
-import logging
 from typing import Any
 
 import httpx
@@ -9,14 +8,16 @@ from google.genai import types
 from core.config import (
     EMBEDDING_MODEL_ID,
     GEMINI_API_KEY,
+    GEMINI_MODEL,
     MODEL_TYPE,
     OLLAMA_MODEL,
     OLLAMA_URL,
     VECTOR_DIMENSION,
 )
 from core.exceptions import AIProviderError
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LogicIntelligence:
@@ -53,7 +54,6 @@ class LogicIntelligence:
             self.gemini_client = None
 
         # For generation tasks, we dynamically choose based on availability
-        from core.config import GEMINI_MODEL
 
         self.model_id = GEMINI_MODEL
         self.ollama_url = OLLAMA_URL
@@ -98,10 +98,10 @@ class LogicIntelligence:
     async def _call_gemini(self, prompt: str, use_json: bool) -> Any:
         if not self.gemini_client:
             return {} if use_json else ""
-        
+
         use_json_mode = use_json and "gemma" not in self.model_id.lower()
         config = types.GenerateContentConfig(response_mime_type="application/json") if use_json_mode else None
-        
+
         try:
             response = self.gemini_client.models.generate_content(
                 model=self.model_id, contents=[prompt], config=config

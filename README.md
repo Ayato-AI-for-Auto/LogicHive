@@ -48,13 +48,40 @@ If you must have top-level imports, use the `mock_imports` parameter in `save_fu
 
 ---
 
-## 🚀 Quick Setup
+## 🚀 Quick Setup (Docker - Recommended)
+
+LogicHive is distributed as a Docker container for seamless use on **Windows, macOS, and Linux**.
+
+```bash
+# 1. Pull the latest image
+docker pull ghcr.io/ayato-labs/logichive-hub:latest
+
+# 2. Run the MCP Server
+docker run -d \
+  -p 10880:10880 \
+  -e GEMINI_API_KEY=your_api_key_here \
+  -v logichive_data:/app/storage/data \
+  --name logichive-hub \
+  ghcr.io/ayato-labs/logichive-hub:latest
+```
+
+### 🔌 Connecting to AI Clients
+
+Use the SSE endpoint in your AI clients (Cursor, Claude Desktop, etc.):
+
+- **SSE Endpoint**: `http://localhost:10880/sse`
+
+---
+
+## 🛠️ Local Development (Manual Setup)
+
+If you prefer to run LogicHive without Docker:
 
 ```powershell
 # 1. Install dependencies
 uv pip install -e .
 
-# 2. Register MCP Server
+# 2. Start LogicHive MCP Server
 uv run src/mcp_server.py
 ```
 

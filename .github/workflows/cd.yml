@@ -42,6 +42,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
+      - name: Run Lint (Ruff)
+        run: |
+          # Strict check for core logic
+          uv run ruff check src tests --line-length 100
+          # Relaxed check for others (ignore formatting/complexity/print)
+          uv run ruff check . --exclude src --exclude tests --line-length 100 --ignore E501,T201,C901
+
       - name: Run tests
         id: pytest
         run: |
@@ -136,41 +143,66 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release:
-    name: Build and Release EXE
+  release_version:
+    name: Semantic Release
     needs: test
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install dependencies
+        run: npm install
+      - name: Release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+
+  docker:
+    name: Build and Push Docker Image
+    needs: release_version
+    if: needs.release_version.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          fetch-depth: 0
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set FORCE_JAVASCRIPT_ACTIONS_TO_NODE24
-        run: echo "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true" >> $GITHUB_ENV
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          enable-cache: true
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release_version.outputs.new_release_version }}
+            type=raw,value=latest
 
-      - name: Set up Python
-        run: uv python install 3.11
-
-      - name: Install dependencies
-        run: |
-          uv sync --all-extras
-
-      - name: Build EXE
-        run: |
-          uv run pyinstaller --noconfirm LogicHive.spec
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          files: dist/LogicHive-MCP.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

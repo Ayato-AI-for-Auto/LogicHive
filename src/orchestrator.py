@@ -1,5 +1,5 @@
 # Copyright (C) 2026 ayato-labs
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -7,7 +7,6 @@
 
 import ast
 import asyncio
-import logging
 import re
 import uuid
 from typing import Any
@@ -23,11 +22,12 @@ from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
 from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
+from core.logging_config import get_logger
 from core.tracer import trace_execution
 from storage.sqlite_api import sqlite_storage
 from storage.vector_store import vector_manager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # --- Resource Constraints ---
 # Limit concurrent search requests to prevent LLM pipeline instability

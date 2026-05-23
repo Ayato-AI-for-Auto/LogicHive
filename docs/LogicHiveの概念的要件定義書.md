@@ -154,6 +154,12 @@ LogicHiveの「防腐(Anti-Rot)」機構を構築する過程で、我々は重�
 
 「論理」を追求する過程で陥りやすい「完璧主義の罠」を回避するため、以下の実用的な運用ルールを適用する。
 
+#### 3.2 デリバリと環境戦略 (Delivery & Environment)
+- **Docker First**: 全てのプラットフォーム(Windows, macOS, Linux)で同一の動作環境を保証するため、Dockerイメージによる配信をデフォルトとする。
+- **Container Registry**: GitHub Container Registry (GHCR) を通じて最新の検証済みイメージを配布する。
+- **SSE Transport**: StdioではなくHTTP(SSE)を介した通信を採用し、コンテナ外からのアクセスを容易にする。
+- **Isolated Sandboxing**: ロジックの検証はコンテナ内部でさらに隔離された一時的な環境(uv/venv)で実行される。
+
 1. **検証結果の完全開示 (Glassbox Verification)**:
    - 品質ゲートでリジェクトされた際、単にスコアを返すのではなく、**各エバリュエータの内訳、標準出力(stdout)、エラー出力(stderr)、およびスタックトレース(Traceback)をすべて開示**する。
    - 「なぜ落ちたのか」をユーザーが1秒で理解できる状態を維持する。
