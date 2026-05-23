@@ -48,12 +48,15 @@ If you must have top-level imports, use the `mock_imports` parameter in `save_fu
 
 ---
 
-## 🚀 Quick Setup (Docker - Recommended)
+## 🚀 Quick Setup (Container: Docker / Podman)
 
-LogicHive is distributed as a Docker container for seamless use on **Windows, macOS, and Linux**.
+LogicHive is distributed as an **OCI-compliant Container Image**. This ensures cross-platform compatibility without vendor lock-in.
+
+> **Note on Licensing for Business Users**: 
+> You do **not** need a paid Docker Desktop license to run LogicHive. Because this is a standard OCI image, you can run it using 100% free and open-source alternatives like **Podman**, **Rancher Desktop**, or **OrbStack** on macOS/Windows, or standard Docker Engine on Linux.
 
 ```bash
-# 1. Pull the latest image
+# 1. Pull the latest image (Replace 'docker' with 'podman' if using Podman)
 docker pull ghcr.io/ayato-labs/logichive-hub:latest
 
 # 2. Run the MCP Server
