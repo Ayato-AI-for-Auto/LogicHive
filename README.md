@@ -50,16 +50,18 @@ If you must have top-level imports, use the `mock_imports` parameter in `save_fu
 
 ## ⚙️ Configuration
 
-LogicHive is configured via environment variables or a `.env` file.
+LogicHive is configured via environment variables or a `.env` file, resolving in the following order:
 
+1.  **Local `.env` (Primary)**: Place `.env` in the same directory as `LogicHive-MCP.exe` (or project root).
+2.  **User Home (Fallback)**: `~/.logichive/.env` (Global settings across folder moves).
+3.  **OS Environment Variables**: Directly set variables override `.env` values.
+
+**Setup Steps:**
 1.  **Locate `.env.example`**: Copy this file to `.env`.
 2.  **Set your API Keys**: At minimum, set `GEMINI_API_KEY`.
-3.  **Deployment Specifics**:
-    -   **EXE User**: Place the `.env` file in the same folder as `LogicHive-MCP.exe`.
-    -   **Docker User**: Pass variables via `-e` or a `.env` file.
-    -   **Source User**: Place `.env` in the project root.
+3.  **Place the file**: Follow the rules above based on your deployment.
 
-See [.env.example](.env.example) for all available options including Ollama, model selection, and security drivers.
+See [.env.example](.env.example) and [ADR-005](docs/adr/005-configuration-resolution-strategy.md) for details.
 
 ---
 
