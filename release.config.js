@@ -8,6 +8,7 @@ module.exports = {
       "@semantic-release/exec",
       {
         prepareCmd: "python tools/migration/update_version.py ${nextRelease.version}",
+        successCmd: "echo \"new_release_published=true\" >> $GITHUB_OUTPUT && echo \"new_release_version=${nextRelease.version}\" >> $GITHUB_OUTPUT",
       },
     ],
     [
