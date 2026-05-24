@@ -77,11 +77,40 @@ docker run -d \
   ghcr.io/ayato-labs/logichive-hub:latest
 ```
 
-### 🔌 Connecting to AI Clients
+### 🔌 Connecting to AI Clients (MCP SSE)
 
-Use the SSE endpoint in your AI clients (Cursor, Claude Desktop, etc.):
+LogicHive now runs as a **Streamable HTTP (SSE)** server. Unlike traditional Stdio-based MCP servers, you do not need to specify a launch command in your config. Instead, point your client to the SSE URL.
 
 - **SSE Endpoint**: `http://localhost:10880/sse`
+
+#### For Cursor / VS Code
+Add a new MCP server with:
+- **Type**: `SSE`
+- **URL**: `http://localhost:10880/sse`
+
+#### For Claude Desktop
+Add the following to your `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "logichive": {
+      "url": "http://localhost:10880/sse"
+    }
+  }
+}
+```
+
+#### For Generic `mcp.json`
+```json
+{
+  "mcpServers": {
+    "logichive": {
+      "url": "http://localhost:10880/sse"
+    }
+  }
+}
+```
 
 ---
 
