@@ -4,12 +4,15 @@ import sys
 
 block_cipher = None
 
+# Reliable way to get script directory
+script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+
 # Ensure the project root is in the path so 'src' is resolvable
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(script_dir, '..', '..')))
 
 a = Analysis(
-    [os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'mcp_server.py'))],
-    pathex=[os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))],
+    [os.path.abspath(os.path.join(script_dir, '..', '..', 'src', 'mcp_server.py'))],
+    pathex=[os.path.abspath(os.path.join(script_dir, '..', '..', 'src'))],
     binaries=[],
     datas=[],
     hiddenimports=[
