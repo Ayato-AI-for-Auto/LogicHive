@@ -1,10 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+import sys
 
 block_cipher = None
 
+# Ensure the project root is in the path so 'src' is resolvable
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 a = Analysis(
-    ['src/mcp_server.py'],
-    pathex=['src'],
+    [os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'mcp_server.py'))],
+    pathex=[os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))],
     binaries=[],
     datas=[],
     hiddenimports=[
