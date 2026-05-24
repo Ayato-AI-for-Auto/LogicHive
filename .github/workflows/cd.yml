@@ -131,11 +131,15 @@ jobs:
         run: uv sync --all-extras
 
       - name: Build EXE with PyInstaller
+        shell: pwsh
         run: |
-          uv run pyinstaller --noconfirm LogicHive.spec
+          $env:PYTHONPATH = "src"
+          uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
 
       - name: Upload to GitHub Release
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.release_version.outputs.new_release_version }}
         run: |
-          gh release upload v${{ needs.release_version.outputs.new_release_version }} dist/LogicHive-MCP.exe --clobber
+          gh release upload "v$env:RELEASE_VERSION" dist/LogicHive-MCP.exe --clobber
