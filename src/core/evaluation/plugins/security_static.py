@@ -77,11 +77,7 @@ class SecurityVisitor(ast.NodeVisitor):
                 # Targets: API_KEY, PASSWORD, TOKEN, SECRET, etc.
                 pattern = r"(API_KEY|PASSWORD|TOKEN|AUTH_TOKEN|PRIVATE_KEY|AWS_SECRET|SECRET_KEY)"
                 if re.search(pattern, name) and isinstance(node.value, (ast.Constant, ast.Str)):
-                    val = (
-                        node.value.value
-                        if isinstance(node.value, ast.Constant)
-                        else node.value.s
-                    )
+                    val = node.value.value if isinstance(node.value, ast.Constant) else node.value.s
                     if isinstance(val, str) and len(val) > 4:  # Ignore very short strings
                         self.issues.append(
                             {
@@ -106,8 +102,16 @@ class SecurityVisitor(ast.NodeVisitor):
             self._add_issue("insecure_deserialization", node.lineno, "Pickle usage is insecure")
 
         # 3. Command Injection
-        if func_name in ("run", "call", "Popen", "check_call", "check_output") and self._has_shell_true(node):
-            self._add_issue("command_injection", node.lineno, f"Subprocess '{func_name}' with shell=True")
+        if func_name in (
+            "run",
+            "call",
+            "Popen",
+            "check_call",
+            "check_output",
+        ) and self._has_shell_true(node):
+            self._add_issue(
+                "command_injection", node.lineno, f"Subprocess '{func_name}' with shell=True"
+            )
 
         self.generic_visit(node)
 
@@ -130,12 +134,14 @@ class SecurityVisitor(ast.NodeVisitor):
         return False
 
     def _add_issue(self, issue_type, lineno, message, severity="high"):
-        self.issues.append({
-            "issue": issue_type,
-            "lineno": lineno,
-            "severity": severity,
-            "message": message,
-        })
+        self.issues.append(
+            {
+                "issue": issue_type,
+                "lineno": lineno,
+                "severity": severity,
+                "message": message,
+            }
+        )
 
     def check_sql_injection(self):
         """Regex-based catch for obvious SQL injection patterns."""

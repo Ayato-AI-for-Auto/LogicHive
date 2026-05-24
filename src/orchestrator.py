@@ -48,8 +48,22 @@ def extract_dependencies(code: str, language: str = "python") -> list[str]:
 
     # Clean up standard libs/internal refs
     std_lib = {
-        "os", "sys", "json", "math", "datetime", "typing", "asyncio", "logging",
-        "ast", "pathlib", "abc", "fs", "path", "http", "https", "crypto",
+        "os",
+        "sys",
+        "json",
+        "math",
+        "datetime",
+        "typing",
+        "asyncio",
+        "logging",
+        "ast",
+        "pathlib",
+        "abc",
+        "fs",
+        "path",
+        "http",
+        "https",
+        "crypto",
     }
     return sorted(dependencies - std_lib)
 
@@ -89,10 +103,16 @@ def _extract_js_deps(code: str) -> set[str]:
 
 @trace_execution
 async def do_save_async(
-    name: str, code: str, description: str = "", tags: list[str] | None = None,
-    language: str = "python", dependencies: list[str] | None = None,
-    test_code: str = "", project: str = "default",
-    mock_imports: list[str] | None = None, timeout: int | None = None,
+    name: str,
+    code: str,
+    description: str = "",
+    tags: list[str] | None = None,
+    language: str = "python",
+    dependencies: list[str] | None = None,
+    test_code: str = "",
+    project: str = "default",
+    mock_imports: list[str] | None = None,
+    timeout: int | None = None,
 ):
     """Asynchronously saves a function with background verification."""
     tags, dependencies, mock_imports = tags or [], dependencies or [], mock_imports or []
@@ -106,13 +126,23 @@ async def do_save_async(
         dependencies = extract_dependencies(code, language=language)
 
     from core.system_info import SystemFingerprint
+
     data = {
-        "id": str(uuid.uuid4()), "name": str(name), "code": str(code),
-        "description": str(description), "language": str(language), "tags": tags,
-        "reliability_score": 0.0, "embedding": None, "code_hash": str(code_hash),
-        "dependencies": dependencies, "test_code": test_code, "project": project,
+        "id": str(uuid.uuid4()),
+        "name": str(name),
+        "code": str(code),
+        "description": str(description),
+        "language": str(language),
+        "tags": tags,
+        "reliability_score": 0.0,
+        "embedding": None,
+        "code_hash": str(code_hash),
+        "dependencies": dependencies,
+        "test_code": test_code,
+        "project": project,
         "env_fingerprint": SystemFingerprint.get_current(),
-        "verification_status": "pending", "verification_report": None,
+        "verification_status": "pending",
+        "verification_report": None,
     }
 
     # 3. Initial Save & Trigger Verification
@@ -120,9 +150,20 @@ async def do_save_async(
     if not await sqlite_storage.upsert_function(data):
         raise RuntimeError("Failed to perform initial save to LogicHive vault.")
 
-    asyncio.create_task(_run_async_verification_pipeline(
-        name, project, code, description, tags, language, dependencies, test_code, mock_imports, timeout
-    ))
+    asyncio.create_task(
+        _run_async_verification_pipeline(
+            name,
+            project,
+            code,
+            description,
+            tags,
+            language,
+            dependencies,
+            test_code,
+            mock_imports,
+            timeout,
+        )
+    )
 
     logger.info(f"Orchestrator: Save accepted for '{name}'. Verification running.")
     return True

@@ -47,9 +47,7 @@ class EphemeralPythonExecutor(BaseExecutor):
             parent.kill()
             logger.debug(f"Executor: Process tree for PID {pid} killed.")
         except (psutil.NoSuchProcess, psutil.AccessDenied):
-            logger.trace(
-                f"Executor: Parent process {pid} already gone while killing process tree."
-            )
+            logger.trace(f"Executor: Parent process {pid} already gone while killing process tree.")
 
     async def execute(
         self,
@@ -98,6 +96,7 @@ class EphemeralPythonExecutor(BaseExecutor):
         finally:
             if pooled_env:
                 from .pool import pool_manager
+
                 await pool_manager.release(pooled_env)
 
     async def _acquire_pooled_env(self, dependencies):
@@ -105,6 +104,7 @@ class EphemeralPythonExecutor(BaseExecutor):
             return None
 
         from .pool import pool_manager
+
         target_spec = None
         if any("torch" in d.lower() for d in dependencies):
             target_spec = "torch-gpu" if pool_manager.has_gpu else "torch-cpu"
@@ -118,10 +118,12 @@ class EphemeralPythonExecutor(BaseExecutor):
         workspace = {
             "script_file": tmp_path / "solution.py",
             "harness_file": tmp_path / "harness.py",
-            "result_file": tmp_path / "result.json"
+            "result_file": tmp_path / "result.json",
         }
         workspace["script_file"].write_text(code, encoding="utf-8")
-        harness_content = self._generate_harness(code, test_code, workspace["result_file"], mock_imports)
+        harness_content = self._generate_harness(
+            code, test_code, workspace["result_file"], mock_imports
+        )
         workspace["harness_file"].write_text(harness_content, encoding="utf-8")
         return workspace
 
@@ -136,25 +138,47 @@ class EphemeralPythonExecutor(BaseExecutor):
         return cmd
 
     async def _run_subprocess(self, cmd, cwd, timeout, memory_limit, result_file):
-        process_env = {k: v for k, v in os.environ.items() if k in [
-            "PATH", "SYSTEMROOT", "SystemDrive", "USERPROFILE", "APPDATA",
-            "LOCALAPPDATA", "TEMP", "TMP", "USERNAME", "HOME", "HOMEDRIVE",
-            "HOMEPATH", "ProgramData"
-        ]}
+        process_env = {
+            k: v
+            for k, v in os.environ.items()
+            if k
+            in [
+                "PATH",
+                "SYSTEMROOT",
+                "SystemDrive",
+                "USERPROFILE",
+                "APPDATA",
+                "LOCALAPPDATA",
+                "TEMP",
+                "TMP",
+                "USERNAME",
+                "HOME",
+                "HOMEDRIVE",
+                "HOMEPATH",
+                "ProgramData",
+            ]
+        }
         process_env.update({"PYTHONPATH": "", "PYTHONNOUSERSITE": "1"})
 
         process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-            cwd=cwd, env=process_env,
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+            env=process_env,
         )
 
         # Track state across tasks
         state = {"memory_exceeded": False}
         done_event = asyncio.Event()
-        monitor_task = asyncio.create_task(self._monitor_resources(process, memory_limit, done_event, state))
+        monitor_task = asyncio.create_task(
+            self._monitor_resources(process, memory_limit, done_event, state)
+        )
 
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
             stdout = stdout_bytes.decode("utf-8", errors="replace")
             stderr = stderr_bytes.decode("utf-8", errors="replace")
 
@@ -169,13 +193,16 @@ class EphemeralPythonExecutor(BaseExecutor):
         except asyncio.TimeoutError:
             self._kill_process_tree(process.pid)
             await process.wait()
-            return ExecutionResult(status=ExecutionStatus.TIMEOUT, logs=ExecutionLogs(stderr="Execution timed out."))
+            return ExecutionResult(
+                status=ExecutionStatus.TIMEOUT, logs=ExecutionLogs(stderr="Execution timed out.")
+            )
         finally:
             done_event.set()
             monitor_task.cancel()
 
     async def _monitor_resources(self, process, limit_mb, done_event, state):
         import psutil
+
         try:
             while not done_event.is_set():
                 try:
@@ -204,18 +231,31 @@ class EphemeralPythonExecutor(BaseExecutor):
             try:
                 raw = json.loads(result_file.read_text(encoding="utf-8"))
                 if "main_result" in raw:
-                    results.append(Result(data=raw["main_result"], metadata={"is_main_result": True}))
+                    results.append(
+                        Result(data=raw["main_result"], metadata={"is_main_result": True})
+                    )
                 if raw.get("error"):
                     err_info = raw["error"]
-                    error = ExecutionError(name=err_info.get("name", "UnknownError"), value=err_info.get("value", ""), traceback=err_info.get("traceback", ""))
+                    error = ExecutionError(
+                        name=err_info.get("name", "UnknownError"),
+                        value=err_info.get("value", ""),
+                        traceback=err_info.get("traceback", ""),
+                    )
                     status = ExecutionStatus.FAILURE
             except Exception as e:
                 logger.error(f"Executor: Failed to parse harness results: {e}")
 
         if status == ExecutionStatus.FAILURE and not error:
-            error = ExecutionError(name="RuntimeError", value=f"Exit code {returncode}", traceback=stderr)
+            error = ExecutionError(
+                name="RuntimeError", value=f"Exit code {returncode}", traceback=stderr
+            )
 
-        return ExecutionResult(status=status, logs=ExecutionLogs(stdout=stdout, stderr=stderr), results=results, error=error)
+        return ExecutionResult(
+            status=status,
+            logs=ExecutionLogs(stdout=stdout, stderr=stderr),
+            results=results,
+            error=error,
+        )
 
     def _generate_harness(
         self, code: str, test_code: str, result_file: Path, mock_imports: list[str] | None = None

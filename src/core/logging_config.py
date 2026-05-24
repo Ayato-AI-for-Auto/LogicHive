@@ -40,9 +40,10 @@ def json_serializer(record):
         exception = {
             "type": type_name.__name__ if hasattr(type_name, "__name__") else str(type_name),
             "value": str(value),
-            "traceback": record["extra"].get("traceback_str") or ""  # Loguru usually handles tb formatting
+            "traceback": record["extra"].get("traceback_str")
+            or "",  # Loguru usually handles tb formatting
         }
-    
+
     subset = {
         "timestamp": record["time"].isoformat(),
         "level": record["level"].name,
@@ -122,4 +123,3 @@ def get_logger(name: str):
 
 # Initialize on module load
 setup_logging()
-

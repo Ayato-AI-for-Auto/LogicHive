@@ -2,6 +2,7 @@ import importlib
 import pkgutil
 
 from core.logging_config import get_logger
+
 from .base import BaseExecutor
 
 logger = get_logger(__name__)
@@ -34,11 +35,17 @@ class ExecutorFactory:
                     importlib.import_module(name)
                     logger.debug(f"ExecutorFactory: Loaded executor module {name}")
                 except Exception as e:
-                    logger.error(f"ExecutorFactory: Failed to load module {name}: {e}", exc_info=True)
+                    logger.error(
+                        f"ExecutorFactory: Failed to load module {name}: {e}", exc_info=True
+                    )
             cls._loaded = True
-            logger.info(f"ExecutorFactory: Plugin discovery finished. Loaded languages: {list(cls._executors.keys())}")
+            logger.info(
+                f"ExecutorFactory: Plugin discovery finished. Loaded languages: {list(cls._executors.keys())}"
+            )
         except Exception as e:
-            logger.error(f"ExecutorFactory: Critical failure during plugin discovery: {e}", exc_info=True)
+            logger.error(
+                f"ExecutorFactory: Critical failure during plugin discovery: {e}", exc_info=True
+            )
 
     @classmethod
     def register(cls, language: str, executor: BaseExecutor):
@@ -53,12 +60,12 @@ class ExecutorFactory:
         from core.config import EXECUTION_DRIVER
 
         # If docker is requested and we have a docker variant, return it
-        if EXECUTION_DRIVER == "docker":
+        if EXECUTION_DRIVER == "docker" and lang == "python":
             # For now, we only have docker for python
-            if lang == "python":
-                from .docker import DockerPythonExecutor
-                logger.debug(f"ExecutorFactory: Returning DockerPythonExecutor for {lang}")
-                return DockerPythonExecutor()
+            from .docker import DockerPythonExecutor
+
+            logger.debug(f"ExecutorFactory: Returning DockerPythonExecutor for {lang}")
+            return DockerPythonExecutor()
 
         executor = cls._executors.get(lang)
         if not executor:

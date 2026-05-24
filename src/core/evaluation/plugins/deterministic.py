@@ -99,7 +99,11 @@ class DeterministicEvaluator(BaseEvaluator):
                 if isinstance(node, ast.Assert):
                     if not self._is_constant_expr(node.test):
                         count += 1
-                elif isinstance(node, ast.Call) and self._is_assert_call(node) and not self._is_theatrical_call(node):
+                elif (
+                    isinstance(node, ast.Call)
+                    and self._is_assert_call(node)
+                    and not self._is_theatrical_call(node)
+                ):
                     count += 1
             return count
         except SyntaxError:
@@ -132,7 +136,11 @@ class DeterministicEvaluator(BaseEvaluator):
         if isinstance(node, (ast.Num, ast.Str, ast.Bytes, ast.NameConstant)):
             return True
         # Handle common trivial comparisons: 1 == 1, True is True
-        return bool(isinstance(node, ast.Compare) and self._is_constant_expr(node.left) and all(self._is_constant_expr(comp) for comp in node.comparators))
+        return bool(
+            isinstance(node, ast.Compare)
+            and self._is_constant_expr(node.left)
+            and all(self._is_constant_expr(comp) for comp in node.comparators)
+        )
 
     def _verify_test_calls_code_python(self, code: str, test_code: str) -> bool:
         """Checks if test_code calls any function or class defined in code."""
@@ -143,7 +151,9 @@ class DeterministicEvaluator(BaseEvaluator):
             # Find all public definitions in code
             defined_names = set()
             for node in ast.walk(code_tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and not node.name.startswith("_"):
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                ) and not node.name.startswith("_"):
                     defined_names.add(node.name)
 
             if not defined_names:
@@ -178,7 +188,9 @@ class DeterministicEvaluator(BaseEvaluator):
         for m in matches:
             # Heuristic: If it looks like assert(true) or assert(1 == 1)
             inner = m.lower()
-            if ("true" in inner or "false" in inner or "1==1" in inner or "1 == 1" in inner) and len(inner) < 20:
+            if (
+                "true" in inner or "false" in inner or "1==1" in inner or "1 == 1" in inner
+            ) and len(inner) < 20:
                 continue
             valid_matches += 1
 

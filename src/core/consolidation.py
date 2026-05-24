@@ -100,7 +100,11 @@ class LogicIntelligence:
             return {} if use_json else ""
 
         use_json_mode = use_json and "gemma" not in self.model_id.lower()
-        config = types.GenerateContentConfig(response_mime_type="application/json") if use_json_mode else None
+        config = (
+            types.GenerateContentConfig(response_mime_type="application/json")
+            if use_json_mode
+            else None
+        )
 
         try:
             response = self.gemini_client.models.generate_content(
@@ -114,7 +118,15 @@ class LogicIntelligence:
             end_idx = text.rfind("}")
             if start_idx != -1 and end_idx != -1:
                 parsed = json.loads(text[start_idx : end_idx + 1])
-                return (parsed[0] if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) else parsed) if isinstance(parsed, dict) else {}
+                return (
+                    (
+                        parsed[0]
+                        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict)
+                        else parsed
+                    )
+                    if isinstance(parsed, dict)
+                    else {}
+                )
             return {}
         except (json.JSONDecodeError, ValueError) as e:
             raise AIProviderError(f"JSON parsing failed: {e}") from e

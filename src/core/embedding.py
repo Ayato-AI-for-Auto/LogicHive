@@ -1,11 +1,10 @@
 import logging
 
-from core.logging_config import get_logger
-
 from core.config import (
     EMBEDDING_MODEL_ID,
     GEMINI_API_KEY,
 )
+from core.logging_config import get_logger
 
 # Suppress verbose third-party logging
 logging.getLogger("google.genai").setLevel(logging.WARNING)

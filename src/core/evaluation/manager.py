@@ -144,9 +144,8 @@ class EvaluationManager:
 
     def _perform_pre_checks(self, kwargs):
         desc = (kwargs.get("description") or "").upper()
-        is_draft = (
-            kwargs.get("is_draft", False)
-            or any(k in desc for k in ["DRAFT", "AI_DRAFT", "AI-DRAFT"])
+        is_draft = kwargs.get("is_draft", False) or any(
+            k in desc for k in ["DRAFT", "AI_DRAFT", "AI-DRAFT"]
         )
         test_code = kwargs.get("test_code", "")
 
@@ -236,7 +235,7 @@ class EvaluationManager:
         run = results.get("runtime")
         if run and run.score == 0 and not any(k in (language or "").lower() for k in ["draft"]):
             # Check is_draft from kwargs indirectly or pass it
-            pass # Simplified for now
+            pass  # Simplified for now
 
         return None
 
@@ -260,7 +259,13 @@ class EvaluationManager:
         # Complex static aggregation
         static_score = self._aggregate_static_scores(results, lang)
         if static_score is not None:
-            parts.append((static_score, 0.20, f"Rigour Static: Security/Dependency verified (Avg={static_score:.1f})"))
+            parts.append(
+                (
+                    static_score,
+                    0.20,
+                    f"Rigour Static: Security/Dependency verified (Avg={static_score:.1f})",
+                )
+            )
 
         total_weight = sum(p[1] for p in parts)
         if total_weight <= 0:
@@ -274,7 +279,10 @@ class EvaluationManager:
         if ai_res:
             if ai_res.score < 30:
                 final_score = 0.0
-                reasons.insert(0, "VETO: AI Auditor identified 'Quality Theater' - Opinion confirmed rejection.")
+                reasons.insert(
+                    0,
+                    "VETO: AI Auditor identified 'Quality Theater' - Opinion confirmed rejection.",
+                )
             elif ai_res.score < 70:
                 final_score = min(final_score, ai_res.score)
 

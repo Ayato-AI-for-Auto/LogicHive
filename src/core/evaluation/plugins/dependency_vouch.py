@@ -48,11 +48,43 @@ class DependencyVouchEvaluator(BaseEvaluator):
 
     def _is_stdlib(self, module_name: str) -> bool:
         std = {
-            "os", "sys", "json", "re", "math", "datetime", "typing", "asyncio", "logging",
-            "ast", "pathlib", "abc", "collections", "functools", "itertools", "threading",
-            "multiprocessing", "pickle", "shutil", "tempfile", "time", "uuid", "hashlib",
-            "base64", "xml", "html", "unittest", "pytest", "typing_extensions", "random",
-            "enum", "inspect", "traceback", "warnings", "importlib", "glob", "argparse",
+            "os",
+            "sys",
+            "json",
+            "re",
+            "math",
+            "datetime",
+            "typing",
+            "asyncio",
+            "logging",
+            "ast",
+            "pathlib",
+            "abc",
+            "collections",
+            "functools",
+            "itertools",
+            "threading",
+            "multiprocessing",
+            "pickle",
+            "shutil",
+            "tempfile",
+            "time",
+            "uuid",
+            "hashlib",
+            "base64",
+            "xml",
+            "html",
+            "unittest",
+            "pytest",
+            "typing_extensions",
+            "random",
+            "enum",
+            "inspect",
+            "traceback",
+            "warnings",
+            "importlib",
+            "glob",
+            "argparse",
         }
         return module_name.split(".")[0] in std
 
@@ -72,7 +104,9 @@ class DependencyVouchEvaluator(BaseEvaluator):
                 continue
 
             top_level = imp.split(".")[0]
-            if (Path(cwd) / f"{top_level}.py").exists() or (Path(cwd) / top_level / "__init__.py").exists():
+            if (Path(cwd) / f"{top_level}.py").exists() or (
+                Path(cwd) / top_level / "__init__.py"
+            ).exists():
                 continue
 
             normalized = top_level.lower().replace("_", "-")
@@ -80,7 +114,14 @@ class DependencyVouchEvaluator(BaseEvaluator):
                 continue
             # Fallback for common libs if no manifest found
             if not declared and top_level in {
-                "pandas", "numpy", "requests", "pydantic", "fastapi", "sqlalchemy", "tqdm", "yaml"
+                "pandas",
+                "numpy",
+                "requests",
+                "pydantic",
+                "fastapi",
+                "sqlalchemy",
+                "tqdm",
+                "yaml",
             }:
                 continue
 

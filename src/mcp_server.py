@@ -450,6 +450,7 @@ def _format_report(report):
         return md
 
     import json
+
     return f"```json\n{json.dumps(report, indent=2)}\n```"
 
 

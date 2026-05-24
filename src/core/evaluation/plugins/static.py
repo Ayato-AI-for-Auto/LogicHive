@@ -120,10 +120,7 @@ class RuffEvaluator(BaseEvaluator):
 
                     python_dir = Path(sys.executable).parent
                     alt_ruff = python_dir / ("ruff.exe" if os.name == "nt" else "ruff")
-                    if alt_ruff.exists():
-                        ruff_cmd = str(alt_ruff)
-                    else:
-                        ruff_cmd = "ruff"  # Last resort
+                    ruff_cmd = str(alt_ruff) if alt_ruff.exists() else "ruff"  # Last resort
 
             # Use subprocess to run ruff check on stdin
             process = await asyncio.create_subprocess_exec(

@@ -87,13 +87,17 @@ class PoolManager:
                         )
                     except OSError as e:
                         # Fallback if rename fails (e.g. files in use)
-                        logger.warning(f"PoolManager: Rename failed ({e}), performing standard cleanup.")
+                        logger.warning(
+                            f"PoolManager: Rename failed ({e}), performing standard cleanup."
+                        )
                         for item in self.base_dir.iterdir():
                             if item.is_dir():
                                 try:
                                     shutil.rmtree(item)
                                 except Exception as re:
-                                    logger.debug(f"PoolManager: Partial cleanup failed for {item}: {re}")
+                                    logger.debug(
+                                        f"PoolManager: Partial cleanup failed for {item}: {re}"
+                                    )
 
                 self.base_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
