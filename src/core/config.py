@@ -14,10 +14,17 @@ load_dotenv()
 # 必要に応じて環境変数での上書き(Override)も可能です。
 
 # 1. AI & Models
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # デフォルト値を削除
-MODEL_TYPE = os.getenv("MODEL_TYPE", "gemini")  # "gemini" or "ollama"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL_TYPE = os.getenv("MODEL_TYPE", "gemini").lower()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemma-3-27b-it")
 EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "gemini-embedding-001")
+
+# Validate configuration
+if MODEL_TYPE == "gemini" and not GEMINI_API_KEY:
+    print("\n[WARNING] GEMINI_API_KEY is not set.")
+    print("LogicHive requires a Gemini API Key to function in 'gemini' mode.")
+    print("Please set the GEMINI_API_KEY environment variable or create a .env file.")
+    print("See .env.example for a template.\n")
 
 # 2. Ollama Fallback (Internal use or alternative)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
