@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,9 +34,11 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 # ⚙️ Internal System Configuration
 # ==========================================
 
-# Base Paths
-BASE_DIR = Path(__file__).parent.parent.resolve().absolute()
-PROJECT_ROOT = BASE_DIR.parent.resolve()
+# Resolve base directory: frozen (executable) vs source (development)
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 
 # Handle Cloud Run or other container environments
 IS_CLOUD = os.getenv("K_SERVICE") is not None or os.name != "nt"
@@ -44,8 +47,8 @@ if IS_CLOUD:
     # Use /tmp for ALL transient operations in the cloud
     DATA_DIR = Path("/tmp/logic-hive")
 else:
-    # Local dev fallback: Consolidate to storage/data at root
-    DATA_DIR = Path("c:/Users/saiha/My_Service/programing/MCP/LogicHive/storage/data")
+    # Local dev: Consolidate to storage/data at root
+    DATA_DIR = BASE_DIR / "storage" / "data"
 
 # Ensure transient directory exists
 try:

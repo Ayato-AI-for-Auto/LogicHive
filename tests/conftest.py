@@ -1,16 +1,31 @@
 import asyncio
+import hashlib
 import os
 import sqlite3
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from core.config import SQLITE_DB_PATH
 from loguru import logger
+
+from core.config import SQLITE_DB_PATH
+
+# Set environment variables for testing BEFORE any imports
+os.environ["SQLITE_DB_PATH"] = os.path.join("storage", "data", "test", "test_logichive.db")
+os.environ["FAISS_INDEX_PATH"] = os.path.join("storage", "data", "test", "test_faiss_index.bin")
+os.environ["FAISS_MAPPING_PATH"] = os.path.join(
+    "storage", "data", "test", "test_faiss_mapping.json"
+)
+
+# Add src to sys.path
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
-    
+
     # If test failed, dump DB metadata to logs
     if report.when == "call" and report.failed:
         logger.error(f"Test {item.name} failed. Dumping DB metadata...")
@@ -29,25 +44,6 @@ def pytest_runtest_makereport(item, call):
         except Exception as e:
             logger.error(f"Failed to dump DB metadata: {e}")
 
-# ... existing conftest.py content continues below ...
-import asyncio
-import os
-
-import pytest
-
-# Set environment variables for testing BEFORE any imports
-os.environ["SQLITE_DB_PATH"] = os.path.join("storage", "data", "test", "test_logichive.db")
-os.environ["FAISS_INDEX_PATH"] = os.path.join("storage", "data", "test", "test_faiss_index.bin")
-os.environ["FAISS_MAPPING_PATH"] = os.path.join(
-    "storage", "data", "test", "test_faiss_mapping.json"
-)
-
-# Add src to sys.path
-import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
-
-from unittest.mock import AsyncMock, MagicMock, patch
 
 class FakeLogicIntelligence:
     """
@@ -60,8 +56,6 @@ class FakeLogicIntelligence:
 
     async def generate_embedding(self, text: str):
         # Deterministic dummy embedding: repeating a simple hash of the text
-        import hashlib
-
         h = int(hashlib.md5(text.encode()).hexdigest(), 16)
         val = (h % 1000) / 1000.0
         return [val] * 768
@@ -150,9 +144,8 @@ def intelligence_isolation(request):
         patch("core.evaluation.plugins.ai.LogicIntelligence", new=FakeLogicIntelligence),
     ]
 
-    started_patches = []
     for p in patches:
-        started_patches.append(p.start())
+        p.start()
 
     yield
 
@@ -202,8 +195,6 @@ async def test_db():
 @pytest.fixture(autouse=True)
 async def clear_cache():
     """Resets the vector manager state between tests."""
-    import os
-
     import faiss
 
     from storage.sqlite_api import vector_manager

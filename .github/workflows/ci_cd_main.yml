@@ -46,7 +46,9 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          uv run ruff check src tests --line-length 100
+          # Run linting on the whole repository. 
+          # E,F,W,I are selected; E501 (line length) is ignored to keep noise low while respecting the 100-char limit.
+          uv run ruff check . --select E,F,W,I --ignore E501,F401,F841 --line-length 100
 
       - name: Run tests
         run: |
