@@ -107,3 +107,35 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  build_exe:
+    name: Build and Upload Windows EXE
+    needs: release_version
+    if: needs.release_version.outputs.new_release_published == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build EXE with PyInstaller
+        run: |
+          uv run pyinstaller --noconfirm LogicHive.spec
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload v${{ needs.release_version.outputs.new_release_version }} dist/LogicHive-MCP.exe --clobber

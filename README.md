@@ -48,18 +48,27 @@ If you must have top-level imports, use the `mock_imports` parameter in `save_fu
 
 ---
 
-## 🚀 Quick Setup (Container: Docker / Podman)
+## 🚀 Quick Setup (Dual Distribution)
 
-LogicHive is distributed as an **OCI-compliant Container Image**. This ensures cross-platform compatibility without vendor lock-in.
+LogicHive offers two ways to run the server, completely circumventing any enterprise container licensing friction.
 
-> **Note on Licensing for Business Users**: 
-> You do **not** need a paid Docker Desktop license to run LogicHive. Because this is a standard OCI image, you can run it using 100% free and open-source alternatives like **Podman**, **Rancher Desktop**, or **OrbStack** on macOS/Windows, or standard Docker Engine on Linux.
+### Option A: Windows Native EXE (Zero Friction)
+For Windows-heavy corporate environments, you do not need Docker at all.
+
+1. Download `LogicHive-MCP.exe` from the [Latest Release](https://github.com/ayato-labs/LogicHive/releases).
+2. Double-click the `.exe` (or run it via Command Prompt).
+3. The server runs natively on `http://localhost:10880/sse`.
+
+*Note: Because LogicHive uses network-based SSE, **a single Windows machine running the `.exe` can serve your entire team**—even if they are on Mac or Linux clients.*
+
+### Option B: OCI Container (Docker / Podman)
+LogicHive is also distributed as an **OCI-compliant Container Image** for cloud-native deployment.
+
+> **Note on Licensing**: Because this is a standard OCI image, you can run it using 100% free alternatives like **Podman**, **Rancher Desktop**, or standard Docker Engine on Linux.
 
 ```bash
-# 1. Pull the latest image (Replace 'docker' with 'podman' if using Podman)
 docker pull ghcr.io/ayato-labs/logichive-hub:latest
 
-# 2. Run the MCP Server
 docker run -d \
   -p 10880:10880 \
   -e GEMINI_API_KEY=your_api_key_here \
