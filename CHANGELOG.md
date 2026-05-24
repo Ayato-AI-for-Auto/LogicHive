@@ -1,3 +1,10 @@
+## [0.9.2](https://github.com/ayato-labs/LogicHive/compare/v0.9.1...v0.9.2) (2026-05-24)
+
+
+### Bug Fixes
+
+* use absolute path in PyInstaller spec ([4011063](https://github.com/ayato-labs/LogicHive/commit/4011063caee8c53a31a02a3d029a3b8eec83c3f0))
+
 ## [0.9.1](https://github.com/ayato-labs/LogicHive/compare/v0.9.0...v0.9.1) (2026-05-24)
 
 
