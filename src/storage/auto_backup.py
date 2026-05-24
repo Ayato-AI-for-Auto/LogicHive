@@ -8,8 +8,9 @@ from typing import Any
 import httpx
 
 from core.config import ENABLE_AUTO_BACKUP, GITHUB_TOKEN
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AutoBackupManager:

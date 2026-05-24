@@ -8,14 +8,15 @@
 import asyncio
 import importlib
 import importlib.util
-import logging
 import os
 import pkgutil
 from typing import Any
 
+from core.logging_config import get_logger
+
 from .base import BaseEvaluator, EvaluationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EvaluationManager:

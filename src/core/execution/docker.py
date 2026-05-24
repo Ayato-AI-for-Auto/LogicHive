@@ -1,7 +1,8 @@
 import asyncio
 import json
-import logging
 import time
+
+from core.logging_config import get_logger
 
 from .base import (
     BaseExecutor,
@@ -12,7 +13,7 @@ from .base import (
     Result,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DockerPythonExecutor(BaseExecutor):

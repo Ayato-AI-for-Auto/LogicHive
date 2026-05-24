@@ -1,10 +1,11 @@
 import ast
-import logging
 import re
+
+from core.logging_config import get_logger
 
 from ..base import BaseEvaluator, EvaluationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SecurityStaticEvaluator(BaseEvaluator):

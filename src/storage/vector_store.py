@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +14,9 @@ from core.config import (
 )
 from core.db import get_db_connection
 from core.exceptions import StorageError
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class VectorIndexManager:
@@ -51,32 +51,38 @@ class VectorIndexManager:
                         self.name_to_id = mapping["name_to_id"]
                         self._current_id = mapping["current_id"]
                     self._initialized = True
-                    logger.info("FAISS: Loaded index from disk.")
+                    logger.info("FAISS: Loaded index from disk successfully.")
                     return
                 except Exception as e:
-                    logger.error(f"FAISS: Load failed, rebuilding: {e}")
+                    logger.warning(f"FAISS: Load from disk failed, rebuilding from DB: {e}")
 
             # Rebuild from DB rows
+            logger.info("FAISS: Initializing/Rebuilding index from database rows...")
             embeddings = []
             names = []
             skipped_dim = 0
             for row in db_rows:
                 if "embedding" in row and row["embedding"]:
                     try:
-                        vec = json.loads(row["embedding"])
+                        # Handle both string (JSON) and already parsed list
+                        vec = row["embedding"]
+                        if isinstance(vec, str):
+                            vec = json.loads(vec)
+
                         project = row["project"] if "project" in row else "default"
                         name = row["name"]
                         full_key = f"{project}:{name}"
-                        if len(vec) == self.dimension:
+
+                        if vec and len(vec) == self.dimension:
                             embeddings.append(vec)
                             names.append(full_key)
                         else:
                             skipped_dim += 1
-                            logger.warning(
-                                f"FAISS: Skipping '{full_key}' due to dimension mismatch (Expected {self.dimension}, got {len(vec)})"
+                            logger.debug(
+                                f"FAISS: Skipping '{full_key}' due to dimension mismatch or empty vec."
                             )
                     except (json.JSONDecodeError, TypeError, KeyError) as e:
-                        logger.warning(f"FAISS: Skipping row due to invalid embedding: {e}")
+                        logger.warning(f"FAISS: Skipping row due to invalid embedding format: {e}")
                         continue
 
             if embeddings:
@@ -87,17 +93,18 @@ class VectorIndexManager:
                     self.id_to_name[i] = full_key
                     self.name_to_id[full_key] = i
                 self._current_id = len(names)
+                logger.debug(f"FAISS: Added {len(names)} vectors to new index.")
 
             self._initialized = True
             await self.save_to_disk()
-            msg = f"FAISS: Rebuilt index from DB. Loaded: {len(names)}, Skipped (dim): {skipped_dim}"
-            logger.info(msg)
+            logger.info(f"FAISS: Initialization complete. Total: {len(names)}, Skipped: {skipped_dim}")
 
     async def upsert_vector(
-        self, name: str, embedding: list[float], metadata: dict[str, Any] = None, project: str = "default"
+        self, name: str, embedding: list[float], metadata: dict[str, Any] = None, project: str = "default"      
     ):
         async with self._lock:
             full_key = f"{project}:{name}"
+            logger.debug(f"FAISS: upsert_vector for '{full_key}'")
             # 1. Basic validation
             if len(embedding) != self.dimension:
                 logger.warning(
@@ -111,9 +118,10 @@ class VectorIndexManager:
                 old_id = self.name_to_id[full_key]
                 if old_id in self.id_to_name:
                     del self.id_to_name[old_id]
+                    logger.trace(f"FAISS: Mark old vector ID {old_id} as ghost for '{full_key}'")
 
                 ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:     
+                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
                     needs_rebuild = True
 
             vec = np.array([embedding]).astype("float32")
@@ -128,14 +136,15 @@ class VectorIndexManager:
 
             if needs_rebuild:
                 logger.info(
-                    f"FAISS: Ghost vectors exceeded threshold for '{full_key}', rebuilding."
+                    f"FAISS: Ghost vectors ({ghost_count}) exceeded threshold, triggering rebuild."
                 )
                 await self._rebuild_internal()
 
     async def remove_vector(self, name: str, project: str = "default"):
-        """Removes a vector's mapping. Does not directly delete from FAISS (bloat mitigated by rebuild)."""
+        """Removes a vector's mapping. Does not directly delete from FAISS (bloat mitigated by rebuild)."""     
         async with self._lock:
             full_key = f"{project}:{name}"
+            logger.info(f"FAISS: Removing vector mapping for '{full_key}'")
             if full_key in self.name_to_id:
                 old_id = self.name_to_id[full_key]
                 if old_id in self.id_to_name:
@@ -145,9 +154,9 @@ class VectorIndexManager:
                 await self.save_to_disk()
 
                 ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:     
+                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
                     logger.info(
-                        f"FAISS: Ghost vectors exceeded threshold during removal of '{full_key}', rebuilding."
+                        f"FAISS: Ghost vectors ({ghost_count}) exceeded threshold during removal, rebuilding."  
                     )
                     await self._rebuild_internal()
 
@@ -157,8 +166,8 @@ class VectorIndexManager:
             await self._rebuild_internal()
 
     async def _rebuild_internal(self):
-        """Internal rebuild logic (assumes lock is held)."""        
-        logger.info("FAISS: Rebuilding index to clear bloat...")    
+        """Internal rebuild logic (assumes lock is held)."""
+        logger.info("FAISS: Rebuilding index to clear bloat...")
         try:
             db = await get_db_connection()
             async with db.execute(
@@ -176,20 +185,21 @@ class VectorIndexManager:
             skipped_dim = 0
             for row in rows:
                 try:
-                    vec = json.loads(row["embedding"])
+                    vec = row["embedding"]
+                    if isinstance(vec, str):
+                        vec = json.loads(vec)
+
                     project = row["project"] if "project" in row else "default"
                     name = row["name"]
                     full_key = f"{project}:{name}"
-                    if len(vec) == self.dimension:
+
+                    if vec and len(vec) == self.dimension:
                         embeddings.append(vec)
                         names.append(full_key)
                     else:
                         skipped_dim += 1
-                        logger.warning(
-                            f"FAISS: Rebuild skipping '{full_key}' due to dimension mismatch (Expected {self.dimension}, got {len(vec)})"
-                        )
                 except (json.JSONDecodeError, TypeError, KeyError) as e:
-                    logger.warning(f"FAISS: Skipping row due to invalid embedding: {e}")
+                    logger.warning(f"FAISS: Rebuild skipping row due to invalid embedding: {e}")
                     continue
 
             if embeddings:
@@ -202,9 +212,9 @@ class VectorIndexManager:
                 self._current_id = len(names)
 
             await self.save_to_disk()
-            logger.info(f"FAISS: Rebuild complete. Active vectors: {self.index.ntotal}, Skipped (dim): {skipped_dim}")
+            logger.info(f"FAISS: Rebuild complete. Active vectors: {self.index.ntotal}, Skipped: {skipped_dim}")
         except Exception as e:
-            logger.error(f"FAISS: Rebuild failed: {e}")
+            logger.error(f"FAISS: Rebuild failed: {e}", exc_info=True)
             raise StorageError(f"Vector Index Rebuild failed: {e}") from e
 
     async def save_to_disk(self):
@@ -220,62 +230,76 @@ class VectorIndexManager:
                     },
                     f,
                 )
+            logger.debug(f"FAISS: Saved index and mapping to disk.")
         except Exception as e:
             logger.error(f"FAISS: Failed to save index to {self._index_path}: {e}", exc_info=True)
+            # We don't raise here to avoid crashing the whole operation if just saving fails,
+            # but it is logged as ERROR for isolation.
 
     async def search(
         self, query_emb: list[float], limit: int = 5, project: str | None = None
-    ) -> list[tuple]:
+    ) -> list[dict[str, Any]]:
         if not self._initialized:
+            logger.warning("FAISS: Search attempted before initialization.")
             return []
 
-        search_project = project or "default"
-        query_vec = np.array([query_emb]).astype("float32")
-        faiss.normalize_L2(query_vec)
+        try:
+            search_project = project or "default"
+            query_vec = np.array([query_emb]).astype("float32")
+            faiss.normalize_L2(query_vec)
 
-        # Use a larger k for post-filtering to ensure we hit the limit after filtering
-        k = min(limit * 10, self.index.ntotal)
-        if k <= 0:
+            # Use a larger k for post-filtering to ensure we hit the limit after filtering
+            k = min(limit * 10, self.index.ntotal)
+            if k <= 0:
+                return []
+
+            similarities, indices = self.index.search(query_vec, k)
+
+            results = []
+            project_prefix = f"{search_project}:"
+
+            for i, idx in enumerate(indices[0]):
+                if idx == -1:
+                    continue
+
+                full_key = self.id_to_name.get(int(idx))
+                if full_key and full_key.startswith(project_prefix):
+                    name_part = full_key.split(":", 1)[1]
+                    results.append(
+                        {
+                            "name": name_part,
+                            "project": search_project,
+                            "similarity": float(similarities[0][i]),
+                        }
+                    )
+
+                if len(results) >= limit:
+                    break
+
+            logger.debug(f"FAISS: Search found {len(results)} matches for project '{search_project}'")
+            return results
+        except Exception as e:
+            logger.error(f"FAISS: Search failed: {e}", exc_info=True)
             return []
-
-        similarities, indices = self.index.search(query_vec, k)
-
-        results = []
-        project_prefix = f"{search_project}:"
-
-        for i, idx in enumerate(indices[0]):
-            if idx == -1:
-                continue
-
-            full_key = self.id_to_name.get(int(idx))
-            if full_key and full_key.startswith(project_prefix):
-                name_part = full_key.split(":", 1)[1]
-                results.append(
-                    {
-                        "name": name_part,
-                        "project": search_project,
-                        "similarity": float(similarities[0][i]),
-                    }
-                )
-
-            if len(results) >= limit:
-                break
-
-        return results
 
     async def check_health(self) -> dict[str, Any]:
         """Checks if the FAISS index is loaded and has entries."""
-        if not self._initialized:
-            return {"status": "Warning", "message": "Vector store not yet initialized."}
+        try:
+            if not self._initialized:
+                return {"status": "Warning", "message": "Vector store not yet initialized."}
 
-        count = self.index.ntotal
-        mapped = len(self.id_to_name)
-        return {
-            "status": "Healthy" if count >= 0 else "Error",
-            "message": f"Index has {count} total entries ({mapped} mapped active).",
-            "details": {"total": count, "active": mapped},
-        }
+            count = self.index.ntotal
+            mapped = len(self.id_to_name)
+            return {
+                "status": "Healthy" if count >= 0 else "Error",
+                "message": f"Index has {count} total entries ({mapped} mapped active).",
+                "details": {"total": count, "active": mapped},
+            }
+        except Exception as e:
+            logger.error(f"FAISS: Health check failed: {e}", exc_info=True)
+            return {"status": "Error", "message": str(e)}
 
 
 # Singleton instance
 vector_manager = VectorIndexManager()
+

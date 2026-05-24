@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import tempfile
 import time
@@ -8,6 +7,7 @@ import traceback
 from pathlib import Path
 
 from core.config import ENABLE_ENV_POOLING
+from core.logging_config import get_logger
 
 from .base import (
     BaseExecutor,
@@ -19,7 +19,7 @@ from .base import (
 )
 from .factory import ExecutorFactory
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EphemeralPythonExecutor(BaseExecutor):
@@ -41,13 +41,14 @@ class EphemeralPythonExecutor(BaseExecutor):
                 try:
                     child.kill()
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    logger.debug(
-                        f"[TRACE] Executor: Child process {child.pid} already gone while killing process tree."
+                    logger.trace(
+                        f"Executor: Child process {child.pid} already gone while killing process tree."
                     )
             parent.kill()
+            logger.debug(f"Executor: Process tree for PID {pid} killed.")
         except (psutil.NoSuchProcess, psutil.AccessDenied):
-            logger.debug(
-                f"[TRACE] Executor: Parent process {pid} already gone while killing process tree."
+            logger.trace(
+                f"Executor: Parent process {pid} already gone while killing process tree."
             )
 
     async def execute(
@@ -60,16 +61,15 @@ class EphemeralPythonExecutor(BaseExecutor):
         **kwargs,
     ) -> ExecutionResult:
         logger.info(
-            f"[TRACE] Executor: Starting execution [timeout={timeout}s, memory={memory_limit_mb}MB]"
+            f"Executor: Starting execution [timeout={timeout}s, memory={memory_limit_mb}MB]"
         )
         start_time = time.perf_counter()
         dependencies = dependencies or []
         mock_imports = kwargs.get("mock_imports", [])
 
         # 1. Check for Pre-warmed Pool match
-        from .pool import PoolManager
+        from .pool import pool_manager
 
-        pool_manager = PoolManager.get_instance()
         pooled_env = None
 
         # Simple matching logic: if 'torch' is in dependencies, use torch pools
@@ -106,6 +106,8 @@ class EphemeralPythonExecutor(BaseExecutor):
                 for dep in dependencies:
                     cmd.extend(["--with", dep])
                 cmd.extend(["python", str(harness_file)])
+
+            logger.debug(f"Executor: Command built: {' '.join(cmd)}")
 
             # 3. Execute with isolated environment
             process_env = {
@@ -170,8 +172,8 @@ class EphemeralPythonExecutor(BaseExecutor):
                                     self._kill_process_tree(process.pid)
                                     break
                             except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                logger.debug(
-                                    "[TRACE] Executor: Process vanished during resource monitoring."
+                                logger.trace(
+                                    "Executor: Process vanished during resource monitoring."
                                 )
                                 break
                             await asyncio.sleep(0.5)  # Reduced frequency for stability
@@ -187,6 +189,7 @@ class EphemeralPythonExecutor(BaseExecutor):
                     stdout = stdout_bytes.decode("utf-8", errors="replace")
                     stderr = stderr_bytes.decode("utf-8", errors="replace")
                 except asyncio.TimeoutError:
+                    logger.warning(f"Executor: Execution timed out after {timeout}s")
                     self._kill_process_tree(process.pid)
                     await process.wait()
                     return ExecutionResult(
@@ -201,8 +204,8 @@ class EphemeralPythonExecutor(BaseExecutor):
                         try:
                             await monitor_task
                         except asyncio.CancelledError:
-                            logger.debug(
-                                "[TRACE] Executor: Resource monitor task cancelled safely."
+                            logger.trace(
+                                "Executor: Resource monitor task cancelled safely."
                             )
 
                 if memory_exceeded:
@@ -253,7 +256,7 @@ class EphemeralPythonExecutor(BaseExecutor):
 
                 duration = time.perf_counter() - start_time
                 logger.info(
-                    f"[TRACE] Executor: Process execution finished in {duration:.4f}s with status: {status}"
+                    f"Executor: Process execution finished in {duration:.4f}s with status: {status}"
                 )
 
                 return ExecutionResult(
@@ -265,7 +268,7 @@ class EphemeralPythonExecutor(BaseExecutor):
                 )
 
             except Exception as e:
-                logger.exception("Executor: Subprocess call failed")
+                logger.error(f"Executor: Subprocess call failed: {e}", exc_info=True)
                 return ExecutionResult(
                     status=ExecutionStatus.ERROR,
                     logs=ExecutionLogs(stderr=str(e)),
@@ -289,6 +292,7 @@ class EphemeralPythonExecutor(BaseExecutor):
         # We escape the result path for the string template
         res_path = str(result_file).replace("\\", "\\\\")
         mock_imports = mock_imports or []
+        mock_list_str = json.dumps(mock_imports)
 
         harness = f"""
 import json
@@ -335,7 +339,7 @@ def run_user_code():
     try:
         # 0. Apply runtime sandbox & mocks
         apply_sandbox()
-        apply_mocks({json.dumps(mock_imports)})
+        apply_mocks({mock_list_str})
 
         # 1. Execute the main code (defines functions/classes)
         exec({json.dumps(code)}, globals())
@@ -344,7 +348,10 @@ def run_user_code():
         if {json.dumps(test_code)}:
             # Tests are expected to raise AssertionError on failure
             exec({json.dumps(test_code)}, globals())
-            results["main_result"] = "Tests Passed (with Mocks: {", ".join(mock_imports)})" if {str(bool(mock_imports))} else "Tests Passed"
+            if {mock_list_str}:
+                results["main_result"] = f"Tests Passed (with Mocks: {{', '.join({mock_list_str})}})"
+            else:
+                results["main_result"] = "Tests Passed"
         else:
             # If no tests, we just check if it imports/defines correctly
             results["main_result"] = "Execution Successful"

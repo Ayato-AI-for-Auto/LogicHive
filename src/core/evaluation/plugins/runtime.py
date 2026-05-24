@@ -1,11 +1,11 @@
-import logging
+from core.logging_config import get_logger
 
 from ...config import DEFAULT_VERIFICATION_TIMEOUT
 from ...execution.base import ExecutionStatus
 from ...execution.factory import ExecutorFactory
 from ..base import BaseEvaluator, EvaluationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RuntimeEvaluator(BaseEvaluator):

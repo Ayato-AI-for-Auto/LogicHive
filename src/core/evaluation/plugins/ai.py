@@ -1,11 +1,10 @@
-import logging
-
+from core.logging_config import get_logger
 from core.config import GEMINI_API_KEY
 from core.consolidation import LogicIntelligence
 
 from ..base import BaseEvaluator, EvaluationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AIGateEvaluator(BaseEvaluator):

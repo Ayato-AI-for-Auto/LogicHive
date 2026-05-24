@@ -1,10 +1,10 @@
 import importlib
-import logging
 import pkgutil
 
+from core.logging_config import get_logger
 from .base import BaseExecutor
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExecutorFactory:
@@ -19,6 +19,7 @@ class ExecutorFactory:
         if cls._loaded:
             return
 
+        logger.debug("ExecutorFactory: Starting dynamic plugin discovery...")
         try:
             # Package is src.core.execution
             package_name = __package__
@@ -33,10 +34,11 @@ class ExecutorFactory:
                     importlib.import_module(name)
                     logger.debug(f"ExecutorFactory: Loaded executor module {name}")
                 except Exception as e:
-                    logger.error(f"ExecutorFactory: Failed to load module {name}: {e}")
+                    logger.error(f"ExecutorFactory: Failed to load module {name}: {e}", exc_info=True)
             cls._loaded = True
+            logger.info(f"ExecutorFactory: Plugin discovery finished. Loaded languages: {list(cls._executors.keys())}")
         except Exception as e:
-            logger.error(f"ExecutorFactory: Plugin discovery failed: {e}")
+            logger.error(f"ExecutorFactory: Critical failure during plugin discovery: {e}", exc_info=True)
 
     @classmethod
     def register(cls, language: str, executor: BaseExecutor):
@@ -55,7 +57,12 @@ class ExecutorFactory:
             # For now, we only have docker for python
             if lang == "python":
                 from .docker import DockerPythonExecutor
-
+                logger.debug(f"ExecutorFactory: Returning DockerPythonExecutor for {lang}")
                 return DockerPythonExecutor()
 
-        return cls._executors.get(lang)
+        executor = cls._executors.get(lang)
+        if not executor:
+            logger.warning(f"ExecutorFactory: No executor found for language '{language}'")
+        else:
+            logger.debug(f"ExecutorFactory: Found executor for '{language}'")
+        return executor

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import uuid
 from functools import wraps
 from typing import Any
@@ -8,10 +7,11 @@ from typing import Any
 from core.config import SQLITE_DB_PATH, VECTOR_DIMENSION
 from core.db import get_db_connection, retry_on_db_lock
 from core.exceptions import StorageError
+from core.logging_config import get_logger
 from storage.history_manager import history_manager
 from storage.vector_store import vector_manager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def with_write_lock(func):
@@ -60,7 +60,7 @@ class SqliteStorage:
 
             # 1. Check if name exists in specific project
             async with db.execute(
-                "SELECT id, code, code_hash, version FROM logichive_functions WHERE project = ? AND name = ?",
+                "SELECT id, code, code_hash, version FROM logichive_functions WHERE project = ? AND name = ?",  
                 (project, name),
             ) as cursor:
                 row = await cursor.fetchone()
@@ -72,6 +72,7 @@ class SqliteStorage:
             if existing:
                 if existing["code_hash"] != function_data.get("code_hash"):
                     new_version = (existing.get("version") or 0) + 1
+                    logger.debug(f"SQLite: Code hash mismatch for '{name}', archiving old version {existing['version']}")
                     async with db.execute(
                         "SELECT * FROM logichive_functions WHERE project = ? AND name = ?",
                         (project, name),
@@ -83,6 +84,7 @@ class SqliteStorage:
                 else:
                     row_id = existing["id"]
                     new_version = existing["version"]
+                    logger.debug(f"SQLite: Code hash match for '{name}', updating existing record (version {new_version})")
 
             data = (
                 row_id,
@@ -106,8 +108,8 @@ class SqliteStorage:
 
             await db.execute(
                 """
-                INSERT OR REPLACE INTO logichive_functions 
-                (id, project, name, code, description, language, tags, reliability_score, test_metrics, embedding, code_hash, version, dependencies, test_code, env_fingerprint, verification_status, verification_report)
+                INSERT OR REPLACE INTO logichive_functions
+                (id, project, name, code, description, language, tags, reliability_score, test_metrics, embedding, code_hash, version, dependencies, test_code, env_fingerprint, verification_status, verification_report)      
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 data
@@ -121,7 +123,6 @@ class SqliteStorage:
             await db.commit()
 
             # Final safety check: Only add to vector store if we have a valid embedding
-            # Note: During initial save, embedding is usually None.
             emb = function_data.get("embedding")
             if emb is not None and isinstance(emb, list) and len(emb) > 0:
                 logger.info(f"[TRACE] SQLite: Adding vector for '{name}' to index.")
@@ -135,21 +136,22 @@ class SqliteStorage:
             return True
         except Exception as e:
             logger.error(f"[TRACE] SQLite: Failed to save function '{name}': {e}", exc_info=True)
-            raise StorageError(f"Database upsert failed: {e}")
+            raise StorageError(f"Database upsert failed for '{name}': {e}") from e
 
     async def list_all_functions(self) -> list[dict[str, Any]]:
         try:
             db = await get_db_connection()
             async with db.execute("SELECT * FROM logichive_functions") as cursor:
                 rows = await cursor.fetchall()
+                logger.debug(f"SQLite: Listed {len(rows)} functions.")
                 return [self._process_row(dict(row)) for row in rows]
         except Exception as e:
             logger.error(f"[TRACE] SQLite: Failed to list all functions: {e}", exc_info=True)
-            # Re-raise instead of returning empty list to ensure traceability of failures
-            raise
+            raise StorageError(f"Failed to list all functions: {e}") from e
 
     async def delete_function(self, name: str, project: str = "default") -> bool:
         try:
+            logger.info(f"SQLite: Deleting function '{name}' from project '{project}'")
             db = await get_db_connection()
             await db.execute(
                 "DELETE FROM logichive_functions WHERE project = ? AND name = ?",
@@ -158,8 +160,8 @@ class SqliteStorage:
             await db.commit()
             return True
         except Exception as e:
-            logger.error(f"SQLite: Delete failed for '{name}': {e}")
-            return False
+            logger.error(f"SQLite: Delete failed for '{name}': {e}", exc_info=True)
+            raise StorageError(f"Failed to delete function '{name}': {e}") from e
 
     async def find_similar_functions(
         self,
@@ -174,9 +176,10 @@ class SqliteStorage:
         try:
             async with self._lock:
                 if not vector_manager._initialized:
+                    logger.debug("SQLite: Initializing vector store before search...")
                     db = await get_db_connection()
                     async with db.execute(
-                        "SELECT name, embedding, project FROM logichive_functions WHERE embedding IS NOT NULL"
+                        "SELECT name, embedding, project FROM logichive_functions WHERE embedding IS NOT NULL"  
                     ) as cursor:
                         rows = [dict(r) for r in await cursor.fetchall()]
                     await vector_manager.ensure_initialized(rows)
@@ -188,7 +191,7 @@ class SqliteStorage:
                             embedding, limit=limit, project=project
                         )
                     except Exception as ve:
-                        logger.warning(f"SQLite: Vector search failed: {ve}")
+                        logger.warning(f"SQLite: Vector search failed (falling back to SQL): {ve}")
 
                 sql_results = {}
                 select_fields = "id, name, description, language, tags, reliability_score, project, version, created_at, updated_at, code"
@@ -220,6 +223,7 @@ class SqliteStorage:
                     if conditions:
                         where_clause = " AND ".join(conditions)
                         sql = f"SELECT {select_fields} FROM logichive_functions WHERE {where_clause} LIMIT {limit * 3}"
+                        logger.debug(f"SQLite: Hybrid Search SQL: {sql} with params {params}")
                         db = await get_db_connection()
                         async with db.execute(sql, params) as cursor:
                             rows = await cursor.fetchall()
@@ -251,10 +255,11 @@ class SqliteStorage:
                 results_list = sorted(
                     final_results.values(), key=lambda x: x.get("similarity", 0), reverse=True
                 )
+                logger.info(f"SQLite: Hybrid Search returned {len(results_list)} results.")
                 return results_list[:limit]
         except Exception as e:
-            logger.error(f"SQLite: Find similar failed: {e}")
-            raise StorageError(f"Hybrid search failed: {e}")
+            logger.error(f"SQLite: Find similar failed: {e}", exc_info=True)
+            raise StorageError(f"Hybrid search failed: {e}") from e
 
     def _process_row(self, row: dict[str, Any]) -> dict[str, Any]:
         if not row:
@@ -285,8 +290,8 @@ class SqliteStorage:
                 row = await cursor.fetchone()
                 return self._process_row(dict(row)) if row else None
         except Exception as e:
-            logger.error(f"SQLite: Failed to find by hash: {e}")
-            return None
+            logger.error(f"SQLite: Failed to find by hash for project '{project}': {e}", exc_info=True)
+            raise StorageError(f"Hash lookup failed: {e}") from e
 
     async def update_verification_status(
         self,
@@ -313,13 +318,13 @@ class SqliteStorage:
             sql = (
                 f"UPDATE logichive_functions SET {', '.join(fields)} WHERE project = ? AND name = ?"
             )
-            logger.info(f"[DEBUG] SQLite Update: sql={sql}, params={params}")
+            logger.debug(f"SQLite Update: '{name}' in '{project}' status -> {status}")
             await db.execute(sql, params)
             await db.commit()
             return True
         except Exception as e:
-            logger.error(f"SQLite: Failed to update status for '{name}': {e}")
-            return False
+            logger.error(f"SQLite: Failed to update status for '{name}': {e}", exc_info=True)
+            raise StorageError(f"Status update failed for '{name}': {e}") from e
 
     async def get_function_by_name(
         self, name: str, project: str = "default"
@@ -332,8 +337,8 @@ class SqliteStorage:
                 row = await cursor.fetchone()
             return self._process_row(dict(row)) if row else None
         except Exception as e:
-            logger.error(f"SQLite: Get failed for '{name}': {e}")
-            return None
+            logger.error(f"SQLite: Get failed for '{name}': {e}", exc_info=True)
+            raise StorageError(f"Failed to retrieve function '{name}': {e}") from e
 
     async def get_functions(
         self, project: str = None, tags: list[str] = None, limit: int = 50
@@ -360,10 +365,11 @@ class SqliteStorage:
             db = await get_db_connection()
             async with db.execute(sql, params) as cursor:
                 rows = await cursor.fetchall()
+                logger.debug(f"SQLite: Retrieved {len(rows)} functions for query.")
                 return [self._process_row(dict(row)) for row in rows]
         except Exception as e:
-            logger.error(f"SQLite: List failed: {e}")
-            raise StorageError(f"Failed to list functions: {e}")
+            logger.error(f"SQLite: List failed: {e}", exc_info=True)
+            raise StorageError(f"Failed to list functions: {e}") from e
 
     async def get_all_functions(self) -> list[dict[str, Any]]:
         return await self.get_functions(limit=1000)
@@ -374,10 +380,12 @@ class SqliteStorage:
             db = await get_db_connection()
             async with db.execute("SELECT COUNT(*) FROM logichive_functions") as cursor:
                 row = await cursor.fetchone()
-                return row[0] if row else 0
+                count = row[0] if row else 0
+                logger.debug(f"SQLite: Function count: {count}")
+                return count
         except Exception as e:
-            logger.error(f"SQLite: Failed to get function count: {e}")
-            return 0
+            logger.error(f"SQLite: Failed to get function count: {e}", exc_info=True)
+            raise StorageError(f"Failed to get function count: {e}") from e
 
     @retry_on_db_lock()
     @with_write_lock
@@ -385,14 +393,15 @@ class SqliteStorage:
         try:
             db = await get_db_connection()
             await db.execute(
-                "UPDATE logichive_functions SET call_count = call_count + 1 WHERE project = ? AND name = ?",
+                "UPDATE logichive_functions SET call_count = call_count + 1 WHERE project = ? AND name = ?",    
                 (project, name),
             )
             await db.commit()
+            logger.debug(f"SQLite: Incremented call count for '{name}'")
             return True
         except Exception as e:
-            logger.error(f"SQLite: Increment failed for '{name}': {e}")
-            return False
+            logger.error(f"SQLite: Increment failed for '{name}': {e}", exc_info=True)
+            raise StorageError(f"Failed to increment call count for '{name}': {e}") from e
 
     async def check_health(self) -> dict[str, Any]:
         """Checks if the database is accessible and the main table exists."""
@@ -405,7 +414,9 @@ class SqliteStorage:
                     return {"status": "Healthy", "message": "Database OK"}
                 return {"status": "Error", "message": "Table not found"}
         except Exception as e:
+            logger.error(f"SQLite: Health check failed: {e}", exc_info=True)
             return {"status": "Error", "message": str(e)}
 
 
 sqlite_storage = SqliteStorage()
+

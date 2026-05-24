@@ -1,15 +1,16 @@
 import ast
 import asyncio
 import json
-import logging
 import os
 import subprocess
 import tempfile
 from pathlib import Path
 
+from core.logging_config import get_logger
+
 from ..base import BaseEvaluator, EvaluationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class StructuralEvaluator(BaseEvaluator):

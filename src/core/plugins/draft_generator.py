@@ -1,10 +1,10 @@
-import logging
 from typing import Any
 
 from core.config import GEMINI_API_KEY
 from core.consolidation import LogicIntelligence
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DraftGenerator:
@@ -25,6 +25,7 @@ class DraftGenerator:
         """
         Generates a functional draft based on the user query and nearby context.
         """
+        logger.info(f"DraftGenerator: Initiating synthesis for query: '{query}'")
         if not context_results:
             logger.info("DraftGenerator: No context available for synthesis.")
             context_str = "No existing patterns found in the vault."
@@ -36,6 +37,7 @@ class DraftGenerator:
                     f"NAME: {res['name']}\nDESC: {res['description']}\nCODE:\n{res['code']}\n"
                 )
             context_str = "\n---\n".join(context_snippets)
+            logger.debug(f"DraftGenerator: Using {len(context_results[:3])} patterns as context.")
 
         prompt = (
             f"You are the LogicHive Draft Assistant. Your goal is to synthesize a high-quality, reusable code draft.\n"
@@ -55,6 +57,7 @@ class DraftGenerator:
         try:
             res = await self.intel._call_llm_async(prompt, use_json=True)
             if not res or "code" not in res:
+                logger.warning("DraftGenerator: LLM returned empty or invalid draft.")
                 return {}
 
             # Ensure it is marked as draft
@@ -69,7 +72,8 @@ class DraftGenerator:
             if "language" not in res:
                 res["language"] = language
 
+            logger.info(f"DraftGenerator: Successfully synthesized draft: '{res.get('name')}'")
             return res
         except Exception as e:
-            logger.error(f"DraftGenerator: Failed to synthesize draft: {e}")
+            logger.error(f"DraftGenerator: Failed to synthesize draft: {e}", exc_info=True)
             return {}

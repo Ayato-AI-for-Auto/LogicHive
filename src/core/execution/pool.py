@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 import shutil
 import subprocess
@@ -8,8 +7,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from core.config import DEFAULT_POOL_SPECS, ENABLE_ENV_POOLING, POOL_BASE_DIR, POOL_MAX_SIZE
+from core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PreWarmedEnv:
@@ -56,7 +56,8 @@ class PoolManager:
                 check=False,
             )
             return result.returncode == 0
-        except Exception:
+        except Exception as e:
+            logger.debug(f"PoolManager: GPU detection skipped/failed: {e}")
             return False
 
     async def initialize(self):
@@ -84,19 +85,21 @@ class PoolManager:
                         logger.info(
                             f"PoolManager: Background cleanup of {cleanup_path.name} complete."
                         )
-                    except OSError:
+                    except OSError as e:
                         # Fallback if rename fails (e.g. files in use)
-                        logger.warning("PoolManager: Rename failed, performing standard cleanup.")
+                        logger.warning(f"PoolManager: Rename failed ({e}), performing standard cleanup.")
                         for item in self.base_dir.iterdir():
                             if item.is_dir():
-                                shutil.rmtree(item, ignore_errors=True)
+                                try:
+                                    shutil.rmtree(item)
+                                except Exception as re:
+                                    logger.debug(f"PoolManager: Partial cleanup failed for {item}: {re}")
 
                 self.base_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                logger.error(f"PoolManager: Initial cleanup failed: {e}")
+                logger.error(f"PoolManager: Initial cleanup failed: {e}", exc_info=True)
 
         # Fire and forget the heavy cleanup in a separate thread so it doesn't block FastMCP lifespan
-        # We don't 'await' it here to ensure the MCP server becomes ready immediately.
         import threading
 
         cleanup_thread = threading.Thread(target=_async_cleanup_orchestrator, daemon=True)
@@ -123,10 +126,12 @@ class PoolManager:
             return None
 
         if spec_name not in self.pools:
+            logger.warning(f"PoolManager: Requested unknown pool spec: {spec_name}")
             return None
 
         # Skip GPU pool if no GPU detected, fallback to CPU
         if spec_name == "torch-gpu" and not self.has_gpu:
+            logger.debug("PoolManager: No GPU detected, falling back to torch-cpu.")
             spec_name = "torch-cpu"
 
         try:
@@ -147,8 +152,11 @@ class PoolManager:
 
         # Environments are single-use to ensure isolation
         def cleanup():
-            if env.path.exists():
-                shutil.rmtree(env.path, ignore_errors=True)
+            try:
+                if env.path.exists():
+                    shutil.rmtree(env.path)
+            except Exception as e:
+                logger.debug(f"PoolManager: Failed to delete released env {env.path}: {e}")
 
         # Run cleanup in thread to avoid blocking loop
         await asyncio.to_thread(cleanup)
@@ -178,7 +186,6 @@ class PoolManager:
                             continue
 
                         # Check if we already have tasks in flight for this spec
-                        # (Basic heuristic: if qsize is very low, trigger one)
                         logger.debug(
                             f"PoolManager: Replenishing {spec_name} (current size: {current_size})"
                         )
@@ -186,9 +193,10 @@ class PoolManager:
 
                 await asyncio.sleep(10)  # Less frequent checks now that we use task-based burst
             except asyncio.CancelledError:
+                logger.info("PoolManager: Background worker cancelled.")
                 break
             except Exception as e:
-                logger.error(f"PoolManager: Worker error: {e}")
+                logger.error(f"PoolManager: Worker error: {e}", exc_info=True)
                 await asyncio.sleep(10)
 
     async def _prepare_env(self, spec_name: str):
@@ -221,7 +229,7 @@ class PoolManager:
 
                 if res.returncode != 0:
                     logger.error(f"PoolManager: uv venv failed: {res.stderr}")
-                    raise Exception(f"uv venv failed for {spec_name}")
+                    raise RuntimeError(f"uv venv failed for {spec_name}")
 
                 # 2. Install packages
                 packages = DEFAULT_POOL_SPECS.get(spec_name, [])
@@ -234,7 +242,7 @@ class PoolManager:
 
                     if res.returncode != 0:
                         logger.error(f"PoolManager: uv pip install failed: {res.stderr}")
-                        raise Exception(f"uv pip install failed for {spec_name}")
+                        raise RuntimeError(f"uv pip install failed for {spec_name}")
 
                 # 3. Add to pool
                 new_env = PreWarmedEnv(spec_name, env_path, python_exe)
@@ -242,7 +250,7 @@ class PoolManager:
                 logger.info(f"PoolManager: {spec_name} ({env_id}) is READY.")
 
             except Exception as e:
-                logger.error(f"PoolManager: Failed to prepare {spec_name}: {e}")
+                logger.error(f"PoolManager: Failed to prepare {spec_name}: {e}", exc_info=True)
                 if env_path.exists():
                     shutil.rmtree(env_path, ignore_errors=True)
 
