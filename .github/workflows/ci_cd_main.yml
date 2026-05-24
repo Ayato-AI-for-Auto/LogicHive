@@ -121,7 +121,9 @@ jobs:
   build_exe:
     name: Build and Upload Windows EXE
     needs: release_version
-    if: needs.release_version.outputs.new_release_published == 'true'
+    if: |
+      needs.release_version.outputs.new_release_published == 'true' || 
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     runs-on: windows-latest
     permissions:
       contents: write
@@ -146,7 +148,14 @@ jobs:
           $env:PYTHONPATH = "src"
           uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
 
+      - name: Upload Artifact (for Testing)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicHive-MCP-${{ github.ref_name }}
+          path: dist/LogicHive-MCP.exe
+
       - name: Upload to GitHub Release
+        if: needs.release_version.outputs.new_release_published == 'true'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
