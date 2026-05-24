@@ -37,71 +37,113 @@ search_semaphore = asyncio.Semaphore(3)
 
 
 def extract_dependencies(code: str, language: str = "python") -> list[str]:
-    """
-    Extracts dependencies based on language.
-    Python uses AST, while others use optimized regex.
-    """
-    dependencies = set()
+    """Extracts dependencies based on language."""
     lang = language.lower()
+    dependencies = set()
 
     if lang == "python":
-        try:
-            tree = ast.parse(code)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        base = alias.name.split(".")[0]
-                        dependencies.add(base)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.level == 0 and node.module:
-                        base = node.module.split(".")[0]
-                        dependencies.add(base)
-        except Exception as e:
-            logger.warning(f"Orchestrator: AST extraction failed, falling back to regex: {e}")
-            # Fallback to regex for Python if AST fails
-            matches = re.findall(r"^(?:import|from)\s+([a-zA-Z0-9_]+)", code, re.MULTILINE)
-            dependencies.update(matches)
-
+        dependencies = _extract_python_deps(code)
     elif lang in ["typescript", "javascript", "tsx", "jsx"]:
-        # Regex for ES6 imports: from 'pkg' or from "pkg" (robust whitespace)
-        es6_matches = re.findall(r"from\s+['\"]([^'\"./][^'\"]*)['\"]", code)
-        # Regex for CommonJS: require('pkg')
-        cjs_matches = re.findall(r"require\s*\(\s*['\"]([^'\"./][^'\"]*)['\"]\s*\)", code)
-        # Simple import 'pkg'
-        simple_matches = re.findall(r"import\s+['\"]([^'\"./][^'\"]*)['\"]", code)
-
-        all_matches = es6_matches + cjs_matches + simple_matches
-        for pkg in all_matches:
-            # Extract scope if present (e.g. @types/node -> @types/node, but lodash/fp -> lodash)
-            if pkg.startswith("@"):
-                parts = pkg.split("/")
-                if len(parts) >= 2:
-                    dependencies.add(f"{parts[0]}/{parts[1]}")
-                else:
-                    dependencies.add(pkg)
-            else:
-                dependencies.add(pkg.split("/")[0])
+        dependencies = _extract_js_deps(code)
 
     # Clean up standard libs/internal refs
     std_lib = {
-        "os",
-        "sys",
-        "json",
-        "math",
-        "datetime",
-        "typing",
-        "asyncio",
-        "logging",
-        "ast",
-        "pathlib",
-        "abc",
-        "fs",
-        "path",
-        "http",
-        "https",
-        "crypto",
+        "os", "sys", "json", "math", "datetime", "typing", "asyncio", "logging",
+        "ast", "pathlib", "abc", "fs", "path", "http", "https", "crypto",
     }
     return sorted(dependencies - std_lib)
+
+
+def _extract_python_deps(code: str) -> set[str]:
+    deps = set()
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    deps.add(alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                deps.add(node.module.split(".")[0])
+    except Exception as e:
+        logger.warning(f"Orchestrator: AST extraction failed: {e}")
+        deps.update(re.findall(r"^(?:import|from)\s+([a-zA-Z0-9_]+)", code, re.MULTILINE))
+    return deps
+
+
+def _extract_js_deps(code: str) -> set[str]:
+    deps = set()
+    patterns = [
+        r"from\s+['\"]([^'\"./][^'\"]*)['\"]",
+        r"require\s*\(\s*['\"]([^'\"./][^'\"]*)['\"]\s*\)",
+        r"import\s+['\"]([^'\"./][^'\"]*)['\"]",
+    ]
+    for pattern in patterns:
+        for pkg in re.findall(pattern, code):
+            if pkg.startswith("@"):
+                parts = pkg.split("/")
+                deps.add(f"{parts[0]}/{parts[1]}" if len(parts) >= 2 else pkg)
+            else:
+                deps.add(pkg.split("/")[0])
+    return deps
+
+
+@trace_execution
+async def do_save_async(
+    name: str, code: str, description: str = "", tags: list[str] | None = None,
+    language: str = "python", dependencies: list[str] | None = None,
+    test_code: str = "", project: str = "default",
+    mock_imports: list[str] | None = None, timeout: int | None = None,
+):
+    """Asynchronously saves a function with background verification."""
+    tags, dependencies, mock_imports = tags or [], dependencies or [], mock_imports or []
+
+    # 1. Deduplication & Sync Validation
+    code_hash = calculate_code_hash(code)
+    await _validate_save_request(name, code, language, code_hash, project)
+
+    # 2. Data Preparation
+    if not dependencies:
+        dependencies = extract_dependencies(code, language=language)
+
+    from core.system_info import SystemFingerprint
+    data = {
+        "id": str(uuid.uuid4()), "name": str(name), "code": str(code),
+        "description": str(description), "language": str(language), "tags": tags,
+        "reliability_score": 0.0, "embedding": None, "code_hash": str(code_hash),
+        "dependencies": dependencies, "test_code": test_code, "project": project,
+        "env_fingerprint": SystemFingerprint.get_current(),
+        "verification_status": "pending", "verification_report": None,
+    }
+
+    # 3. Initial Save & Trigger Verification
+    logger.info(f"[TRACE] Orchestrator: Saving initial 'pending' record for '{name}'")
+    if not await sqlite_storage.upsert_function(data):
+        raise RuntimeError("Failed to perform initial save to LogicHive vault.")
+
+    asyncio.create_task(_run_async_verification_pipeline(
+        name, project, code, description, tags, language, dependencies, test_code, mock_imports, timeout
+    ))
+
+    logger.info(f"Orchestrator: Save accepted for '{name}'. Verification running.")
+    return True
+
+
+async def _validate_save_request(name, code, language, code_hash, project):
+    # Hash Check
+    existing = await sqlite_storage.get_function_by_hash(code_hash, project)
+    if existing:
+        raise ValidationError(f"Asset identical to '{existing['name']}' already exists.")
+
+    # Structural & Static Checks
+    eval_manager = EvaluationManager()
+    for evaluator_name in ["structural", "python_static" if language.lower() == "python" else None]:
+        if not evaluator_name:
+            continue
+        evaluator = eval_manager.get_evaluator(evaluator_name)
+        if evaluator:
+            res = await evaluator.evaluate(code, language)
+            if res.score == 0:
+                raise SyntaxValidationError(f"Immediate Rejection ({evaluator_name}): {res.reason}")
 
 
 @trace_execution
@@ -131,9 +173,6 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
     except Exception as e:
         logger.error(f"[TRACE] Orchestrator: Deletion failed for '{name}': {e}", exc_info=True)
         raise
-
-
-# --- MCP / REST API Implementation Wrappers ---
 
 
 @trace_execution
@@ -217,128 +256,6 @@ async def _run_async_verification_pipeline(
         await sqlite_storage.update_verification_status(
             name, project, status="error", report={"error": str(e)}
         )
-
-
-@trace_execution
-async def do_save_async(
-    name: str,
-    code: str,
-    description: str = "",
-    tags: list[str] | None = None,
-    language: str = "python",
-    dependencies: list[str] | None = None,
-    test_code: str = "",
-    project: str = "default",
-    mock_imports: list[str] | None = None,
-    timeout: int | None = None,
-):
-    """
-    Asynchronously saves a function.
-    1. Checks for hash-based deduplication.
-    2. Saves with 'pending' status.
-    3. Kicks off background verification and returns immediately.
-    """
-    if tags is None:
-        tags = []
-    if dependencies is None:
-        dependencies = []
-    if mock_imports is None:
-        mock_imports = []
-    # 1. Deduplication Check
-    code_hash = calculate_code_hash(code)
-    existing = await sqlite_storage.get_function_by_hash(code_hash, project)
-    if existing:
-        logger.info(
-            f"Orchestrator: Deduplication hit for '{name}' (Existing: '{existing['name']}')"
-        )
-        raise ValidationError(
-            f"Asset with identical logic is already registered as '{existing['name']}' in project '{project}'."
-        )
-
-    # 2. Synchronous Critical Checks (Quality Gate Tip #1: Early Rejection)
-    eval_manager = EvaluationManager()
-
-    # Structural Check (Language-Agnostic)
-    structural = eval_manager.get_evaluator("structural")
-    if structural:
-        struct_res = await structural.evaluate(code, language)
-        if struct_res.score == 0:
-            raise SyntaxValidationError(
-                f"Structural Error: {struct_res.reason}",
-                details={
-                    "score": 0.0,
-                    "reason": "Immediate Rejection: Structural integrity failed.",
-                    "eval_details": {"structural": struct_res},
-                },
-            )
-
-    # Python-Specific Static Check
-    if language.lower() == "python":
-        python_static = eval_manager.get_evaluator("python_static")
-        if python_static:
-            static_res = await python_static.evaluate(code, language)
-            if static_res.score == 0:
-                raise SyntaxValidationError(
-                    f"Python Static Error: {static_res.reason}",
-                    details={
-                        "score": 0.0,
-                        "reason": "Immediate Rejection: Critical static check failed.",
-                        "eval_details": {"python_static": static_res},
-                    },
-                )
-
-    # 3. Immediate Save (Pending)
-    from core.system_info import SystemFingerprint
-
-    # Automatic Dependency Extraction (Immediate)
-    if not dependencies:
-        extracted = extract_dependencies(code, language=language)
-        dependencies = extracted if extracted else []
-
-    data = {
-        "id": str(uuid.uuid4()),
-        "name": str(name),
-        "code": str(code),
-        "description": str(description),
-        "language": str(language),
-        "tags": tags,
-        "reliability_score": 0.0,
-        "embedding": None,  # Will be updated by bg task
-        "code_hash": str(code_hash),
-        "dependencies": dependencies,
-        "test_code": test_code,
-        "project": project,
-        "env_fingerprint": SystemFingerprint.get_current(),
-        "verification_status": "pending",
-        "verification_report": None,
-    }
-
-    # Initial save to DB
-    logger.info(
-        f"[TRACE] Orchestrator: Saving initial 'pending' record for '{name}' [project={project}]"
-    )
-    save_result = await sqlite_storage.upsert_function(data)
-    if not save_result:
-        raise Exception("Failed to perform initial save to LogicHive vault.")
-
-    # 4. Kick off Background Verification
-    asyncio.create_task(
-        _run_async_verification_pipeline(
-            name,
-            project,
-            code,
-            description,
-            tags,
-            language,
-            dependencies,
-            test_code,
-            mock_imports,
-            timeout,
-        )
-    )
-
-    logger.info(f"Orchestrator: Save accepted for '{name}'. Verification is running in background.")
-    return True
 
 
 @trace_execution

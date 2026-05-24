@@ -22,119 +22,70 @@ class DependencyVouchEvaluator(BaseEvaluator):
 
     async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
         if language.lower() != "python":
-            return EvaluationResult(
-                score=100.0, reason="Dependency check skipped for non-python language."
-            )
+            return EvaluationResult(score=100.0, reason="Dependency check skipped for non-python.")
 
-        # 1. Extract imports from code
         try:
             tree = ast.parse(code)
             imports = self._extract_imports(tree)
         except Exception as e:
-            return EvaluationResult(
-                score=0.0, reason=f"Syntax error prevented dependency analysis: {e}"
-            )
+            return EvaluationResult(score=0.0, reason=f"Syntax error: {e}")
 
         if not imports:
             return EvaluationResult(score=100.0, reason="No external dependencies found.")
 
-        # 2. Filter out stdlib
-        def check_stdlib(m):
-            std = {
-                "os",
-                "sys",
-                "json",
-                "re",
-                "math",
-                "datetime",
-                "typing",
-                "asyncio",
-                "logging",
-                "ast",
-                "pathlib",
-                "abc",
-                "collections",
-                "functools",
-                "itertools",
-                "threading",
-                "multiprocessing",
-                "pickle",
-                "shutil",
-                "tempfile",
-                "time",
-                "uuid",
-                "hashlib",
-                "base64",
-                "xml",
-                "html",
-                "unittest",
-                "pytest",
-                "typing_extensions",
-                "random",
-                "enum",
-                "inspect",
-                "traceback",
-                "warnings",
-                "importlib",
-                "glob",
-                "argparse",
-            }
-            return m.split(".")[0] in std
-
-        # 3. Load project context (manifests)
-        # Search relative to CWD first (good for tests/sandbox), then fallback to package-relative
-        cwd = os.getcwd()
-        project_root = Path(cwd)
-
-        declared_pkgs = self._load_manifest_dependencies(str(project_root))
-
-        # Fallback to hardcoded root if CWD has no manifests
-        if not declared_pkgs:
-            hardcoded_root = Path(__file__).parent.parent.parent.parent
-            declared_pkgs = self._load_manifest_dependencies(str(hardcoded_root))
-
-        hallucinated = []
-        for imp in imports:
-            if check_stdlib(imp):
-                continue
-
-            top_level = imp.split(".")[0]
-
-            # 1. Check if it's a local .py file or directory
-            if (Path(cwd) / f"{top_level}.py").exists() or (
-                Path(cwd) / top_level / "__init__.py"
-            ).exists():
-                continue
-
-            # 2. Check manifests (REQUIRED for external libs)
-            normalized_top = top_level.lower().replace("_", "-")
-            if normalized_top in declared_pkgs:
-                continue
-
-            # Special case: allow common libraries ONLY if no manifest exists AND not a strict project
-            if not declared_pkgs and top_level in {
-                "pandas",
-                "numpy",
-                "requests",
-                "pydantic",
-                "fastapi",
-                "sqlalchemy",
-                "tqdm",
-                "yaml",
-            }:
-                continue
-
-            hallucinated.append(imp)
+        declared = self._get_declared_dependencies()
+        hallucinated = self._find_hallucinated_imports(imports, declared)
 
         if not hallucinated:
-            return EvaluationResult(score=100.0, reason="All dependencies are declared or local.")
+            return EvaluationResult(score=100.0, reason="All dependencies are verified.")
 
         score = max(0.0, 100.0 - (len(hallucinated) * 30))
         return EvaluationResult(
             score=score,
-            reason=f"Hallucinated imports detected: {', '.join(hallucinated)}. Add them to requirements.txt or pyproject.toml.",
+            reason=f"Hallucinated imports: {', '.join(hallucinated)}",
             details={"missing": hallucinated},
         )
+
+    def _is_stdlib(self, module_name: str) -> bool:
+        std = {
+            "os", "sys", "json", "re", "math", "datetime", "typing", "asyncio", "logging",
+            "ast", "pathlib", "abc", "collections", "functools", "itertools", "threading",
+            "multiprocessing", "pickle", "shutil", "tempfile", "time", "uuid", "hashlib",
+            "base64", "xml", "html", "unittest", "pytest", "typing_extensions", "random",
+            "enum", "inspect", "traceback", "warnings", "importlib", "glob", "argparse",
+        }
+        return module_name.split(".")[0] in std
+
+    def _get_declared_dependencies(self) -> set[str]:
+        cwd = os.getcwd()
+        declared = self._load_manifest_dependencies(cwd)
+        if not declared:
+            root = Path(__file__).parent.parent.parent.parent
+            declared = self._load_manifest_dependencies(str(root))
+        return declared
+
+    def _find_hallucinated_imports(self, imports: set[str], declared: set[str]) -> list[str]:
+        hallucinated = []
+        cwd = os.getcwd()
+        for imp in imports:
+            if self._is_stdlib(imp):
+                continue
+
+            top_level = imp.split(".")[0]
+            if (Path(cwd) / f"{top_level}.py").exists() or (Path(cwd) / top_level / "__init__.py").exists():
+                continue
+
+            normalized = top_level.lower().replace("_", "-")
+            if normalized in declared:
+                continue
+            # Fallback for common libs if no manifest found
+            if not declared and top_level in {
+                "pandas", "numpy", "requests", "pydantic", "fastapi", "sqlalchemy", "tqdm", "yaml"
+            }:
+                continue
+
+            hallucinated.append(imp)
+        return hallucinated
 
     def _extract_imports(self, tree: ast.AST) -> set[str]:
         imports = set()

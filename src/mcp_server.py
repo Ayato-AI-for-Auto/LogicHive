@@ -403,15 +403,10 @@ async def get_verification_status(
     Checks the progress and detailed report of a background verification task.
     Use this to see if a recently saved function passed the Quality Gate.
     """
-    logger.info(
-        f"[TRACE] MCP: Tool 'get_verification_status' called for '{name}' [project={project}]"
-    )
+    logger.info(f"[TRACE] MCP: Tool 'get_verification_status' called for '{name}'")
     try:
-        # Re-align with orchestrator's function name
         f_data = await do_get_verification_status(name, project=project)
-
         if f_data.get("status") == "not_found":
-            logger.warning(f"[TRACE] MCP: Asset '{name}' not found.")
             return f_data["message"]
 
         status = f_data.get("status", "unknown")
@@ -419,34 +414,43 @@ async def get_verification_status(
 
         md = f"### Verification Status: {name}\n"
         md += f"- **Current Status**: {status.upper()}\n"
-        if status == "verified":
-            md += "Quality Gate passed. Asset is active in the vault.\n"
-        elif status == "pending":
-            md += "Verification is still in progress. Please check back shortly.\n"
-        elif status == "failed":
-            md += "Quality Gate rejected the asset. Review the report below for details.\n"
-        elif status == "error":
-            md += "A system error occurred during verification. Infrastructure might be unstable.\n"
+        md += _get_status_description(status)
 
-        if isinstance(report, dict):
+        if report:
             md += "\n\n#### Detailed Report:\n"
-            if "error" in report:
-                md += f"**Error Details**: {report['error']}\n"
-            elif "reason" in report:
-                md += f"- **Reason**: {report.get('reason', 'N/A')}\n"
-                details = report.get("details", {})
-                for tool, res in details.items():
-                    md += f"- **{tool.title()}**: {res.get('score', 0):.1f} ({res.get('reason', 'N/A')})\n"
-            else:
-                import json
-
-                md += f"```json\n{json.dumps(report, indent=2)}\n```"
-        elif report:
-            md += f"\n\n#### Raw Report:\n```json\n{report}\n```"
+            md += _format_report(report)
 
         return md
     except Exception as e:
         return f"Error retrieving status: {str(e)}"
+
+
+def _get_status_description(status):
+    mapping = {
+        "verified": "Quality Gate passed. Asset is active in the vault.\n",
+        "pending": "Verification is still in progress. Please check back shortly.\n",
+        "failed": "Quality Gate rejected the asset. Review the report below for details.\n",
+        "error": "A system error occurred during verification. Infrastructure might be unstable.\n",
+    }
+    return mapping.get(status, "")
+
+
+def _format_report(report):
+    if not isinstance(report, dict):
+        return f"```json\n{report}\n```"
+
+    if "error" in report:
+        return f"**Error Details**: {report['error']}\n"
+
+    if "reason" in report:
+        md = f"- **Reason**: {report.get('reason', 'N/A')}\n"
+        details = report.get("details", {})
+        for tool, res in details.items():
+            md += f"- **{tool.title()}**: {res.get('score', 0):.1f} ({res.get('reason', 'N/A')})\n"
+        return md
+
+    import json
+    return f"```json\n{json.dumps(report, indent=2)}\n```"
 
 
 @mcp.tool()
@@ -467,8 +471,8 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 if __name__ == "__main__":
-    from core.config import HOST, PORT
     from core import __version__
+    from core.config import HOST, PORT
 
     logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
     mcp.run(transport="sse", host=HOST, port=PORT)

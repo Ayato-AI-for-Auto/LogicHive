@@ -67,220 +67,155 @@ class EphemeralPythonExecutor(BaseExecutor):
         dependencies = dependencies or []
         mock_imports = kwargs.get("mock_imports", [])
 
-        # 1. Check for Pre-warmed Pool match
-        from .pool import pool_manager
+        # 1. Acquire Pre-warmed Environment
+        pooled_env = await self._acquire_pooled_env(dependencies)
 
-        pooled_env = None
+        # 2. Prepare Workspace and Execute
+        try:
+            with tempfile.TemporaryDirectory(prefix="logichive_exec_") as tmpdir:
+                workspace = self._prepare_workspace(tmpdir, code, test_code, mock_imports)
+                cmd = self._build_command(pooled_env, workspace["harness_file"], dependencies)
 
-        # Simple matching logic: if 'torch' is in dependencies, use torch pools
-        if ENABLE_ENV_POOLING and dependencies:
-            target_spec = None
-            if any("torch" in d.lower() for d in dependencies):
-                # Prefer GPU if available and functional
-                target_spec = "torch-gpu" if pool_manager.has_gpu else "torch-cpu"
-
-            if target_spec:
-                pooled_env = await pool_manager.acquire(target_spec, timeout=1.0)
-
-        # 2. Prepare Workspace
-        with tempfile.TemporaryDirectory(prefix="logichive_exec_") as tmpdir:
-            tmp_path = Path(tmpdir)
-            script_file = tmp_path / "solution.py"
-            harness_file = tmp_path / "harness.py"
-            result_file = tmp_path / "result.json"
-
-            # Write the actual solution code
-            script_file.write_text(code, encoding="utf-8")
-
-            # Create Harness
-            harness_content = self._generate_harness(code, test_code, result_file, mock_imports)
-            harness_file.write_text(harness_content, encoding="utf-8")
-
-            # 3. Build Command
-            if pooled_env:
-                # Use pre-warmed python directly (FAST)
-                cmd = [str(pooled_env.python_executable), str(harness_file)]
-            else:
-                # Fallback to standard uv run (COLD)
-                cmd = ["uv", "run", "--quiet", "--offline", "--no-project"]
-                for dep in dependencies:
-                    cmd.extend(["--with", dep])
-                cmd.extend(["python", str(harness_file)])
-
-            logger.debug(f"Executor: Command built: {' '.join(cmd)}")
-
-            # 3. Execute with isolated environment
-            process_env = {
-                k: v
-                for k, v in os.environ.items()
-                if k
-                in [
-                    "PATH",
-                    "SYSTEMROOT",
-                    "SystemDrive",
-                    "USERPROFILE",
-                    "APPDATA",
-                    "LOCALAPPDATA",
-                    "TEMP",
-                    "TMP",
-                    "USERNAME",
-                    "HOME",
-                    "HOMEDRIVE",
-                    "HOMEPATH",
-                    "ProgramData",
-                ]
-            }
-            process_env["PYTHONPATH"] = ""
-            process_env["PYTHONNOUSERSITE"] = "1"
-
-            import psutil
-
-            memory_exceeded = False
-            done_event = asyncio.Event()
-
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    cwd=tmpdir,
-                    env=process_env,
+                exec_res = await self._run_subprocess(
+                    cmd, tmpdir, timeout, memory_limit_mb, workspace["result_file"]
                 )
-
-                async def monitor_resources():
-                    nonlocal memory_exceeded
-                    try:
-                        while not done_event.is_set():
-                            try:
-                                parent = psutil.Process(process.pid)
-                                if not parent.is_running():
-                                    break
-
-                                # Sum up memory of parent and all recursive children
-                                total_mem = parent.memory_info().rss
-                                for child in parent.children(recursive=True):
-                                    try:
-                                        total_mem += child.memory_info().rss
-                                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                        continue
-
-                                if (total_mem / 1024 / 1024) > memory_limit_mb:
-                                    logger.warning(
-                                        f"Executor: Memory limit exceeded ({total_mem / 1024 / 1024:.1f}MB > {memory_limit_mb}MB). Killing process tree."
-                                    )
-                                    memory_exceeded = True
-                                    self._kill_process_tree(process.pid)
-                                    break
-                            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                logger.trace(
-                                    "Executor: Process vanished during resource monitoring."
-                                )
-                                break
-                            await asyncio.sleep(0.5)  # Reduced frequency for stability
-                    except Exception as e:
-                        logger.error(f"Executor: Resource monitor crashed: {e}")
-
-                monitor_task = asyncio.create_task(monitor_resources())
-
-                try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        process.communicate(), timeout=timeout
-                    )
-                    stdout = stdout_bytes.decode("utf-8", errors="replace")
-                    stderr = stderr_bytes.decode("utf-8", errors="replace")
-                except asyncio.TimeoutError:
-                    logger.warning(f"Executor: Execution timed out after {timeout}s")
-                    self._kill_process_tree(process.pid)
-                    await process.wait()
-                    return ExecutionResult(
-                        status=ExecutionStatus.TIMEOUT,
-                        logs=ExecutionLogs(stderr="Execution timed out."),
-                        duration=time.time() - start_time,
-                    )
-                finally:
-                    done_event.set()
-                    if not monitor_task.done():
-                        monitor_task.cancel()
-                        try:
-                            await monitor_task
-                        except asyncio.CancelledError:
-                            logger.trace(
-                                "Executor: Resource monitor task cancelled safely."
-                            )
-
-                if memory_exceeded:
-                    return ExecutionResult(
-                        status=ExecutionStatus.MEMORY_LIMIT,
-                        logs=ExecutionLogs(stderr=f"Memory limit exceeded ({memory_limit_mb}MB)."),
-                        duration=time.time() - start_time,
-                    )
-
-                # 4. Parse Results
-                duration = time.time() - start_time
-                status = (
-                    ExecutionStatus.SUCCESS if process.returncode == 0 else ExecutionStatus.FAILURE
-                )
-
-                # Try to load structured results from the harness
-                results = []
-                error = None
-
-                if result_file.exists():
-                    try:
-                        raw_result = json.loads(result_file.read_text(encoding="utf-8"))
-                        if "main_result" in raw_result:
-                            results.append(
-                                Result(
-                                    data=raw_result["main_result"],
-                                    metadata={"is_main_result": True},
-                                )
-                            )
-                        if raw_result.get("error"):
-                            err_info = raw_result["error"]
-                            error = ExecutionError(
-                                name=err_info.get("name", "UnknownError"),
-                                value=err_info.get("value", ""),
-                                traceback=err_info.get("traceback", ""),
-                            )
-                            status = ExecutionStatus.FAILURE
-                    except Exception as e:
-                        logger.error(f"Executor: Failed to parse harness results: {e}")
-
-                # If harness didn't catch error but exit code is non-zero, treat as infrastructure error or crash
-                if status == ExecutionStatus.FAILURE and not error:
-                    error = ExecutionError(
-                        name="RuntimeError",
-                        value=f"Process exited with code {process.returncode}",
-                        traceback=stderr,
-                    )
 
                 duration = time.perf_counter() - start_time
-                logger.info(
-                    f"Executor: Process execution finished in {duration:.4f}s with status: {status}"
-                )
+                logger.info(f"Executor: Finished in {duration:.4f}s with status: {exec_res.status}")
+                exec_res.duration = duration
+                return exec_res
 
+        except Exception as e:
+            logger.error(f"Executor: Execution lifecycle failed: {e}", exc_info=True)
+            return ExecutionResult(
+                status=ExecutionStatus.ERROR,
+                logs=ExecutionLogs(stderr=str(e)),
+                error=ExecutionError(
+                    name=type(e).__name__, value=str(e), traceback=traceback.format_exc()
+                ),
+                duration=time.time() - start_time,
+            )
+        finally:
+            if pooled_env:
+                from .pool import pool_manager
+                await pool_manager.release(pooled_env)
+
+    async def _acquire_pooled_env(self, dependencies):
+        if not ENABLE_ENV_POOLING or not dependencies:
+            return None
+
+        from .pool import pool_manager
+        target_spec = None
+        if any("torch" in d.lower() for d in dependencies):
+            target_spec = "torch-gpu" if pool_manager.has_gpu else "torch-cpu"
+
+        if target_spec:
+            return await pool_manager.acquire(target_spec, timeout=1.0)
+        return None
+
+    def _prepare_workspace(self, tmpdir, code, test_code, mock_imports):
+        tmp_path = Path(tmpdir)
+        workspace = {
+            "script_file": tmp_path / "solution.py",
+            "harness_file": tmp_path / "harness.py",
+            "result_file": tmp_path / "result.json"
+        }
+        workspace["script_file"].write_text(code, encoding="utf-8")
+        harness_content = self._generate_harness(code, test_code, workspace["result_file"], mock_imports)
+        workspace["harness_file"].write_text(harness_content, encoding="utf-8")
+        return workspace
+
+    def _build_command(self, pooled_env, harness_file, dependencies):
+        if pooled_env:
+            return [str(pooled_env.python_executable), str(harness_file)]
+
+        cmd = ["uv", "run", "--quiet", "--offline", "--no-project"]
+        for dep in dependencies:
+            cmd.extend(["--with", dep])
+        cmd.extend(["python", str(harness_file)])
+        return cmd
+
+    async def _run_subprocess(self, cmd, cwd, timeout, memory_limit, result_file):
+        process_env = {k: v for k, v in os.environ.items() if k in [
+            "PATH", "SYSTEMROOT", "SystemDrive", "USERPROFILE", "APPDATA",
+            "LOCALAPPDATA", "TEMP", "TMP", "USERNAME", "HOME", "HOMEDRIVE",
+            "HOMEPATH", "ProgramData"
+        ]}
+        process_env.update({"PYTHONPATH": "", "PYTHONNOUSERSITE": "1"})
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            cwd=cwd, env=process_env,
+        )
+
+        # Track state across tasks
+        state = {"memory_exceeded": False}
+        done_event = asyncio.Event()
+        monitor_task = asyncio.create_task(self._monitor_resources(process, memory_limit, done_event, state))
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout = stdout_bytes.decode("utf-8", errors="replace")
+            stderr = stderr_bytes.decode("utf-8", errors="replace")
+
+            if state["memory_exceeded"]:
                 return ExecutionResult(
-                    status=status,
-                    logs=ExecutionLogs(stdout=stdout, stderr=stderr),
-                    results=results,
-                    error=error,
-                    duration=duration,
+                    status=ExecutionStatus.MEMORY_LIMIT,
+                    logs=ExecutionLogs(stderr="Memory limit exceeded."),
                 )
 
+            return self._parse_results(process.returncode, stdout, stderr, result_file)
+
+        except asyncio.TimeoutError:
+            self._kill_process_tree(process.pid)
+            await process.wait()
+            return ExecutionResult(status=ExecutionStatus.TIMEOUT, logs=ExecutionLogs(stderr="Execution timed out."))
+        finally:
+            done_event.set()
+            monitor_task.cancel()
+
+    async def _monitor_resources(self, process, limit_mb, done_event, state):
+        import psutil
+        try:
+            while not done_event.is_set():
+                try:
+                    parent = psutil.Process(process.pid)
+                    if not parent.is_running():
+                        break
+                    total_mem = parent.memory_info().rss + sum(
+                        c.memory_info().rss for c in parent.children(recursive=True)
+                    )
+                    if (total_mem / 1024 / 1024) > limit_mb:
+                        logger.warning(f"Executor: Memory limit exceeded. Killing {process.pid}")
+                        state["memory_exceeded"] = True
+                        self._kill_process_tree(process.pid)
+                        break
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    break
+                await asyncio.sleep(0.5)
+        except Exception as e:
+            logger.error(f"Executor: Resource monitor crashed: {e}")
+
+    def _parse_results(self, returncode, stdout, stderr, result_file) -> ExecutionResult:
+        status = ExecutionStatus.SUCCESS if returncode == 0 else ExecutionStatus.FAILURE
+        results, error = [], None
+
+        if result_file.exists():
+            try:
+                raw = json.loads(result_file.read_text(encoding="utf-8"))
+                if "main_result" in raw:
+                    results.append(Result(data=raw["main_result"], metadata={"is_main_result": True}))
+                if raw.get("error"):
+                    err_info = raw["error"]
+                    error = ExecutionError(name=err_info.get("name", "UnknownError"), value=err_info.get("value", ""), traceback=err_info.get("traceback", ""))
+                    status = ExecutionStatus.FAILURE
             except Exception as e:
-                logger.error(f"Executor: Subprocess call failed: {e}", exc_info=True)
-                return ExecutionResult(
-                    status=ExecutionStatus.ERROR,
-                    logs=ExecutionLogs(stderr=str(e)),
-                    error=ExecutionError(
-                        name=type(e).__name__, value=str(e), traceback=traceback.format_exc()
-                    ),
-                    duration=time.time() - start_time,
-                )
-            finally:
-                if pooled_env:
-                    # Mark used environment for disposal and background replacement
-                    await pool_manager.release(pooled_env)
+                logger.error(f"Executor: Failed to parse harness results: {e}")
+
+        if status == ExecutionStatus.FAILURE and not error:
+            error = ExecutionError(name="RuntimeError", value=f"Exit code {returncode}", traceback=stderr)
+
+        return ExecutionResult(status=status, logs=ExecutionLogs(stdout=stdout, stderr=stderr), results=results, error=error)
 
     def _generate_harness(
         self, code: str, test_code: str, result_file: Path, mock_imports: list[str] | None = None

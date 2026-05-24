@@ -96,41 +96,32 @@ class DeterministicEvaluator(BaseEvaluator):
             tree = ast.parse(test_code)
             count = 0
             for node in ast.walk(tree):
-                # 1. Direct assert statements
                 if isinstance(node, ast.Assert):
-                    # ANTI-THEATER: Check for constant assertions (assert True, assert 1 == 1)
-                    if self._is_constant_expr(node.test):
-                        continue  # Skip theatrical assertions
-                    count += 1
-                # 2. Call to assert functions (pytest.assume, unittest methods, etc)
-                elif isinstance(node, ast.Call):
-                    is_assert_func = False
-                    if (
-                        isinstance(node.func, ast.Name)
-                        and any(
-                            node.func.id.startswith(p)
-                            for p in ["assert", "expect", "assume", "verify", "should"]
-                        )
-                        or isinstance(node.func, ast.Attribute)
-                        and any(
-                            node.func.attr.startswith(p)
-                            for p in ["assert", "expect", "assume", "verify", "should"]
-                        )
-                    ):
-                        is_assert_func = True
-
-                    if is_assert_func:
-                        # Skip ONLY if arguments are present and ALL of them are trivial constants
-                        has_args = len(node.args) > 0 or len(node.keywords) > 0
-                        if has_args:
-                            if all(self._is_constant_expr(arg) for arg in node.args) and all(
-                                self._is_constant_expr(kw.value) for kw in node.keywords
-                            ):
-                                continue
+                    if not self._is_constant_expr(node.test):
                         count += 1
+                elif isinstance(node, ast.Call) and self._is_assert_call(node) and not self._is_theatrical_call(node):
+                    count += 1
             return count
         except SyntaxError:
             return 0
+
+    def _is_assert_call(self, node: ast.Call) -> bool:
+        prefixes = ["assert", "expect", "assume", "verify", "should"]
+        if isinstance(node.func, ast.Name):
+            return any(node.func.id.startswith(p) for p in prefixes)
+        if isinstance(node.func, ast.Attribute):
+            return any(node.func.attr.startswith(p) for p in prefixes)
+        return False
+
+    def _is_theatrical_call(self, node: ast.Call) -> bool:
+        """Checks if a call is 'testing theater' (e.g. assert_equal(1, 1))."""
+        has_args = len(node.args) > 0 or len(node.keywords) > 0
+        if not has_args:
+            return False
+
+        all_args_constant = all(self._is_constant_expr(arg) for arg in node.args)
+        all_kw_constant = all(self._is_constant_expr(kw.value) for kw in node.keywords)
+        return all_args_constant and all_kw_constant
 
     def _is_constant_expr(self, node: ast.AST) -> bool:
         """Determines if an expression is evaluation-time constant (trivial)."""
@@ -152,9 +143,8 @@ class DeterministicEvaluator(BaseEvaluator):
             # Find all public definitions in code
             defined_names = set()
             for node in ast.walk(code_tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    if not node.name.startswith("_"):  # Focus on public API
-                        defined_names.add(node.name)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and not node.name.startswith("_"):
+                    defined_names.add(node.name)
 
             if not defined_names:
                 return True  # Nothing defined to call
@@ -188,9 +178,8 @@ class DeterministicEvaluator(BaseEvaluator):
         for m in matches:
             # Heuristic: If it looks like assert(true) or assert(1 == 1)
             inner = m.lower()
-            if "true" in inner or "false" in inner or "1==1" in inner or "1 == 1" in inner:
-                if len(inner) < 20:  # Simple constant assertions are usually short
-                    continue
+            if ("true" in inner or "false" in inner or "1==1" in inner or "1 == 1" in inner) and len(inner) < 20:
+                continue
             valid_matches += 1
 
         return valid_matches

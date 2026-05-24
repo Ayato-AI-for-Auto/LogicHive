@@ -167,37 +167,34 @@ class PoolManager:
         logger.info("PoolManager: Background worker STARTED.")
 
         # Initial burst to fill pools on start
-        for spec_name in self.pools:
-            if spec_name == "torch-gpu" and not self.has_gpu:
-                continue
-            for _ in range(POOL_MAX_SIZE):
-                asyncio.create_task(self._prepare_env(spec_name))
+        self._trigger_initial_burst()
 
         while True:
             try:
-                for spec_name, queue in self.pools.items():
-                    if not ENABLE_ENV_POOLING:
-                        continue
-
-                    current_size = queue.qsize()
-                    if current_size < POOL_MAX_SIZE:
-                        # Don't spend resources on GPU pool if no GPU
-                        if spec_name == "torch-gpu" and not self.has_gpu:
-                            continue
-
-                        # Check if we already have tasks in flight for this spec
-                        logger.debug(
-                            f"PoolManager: Replenishing {spec_name} (current size: {current_size})"
-                        )
-                        asyncio.create_task(self._prepare_env(spec_name))
-
-                await asyncio.sleep(10)  # Less frequent checks now that we use task-based burst
+                if ENABLE_ENV_POOLING:
+                    self._check_and_replenish_pools()
+                await asyncio.sleep(10)
             except asyncio.CancelledError:
                 logger.info("PoolManager: Background worker cancelled.")
                 break
             except Exception as e:
                 logger.error(f"PoolManager: Worker error: {e}", exc_info=True)
                 await asyncio.sleep(10)
+
+    def _trigger_initial_burst(self):
+        for spec_name in self.pools:
+            if spec_name == "torch-gpu" and not self.has_gpu:
+                continue
+            for _ in range(POOL_MAX_SIZE):
+                asyncio.create_task(self._prepare_env(spec_name))
+
+    def _check_and_replenish_pools(self):
+        for spec_name, queue in self.pools.items():
+            if queue.qsize() < POOL_MAX_SIZE:
+                if spec_name == "torch-gpu" and not self.has_gpu:
+                    continue
+                logger.debug(f"PoolManager: Replenishing {spec_name} (size: {queue.qsize()})")
+                asyncio.create_task(self._prepare_env(spec_name))
 
     async def _prepare_env(self, spec_name: str):
         """Creates a new venv and installs dependencies using uv."""

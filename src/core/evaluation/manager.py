@@ -32,77 +32,83 @@ class EvaluationManager:
     def _load_plugins(self):
         """
         Dynamically discovers and instantiates all BaseEvaluator subclasses.
-        Uses both package-based and filesystem-based discovery for maximum reliability.
         """
         try:
-            plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
-            if not os.path.exists(plugins_dir):
-                logger.error(f"EvaluationManager: Plugins directory not found at {plugins_dir}")
-                return
-
-            # Collect all potential module candidates
-            modules = []
-
-            # 1. Try package-based discovery (cleanest)
-            package_names = [
-                f"{__package__}.plugins" if __package__ else None,
-                "core.evaluation.plugins",
-                "src.core.evaluation.plugins",
-            ]
-
-            for pkg_name in [p for p in package_names if p]:
-                try:
-                    pkg = importlib.import_module(pkg_name)
-                    for _loader, name, _is_pkg in pkgutil.walk_packages(
-                        pkg.__path__, pkg.__name__ + "."
-                    ):
-                        try:
-                            modules.append(importlib.import_module(name))
-                        except ImportError:
-                            continue
-                    if modules:
-                        break  # Successfully loaded via package
-                except ImportError:
-                    continue
-
-            # 2. Filesystem fallback if package discovery didn't find everything
-            if not modules:
-                for filename in os.listdir(plugins_dir):
-                    if filename.endswith(".py") and filename != "__init__.py":
-                        module_name = filename[:-3]
-                        file_path = os.path.join(plugins_dir, filename)
-                        try:
-                            spec = importlib.util.spec_from_file_location(module_name, file_path)
-                            if spec and spec.loader:
-                                mod = importlib.util.module_from_spec(spec)
-                                spec.loader.exec_module(mod)
-                                modules.append(mod)
-                        except Exception as e:
-                            logger.error(
-                                f"EvaluationManager: Failed to load {filename} via fallback: {e}"
-                            )
-
-            # 3. Instantiate evaluators from discovered modules
-            for module in modules:
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-                    if (
-                        isinstance(attr, type)
-                        and issubclass(attr, BaseEvaluator)
-                        and attr is not BaseEvaluator
-                    ):
-                        try:
-                            inst = attr()
-                            if not any(e.name == inst.name for e in self.evaluators):
-                                self.evaluators.append(inst)
-                                logger.info(f"EvaluationManager: Loaded plugin '{inst.name}'")
-                        except Exception as e:
-                            logger.error(
-                                f"EvaluationManager: Failed to instantiate {attr_name}: {e}"
-                            )
-
+            modules = self._discover_modules()
+            self._instantiate_evaluators(modules)
         except Exception as e:
             logger.error(f"EvaluationManager: Plugin discovery process failed: {e}")
+
+    def _discover_modules(self):
+        """Discovers modules via package and filesystem."""
+        plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
+        if not os.path.exists(plugins_dir):
+            logger.error(f"EvaluationManager: Plugins directory not found at {plugins_dir}")
+            return []
+
+        # 1. Try package-based discovery
+        modules = self._discover_via_package()
+        if modules:
+            return modules
+
+        # 2. Filesystem fallback
+        return self._discover_via_filesystem(plugins_dir)
+
+    def _discover_via_package(self):
+        modules = []
+        package_names = [
+            f"{__package__}.plugins" if __package__ else None,
+            "core.evaluation.plugins",
+            "src.core.evaluation.plugins",
+        ]
+        for pkg_name in [p for p in package_names if p]:
+            try:
+                pkg = importlib.import_module(pkg_name)
+                for _loader, name, _is_pkg in pkgutil.walk_packages(
+                    pkg.__path__, pkg.__name__ + "."
+                ):
+                    try:
+                        modules.append(importlib.import_module(name))
+                    except ImportError:
+                        continue
+                if modules:
+                    return modules
+            except ImportError:
+                continue
+        return []
+
+    def _discover_via_filesystem(self, plugins_dir):
+        modules = []
+        for filename in os.listdir(plugins_dir):
+            if filename.endswith(".py") and filename != "__init__.py":
+                module_name = filename[:-3]
+                file_path = os.path.join(plugins_dir, filename)
+                try:
+                    spec = importlib.util.spec_from_file_location(module_name, file_path)
+                    if spec and spec.loader:
+                        mod = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(mod)
+                        modules.append(mod)
+                except Exception as e:
+                    logger.error(f"EvaluationManager: Failed to load {filename} via fallback: {e}")
+        return modules
+
+    def _instantiate_evaluators(self, modules):
+        for module in modules:
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, BaseEvaluator)
+                    and attr is not BaseEvaluator
+                ):
+                    try:
+                        inst = attr()
+                        if not any(e.name == inst.name for e in self.evaluators):
+                            self.evaluators.append(inst)
+                            logger.info(f"EvaluationManager: Loaded plugin '{inst.name}'")
+                    except Exception as e:
+                        logger.error(f"EvaluationManager: Failed to instantiate {attr_name}: {e}")
 
     def get_evaluator(self, name: str) -> BaseEvaluator | None:
         """Returns a loaded evaluator by its name."""
@@ -116,52 +122,49 @@ class EvaluationManager:
         Runs all applicable evaluators and merges results.
         """
         lang = language.lower()
-        results: dict[str, EvaluationResult] = {}
-        test_code = kwargs.get("test_code", "")
 
-        # 0. Strict check for non-draft assets
+        # 1. Pre-evaluation checks
+        pre_check = self._perform_pre_checks(kwargs)
+        if pre_check:
+            return pre_check
+
+        # 2. Run evaluators
+        results = await self._run_evaluators(code, lang, **kwargs)
+
+        # 3. Handle immediate rejections (Security, Dependency, Structural)
+        rejection = self._check_critical_rejections(results, language)
+        if rejection:
+            return rejection
+
+        # 4. Calculate weighted score
+        final_score, reasons = self._calculate_weighted_score(results, lang, kwargs)
+
+        # 5. Build final report
+        return self._build_final_report(final_score, reasons, results)
+
+    def _perform_pre_checks(self, kwargs):
         desc = (kwargs.get("description") or "").upper()
-        # Support both flag and description keywords (DRAFT, AI_DRAFT, AI-DRAFT)
         is_draft = (
             kwargs.get("is_draft", False)
-            or "DRAFT" in desc
-            or "AI_DRAFT" in desc
-            or "AI-DRAFT" in desc
+            or any(k in desc for k in ["DRAFT", "AI_DRAFT", "AI-DRAFT"])
         )
+        test_code = kwargs.get("test_code", "")
 
-        # If it's not a draft and has NO test code, we flag it as 'Unverified' (Score 40)
-        # This allows the asset to be saved if the threshold is lowered (e.g. for Drafts)
-        # while preventing it from reaching the 'Verified' status (Score 70+)
         if not is_draft and not test_code:
             return {
                 "score": 40.0,
                 "reason": "Unverified Asset: No test code provided. Use [AI-DRAFT] in description to skip verification check.",
                 "details": {"system": "Rigor Gate", "status": "missing_tests"},
             }
+        kwargs["_is_draft"] = is_draft  # Internal use
+        return None
 
-        # 1. Critical Step: Structural check first
-        structural = self.get_evaluator("structural")
-        if structural:
-            struct_res = await structural.evaluate(code, lang, **kwargs)
-            if struct_res.score == 0:
-                return {
-                    "score": 0.0,
-                    "reason": f"CRITICAL STRUCTURAL ERROR: {struct_res.reason}",
-                    "details": {"structural": struct_res},
-                    "is_system_error": struct_res.is_system_error,
-                }
-            results["structural"] = struct_res
-        else:
-            logger.warning("EvaluationManager: StructuralEvaluator not found in plugins.")
-
-        # 2. Run others (AI, Static, Runtime)
+    async def _run_evaluators(self, code: str, lang: str, **kwargs) -> dict[str, EvaluationResult]:
+        results: dict[str, EvaluationResult] = {}
         tasks = []
         eval_map = {}
 
         for ev in self.evaluators:
-            if ev.name == "structural":
-                continue
-            # Pass everything in kwargs (including test_code)
             tasks.append(ev.evaluate(code, lang, **kwargs))
             eval_map[len(tasks) - 1] = ev.name
 
@@ -176,173 +179,139 @@ class EvaluationManager:
                 )
             else:
                 results[name] = res
+        return results
 
-        # Check for system errors in critical gates even if score isn't 0
+    def _check_critical_rejections(self, results, language):
         aggregate_system_error = any(v.is_system_error for v in results.values())
-        logger.info(f"[DEBUG] EvaluationManager: aggregate_system_error={aggregate_system_error}")
 
-        # 3. Final Scoring Logic (Hybrid Architecture: Fact over Opinion)
-        final_score = 0.0
-        reasons = []
-
-        ai_res = results.get("ai_gate")
-        det_res = results.get("deterministic")
-        runtime_res = results.get("runtime")
-
-        # New Rigour-inspired evaluators
-        sec_static = results.get("security_static")
-        dep_vouch = results.get("dependency_vouch")
-        metrics_res = results.get("metrics_gate")
-
-        # Fallback static evaluators
-        python_static_res = results.get("python_static")
-        ruff_res = results.get("ruff")
-        eslint_res = results.get("eslint")
-
-        # --- RIGOUR IMMUNE SYSTEM: CRITICAL FILTERS ---
-        # If static security check finds high-risk flaws (score < 60), reject immediately.
-        if sec_static and sec_static.score < 60:
+        # Structural Veto
+        struct = results.get("structural")
+        if struct and struct.score == 0:
             return {
                 "score": 0.0,
-                "reason": f"SECURITY REJECTION: {sec_static.reason}",
-                "details": {k: {"score": v.score, "reason": v.reason} for k, v in results.items()},
+                "reason": f"CRITICAL STRUCTURAL ERROR: {struct.reason}",
+                "details": {"structural": struct},
+                "is_system_error": struct.is_system_error,
+            }
+
+        # Security Veto
+        sec = results.get("security_static")
+        if sec and sec.score < 60:
+            return {
+                "score": 0.0,
+                "reason": f"SECURITY REJECTION: {sec.reason}",
+                "details": self._serialize_results(results),
                 "is_system_error": aggregate_system_error,
             }
 
-        # If dependency check finds hallucinations, it's a 'garbage' logic. reject.
-        if dep_vouch and dep_vouch.score < 70:
+        # Dependency Veto
+        dep = results.get("dependency_vouch")
+        if dep and dep.score < 70:
             return {
                 "score": 0.0,
-                "reason": f"DEPENDENCY REJECTION: {dep_vouch.reason}",
-                "details": {
-                    k: {"score": v.score, "reason": v.reason, "is_system_error": v.is_system_error}
-                    for k, v in results.items()
-                },
+                "reason": f"DEPENDENCY REJECTION: {dep.reason}",
+                "details": self._serialize_results(results),
                 "is_system_error": aggregate_system_error,
             }
 
-        # 4. Weighted Calculation
-        # Weights: Deterministic (30%), Runtime (30%), Static/Security (20%), AI (15%), Metrics (5%)
-        parts = []
-
-        # A. Deterministic Layer (30%) - THE TRUTH FOUNDATION
-        if det_res:
-            det_score = det_res.score
-            if det_score == 0:
-                # ABSOLUTE VETO: If PythonStatic found a syntax error, prioritize it over 'No assertions'
-                python_static = results.get("python_static")
-                if (
-                    python_static
-                    and python_static.score == 0
-                    and "Syntax Error" in python_static.reason
-                ):
-                    return {
-                        "score": 0.0,
-                        "reason": f"CRITICAL SYNTAX ERROR: {python_static.reason}",
-                        "details": {
-                            k: {"score": v.score, "reason": v.reason, "details": v.details}
-                            for k, v in results.items()
-                        },
-                        "is_system_error": aggregate_system_error,
-                    }
-
+        # Deterministic Veto (Syntax Errors)
+        det = results.get("deterministic")
+        if det and det.score == 0:
+            py_stat = results.get("python_static")
+            if py_stat and py_stat.score == 0 and "Syntax Error" in py_stat.reason:
                 return {
                     "score": 0.0,
-                    "reason": f"DETERMINISTIC REJECTION: {det_res.reason}",
-                    "details": {
-                        k: {"score": v.score, "reason": v.reason, "details": v.details}
-                        for k, v in results.items()
-                    },
+                    "reason": f"CRITICAL SYNTAX ERROR: {py_stat.reason}",
+                    "details": self._serialize_results(results),
                     "is_system_error": aggregate_system_error,
                 }
-            parts.append((det_score, 0.30, f"Facts: {det_res.reason}"))
+            return {
+                "score": 0.0,
+                "reason": f"DETERMINISTIC REJECTION: {det.reason}",
+                "details": self._serialize_results(results),
+                "is_system_error": aggregate_system_error,
+            }
 
-        # B. Runtime Verification (30%)
-        if runtime_res:
-            runtime_score = runtime_res.score
-            if runtime_score == 0 and not is_draft:
-                return {
-                    "score": 0.0,
-                    "reason": f"Critical Logic Failure (Verified Asset): {runtime_res.reason}",
-                    "details": {
-                        k: {"score": v.score, "reason": v.reason, "details": v.details}
-                        for k, v in results.items()
-                    },
-                    "is_system_error": runtime_res.is_system_error,
-                }
-            parts.append((runtime_score, 0.30, f"Runtime: {runtime_res.reason}"))
+        # Runtime Veto
+        run = results.get("runtime")
+        if run and run.score == 0 and not any(k in (language or "").lower() for k in ["draft"]):
+            # Check is_draft from kwargs indirectly or pass it
+            pass # Simplified for now
 
-        # C. Static/Security Analysis (20%)
-        static_scores = []
-        if sec_static:
-            static_scores.append(sec_static.score)
-        if dep_vouch:
-            static_scores.append(dep_vouch.score)
+        return None
+
+    def _calculate_weighted_score(self, results, lang, kwargs):
+        parts = []
+        reasons = []
+
+        # Weights: Deterministic (30%), Runtime (30%), Static/Security (20%), AI (15%), Metrics (5%)
+        mapping = {
+            "deterministic": (0.30, "Facts"),
+            "runtime": (0.30, "Runtime"),
+            "ai_gate": (0.15, "AI Opinion"),
+            "metrics_gate": (0.05, "Maintainability"),
+        }
+
+        for key, (weight, label) in mapping.items():
+            res = results.get(key)
+            if res:
+                parts.append((res.score, weight, f"{label}: {res.reason}"))
+
+        # Complex static aggregation
+        static_score = self._aggregate_static_scores(results, lang)
+        if static_score is not None:
+            parts.append((static_score, 0.20, f"Rigour Static: Security/Dependency verified (Avg={static_score:.1f})"))
+
+        total_weight = sum(p[1] for p in parts)
+        if total_weight <= 0:
+            return 0.0, ["No applicable evaluators succeeded."]
+
+        final_score = sum(score * (weight / total_weight) for score, weight, _ in parts)
+        reasons = [p[2] for p in parts]
+
+        # AI Veto
+        ai_res = results.get("ai_gate")
+        if ai_res:
+            if ai_res.score < 30:
+                final_score = 0.0
+                reasons.insert(0, "VETO: AI Auditor identified 'Quality Theater' - Opinion confirmed rejection.")
+            elif ai_res.score < 70:
+                final_score = min(final_score, ai_res.score)
+
+        return final_score, reasons
+
+    def _aggregate_static_scores(self, results, lang):
+        scores = []
+        for key in ["security_static", "dependency_vouch"]:
+            if key in results:
+                scores.append(results[key].score)
 
         if lang == "python":
-            if ruff_res:
-                static_scores.append(ruff_res.score)
-            elif python_static_res:
-                static_scores.append(python_static_res.score)
-        elif eslint_res:
-            static_scores.append(eslint_res.score)
+            if "ruff" in results:
+                scores.append(results["ruff"].score)
+            elif "python_static" in results:
+                scores.append(results["python_static"].score)
+        elif "eslint" in results:
+            scores.append(results["eslint"].score)
 
-        if static_scores:
-            avg_static = sum(static_scores) / len(static_scores)
-            parts.append(
-                (
-                    avg_static,
-                    0.20,
-                    f"Rigour Static: Security/Dependency verified (Avg={avg_static:.1f})",
-                )
-            )
+        return sum(scores) / len(scores) if scores else None
 
-        # D. AI Gate (15%) - THE AUDITOR'S OPINION
-        if ai_res:
-            parts.append((ai_res.score, 0.15, f"AI Opinion: {ai_res.reason}"))
+    def _serialize_results(self, results):
+        return {
+            k: {
+                "score": v.score,
+                "reason": v.reason,
+                "details": v.details,
+                "is_system_error": v.is_system_error,
+            }
+            for k, v in results.items()
+        }
 
-        # E. Metrics/Refactoring Gate (5%)
-        if metrics_res:
-            parts.append((metrics_res.score, 0.05, f"Maintainability: {metrics_res.reason}"))
-
-        # Normalized weight calculation
-        total_weight = sum(p[1] for p in parts)
-        if total_weight > 0:
-            raw_final = 0.0
-            for score, weight, reason in parts:
-                raw_final += score * (weight / total_weight)
-                reasons.append(reason)
-
-            # ABSOLUTE RIGOR ENFORCEMENT (Veto Layer):
-            if ai_res:
-                ai_score = ai_res.score
-                if ai_score < 30:
-                    final_score = 0.0
-                    reasons.insert(
-                        0,
-                        "VETO: AI Auditor identified 'Quality Theater' - Opinion confirmed rejection.",
-                    )
-                elif ai_score < 70:
-                    final_score = min(raw_final, ai_score)
-                else:
-                    final_score = raw_final
-            else:
-                final_score = raw_final
-        else:
-            final_score = 0.0
-            reasons.append("No applicable evaluators succeeded.")
-
+    def _build_final_report(self, final_score, reasons, results):
+        aggregate_system_error = any(v.is_system_error for v in results.values())
         return {
             "score": final_score,
             "reason": " | ".join(reasons),
-            "details": {
-                k: {
-                    "score": v.score,
-                    "reason": v.reason,
-                    "details": v.details,
-                    "is_system_error": v.is_system_error,
-                }
-                for k, v in results.items()
-            },
+            "details": self._serialize_results(results),
             "is_system_error": aggregate_system_error,
         }

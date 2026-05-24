@@ -76,75 +76,66 @@ class SecurityVisitor(ast.NodeVisitor):
                 name = target.id.upper()
                 # Targets: API_KEY, PASSWORD, TOKEN, SECRET, etc.
                 pattern = r"(API_KEY|PASSWORD|TOKEN|AUTH_TOKEN|PRIVATE_KEY|AWS_SECRET|SECRET_KEY)"
-                if re.search(pattern, name):
-                    if isinstance(node.value, (ast.Constant, ast.Str)):
-                        val = (
-                            node.value.value
-                            if isinstance(node.value, ast.Constant)
-                            else node.value.s
+                if re.search(pattern, name) and isinstance(node.value, (ast.Constant, ast.Str)):
+                    val = (
+                        node.value.value
+                        if isinstance(node.value, ast.Constant)
+                        else node.value.s
+                    )
+                    if isinstance(val, str) and len(val) > 4:  # Ignore very short strings
+                        self.issues.append(
+                            {
+                                "issue": "hardcoded_secret",
+                                "lineno": node.lineno,
+                                "severity": "high",
+                                "message": f"Potential hardcoded secret in variable '{target.id}'",
+                            }
                         )
-                        if isinstance(val, str) and len(val) > 4:  # Ignore very short strings
-                            self.issues.append(
-                                {
-                                    "issue": "hardcoded_secret",
-                                    "lineno": node.lineno,
-                                    "severity": "high",
-                                    "message": f"Potential hardcoded secret in variable '{target.id}'",
-                                }
-                            )
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):
         """Detect dangerous function calls."""
-        func_name = ""
-        if isinstance(node.func, ast.Name):
-            func_name = node.func.id
-        elif isinstance(node.func, ast.Attribute):
-            func_name = node.func.attr
+        func_name = self._resolve_func_name(node)
 
         # 1. Code Injection
         if func_name in ("eval", "exec"):
-            self.issues.append(
-                {
-                    "issue": "code_injection",
-                    "lineno": node.lineno,
-                    "severity": "high",
-                    "message": f"Dangerous usage of '{func_name}' detected.",
-                }
-            )
+            self._add_issue("code_injection", node.lineno, f"Dangerous usage of '{func_name}'")
 
         # 2. Insecure Deserialization
-        if func_name in ("loads", "load"):
-            # Check for pickle or yaml.unsafe_load
-            prefix = ""
-            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-                prefix = node.func.value.id
+        if func_name in ("loads", "load") and self._is_pickle_call(node):
+            self._add_issue("insecure_deserialization", node.lineno, "Pickle usage is insecure")
 
-            if prefix == "pickle":
-                self.issues.append(
-                    {
-                        "issue": "insecure_deserialization",
-                        "lineno": node.lineno,
-                        "severity": "high",
-                        "message": "Pickle usage is insecure. Use JSON for untrusted data.",
-                    }
-                )
-
-        # 3. Command Injection (subprocess with shell=True)
-        if func_name in ("run", "call", "Popen", "check_call", "check_output"):
-            for keyword in node.keywords:
-                if keyword.arg == "shell" and isinstance(keyword.value, ast.Constant):
-                    if keyword.value.value is True:
-                        self.issues.append(
-                            {
-                                "issue": "command_injection",
-                                "lineno": node.lineno,
-                                "severity": "high",
-                                "message": f"Subprocess '{func_name}' called with shell=True.",
-                            }
-                        )
+        # 3. Command Injection
+        if func_name in ("run", "call", "Popen", "check_call", "check_output") and self._has_shell_true(node):
+            self._add_issue("command_injection", node.lineno, f"Subprocess '{func_name}' with shell=True")
 
         self.generic_visit(node)
+
+    def _resolve_func_name(self, node: ast.Call) -> str:
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+        if isinstance(node.func, ast.Attribute):
+            return node.func.attr
+        return ""
+
+    def _is_pickle_call(self, node: ast.Call) -> bool:
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            return node.func.value.id == "pickle"
+        return False
+
+    def _has_shell_true(self, node: ast.Call) -> bool:
+        for kw in node.keywords:
+            if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                return True
+        return False
+
+    def _add_issue(self, issue_type, lineno, message, severity="high"):
+        self.issues.append({
+            "issue": issue_type,
+            "lineno": lineno,
+            "severity": severity,
+            "message": message,
+        })
 
     def check_sql_injection(self):
         """Regex-based catch for obvious SQL injection patterns."""
