@@ -1,3 +1,10 @@
+## [0.9.5](https://github.com/ayato-labs/LogicHive/compare/v0.9.4...v0.9.5) (2026-05-24)
+
+
+### Bug Fixes
+
+* remove invalid CLI flag from PyInstaller command ([70c625c](https://github.com/ayato-labs/LogicHive/commit/70c625ca2f9bc5816cdb33d973280ae4eeffc6e6))
+
 ## [0.9.4](https://github.com/ayato-labs/LogicHive/compare/v0.9.3...v0.9.4) (2026-05-24)
 
 
