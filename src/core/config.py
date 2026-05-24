@@ -4,8 +4,25 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# .env ファイルをロード
-load_dotenv()
+# Resolve base directory: frozen (executable) vs source (development)
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent.parent.parent.resolve()
+
+# --- .env loading strategy ---
+# 1. Look in the same directory as the EXE or project root
+# 2. Look in the user's home directory (~/.logichive/.env) as a fallback
+HOME_ENV = Path.home() / ".logichive" / ".env"
+LOCAL_ENV = BASE_DIR / ".env"
+
+if LOCAL_ENV.exists():
+    load_dotenv(LOCAL_ENV)
+elif HOME_ENV.exists():
+    load_dotenv(HOME_ENV)
+else:
+    # Fallback to default CWD-based loading
+    load_dotenv()
 
 # ==========================================
 # 🛡️ LogicHive: User Configuration Section
@@ -40,12 +57,6 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 # ==========================================
 # ⚙️ Internal System Configuration
 # ==========================================
-
-# Resolve base directory: frozen (executable) vs source (development)
-if getattr(sys, "frozen", False):
-    BASE_DIR = Path(sys.executable).parent
-else:
-    BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 
 # Handle Cloud Run or other container environments
 IS_CLOUD = os.getenv("K_SERVICE") is not None or os.name != "nt"
