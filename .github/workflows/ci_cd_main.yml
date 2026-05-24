@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - dev
+      - develop
   pull_request:
     branches:
       - main
-      - dev
+      - develop
   workflow_dispatch:
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
   release_version:
     name: Semantic Release
     needs: test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -123,7 +123,7 @@ jobs:
     needs: release_version
     if: |
       needs.release_version.outputs.new_release_published == 'true' || 
-      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     runs-on: windows-latest
     permissions:
       contents: write
