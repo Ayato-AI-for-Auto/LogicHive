@@ -1,3 +1,10 @@
+## [0.9.8](https://github.com/ayato-labs/LogicHive/compare/v0.9.7...v0.9.8) (2026-05-24)
+
+
+### Bug Fixes
+
+* make .env resolution robust and explicit ([cf17bf6](https://github.com/ayato-labs/LogicHive/commit/cf17bf673ad9f957080623ec8007f7fe8cb6db32))
+
 ## [0.9.7](https://github.com/ayato-labs/LogicHive/compare/v0.9.6...v0.9.7) (2026-05-24)
 
 
