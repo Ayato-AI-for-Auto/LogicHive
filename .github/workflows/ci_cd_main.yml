@@ -77,7 +77,10 @@ jobs:
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          npx semantic-release
+          # Capture version and success status
+          echo "new_release_published=true" >> $GITHUB_OUTPUT
     outputs:
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
