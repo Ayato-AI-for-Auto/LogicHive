@@ -121,9 +121,7 @@ jobs:
   build_exe:
     name: Build and Upload Windows EXE
     needs: release_version
-    if: |
-      needs.release_version.outputs.new_release_published == 'true' || 
-      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    if: needs.release_version.outputs.new_release_published == 'true'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -147,18 +145,19 @@ jobs:
         run: |
           $env:PYTHONPATH = "src"
           uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
-
-      - name: Upload Artifact (for Testing)
-        uses: actions/upload-artifact@v4
-        with:
-          name: LogicHive-MCP-${{ github.ref_name }}
-          path: dist/LogicHive-MCP.exe
+          # Rename based on branch
+          if ("${{ github.ref_name }}" -eq "develop") {
+            Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+          }
 
       - name: Upload to GitHub Release
-        if: needs.release_version.outputs.new_release_published == 'true'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ needs.release_version.outputs.new_release_version }}
         run: |
-          gh release upload "v$env:RELEASE_VERSION" dist/LogicHive-MCP.exe --clobber
+          $exe_file = "dist/LogicHive-MCP.exe"
+          if ("${{ github.ref_name }}" -eq "develop") {
+             $exe_file = "dist/LogicHive-MCP-dev.exe"
+          }
+          gh release upload "v$env:RELEASE_VERSION" $exe_file --clobber
