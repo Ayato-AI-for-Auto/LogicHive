@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from core.execution.base import ExecutionStatus
@@ -53,14 +54,14 @@ async def test_python_executor_with_dependencies():
     """
     # Detect CI environment to avoid network failures
     is_ci = os.getenv("GITHUB_ACTIONS") == "true"
-    
+
     executor = EphemeralPythonExecutor()
     code = "import json\ndef check(): return json.dumps({'a': 1})"
     test_code = "assert check() == '{\"a\": 1}'"
 
     # Use a built-in module for testing instead of numpy to ensure network independence
     dependencies = []
-    
+
     result = await executor.execute(code, test_code, dependencies=dependencies)
 
     assert result.status == ExecutionStatus.SUCCESS
