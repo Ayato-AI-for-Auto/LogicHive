@@ -1,3 +1,10 @@
+## [0.9.7](https://github.com/ayato-labs/LogicHive/compare/v0.9.6...v0.9.7) (2026-05-24)
+
+
+### Bug Fixes
+
+* correctly handle semantic-release outputs ([b0142b1](https://github.com/ayato-labs/LogicHive/commit/b0142b16073b561633e2f847bb2c0dc0aa4bc64e))
+
 ## [0.9.6](https://github.com/ayato-labs/LogicHive/compare/v0.9.5...v0.9.6) (2026-05-24)
 
 
