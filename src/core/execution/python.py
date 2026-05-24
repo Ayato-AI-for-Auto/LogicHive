@@ -131,7 +131,11 @@ class EphemeralPythonExecutor(BaseExecutor):
         if pooled_env:
             return [str(pooled_env.python_executable), str(harness_file)]
 
-        cmd = ["uv", "run", "--quiet", "--offline", "--no-project"]
+        offline = os.getenv("LOGICHIVE_OFFLINE", "true").lower() == "true"
+        cmd = ["uv", "run", "--quiet"]
+        if offline:
+            cmd.append("--offline")
+        cmd.append("--no-project")
         for dep in dependencies:
             cmd.extend(["--with", dep])
         cmd.extend(["python", str(harness_file)])

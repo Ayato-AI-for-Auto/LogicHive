@@ -43,6 +43,12 @@ async def test_kill_process_tree_unit(executor):
     # Kill tree
     executor._kill_process_tree(pid)
 
+    # Reap zombie process
+    try:
+        proc.wait(timeout=1.0)
+    except subprocess.TimeoutExpired:
+        pass
+
     # Verify all dead
     await asyncio.sleep(0.2)
     assert not p.is_running()
