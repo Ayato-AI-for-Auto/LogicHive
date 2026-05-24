@@ -1,3 +1,10 @@
+## [0.9.4](https://github.com/ayato-labs/LogicHive/compare/v0.9.3...v0.9.4) (2026-05-24)
+
+
+### Bug Fixes
+
+* explicitly include google-genai hidden-import for PyInstaller ([be740da](https://github.com/ayato-labs/LogicHive/commit/be740dab65d15af589b91f492d17381db30e7804))
+
 ## [0.9.3](https://github.com/ayato-labs/LogicHive/compare/v0.9.2...v0.9.3) (2026-05-24)
 
 
