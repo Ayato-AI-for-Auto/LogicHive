@@ -1,3 +1,10 @@
+## [0.9.6](https://github.com/ayato-labs/LogicHive/compare/v0.9.5...v0.9.6) (2026-05-24)
+
+
+### Bug Fixes
+
+* correct google.genai hidden imports in spec file ([8551740](https://github.com/ayato-labs/LogicHive/commit/8551740552c4cdc794e04b73a9fab139da2a9751))
+
 ## [0.9.5](https://github.com/ayato-labs/LogicHive/compare/v0.9.4...v0.9.5) (2026-05-24)
 
 
