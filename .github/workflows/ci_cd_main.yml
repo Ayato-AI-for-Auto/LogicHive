@@ -147,7 +147,7 @@ jobs:
         shell: pwsh
         run: |
           $env:PYTHONPATH = "src"
-          uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
+          uv run pyinstaller --noconfirm --clean --hidden-import=google-genai tools/packaging/LogicHive.spec
 
       - name: Upload to GitHub Release
         shell: pwsh
