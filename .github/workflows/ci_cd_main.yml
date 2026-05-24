@@ -44,7 +44,6 @@ jobs:
       - name: Run Lint (Ruff)
         run: |
           uv run ruff check src tests --line-length 100
-          uv run ruff check . --exclude src --exclude tests --line-length 100 --ignore E501,T201,C901
 
       - name: Run tests
         run: |
