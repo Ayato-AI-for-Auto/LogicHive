@@ -7,6 +7,7 @@ from loguru import logger
 # Context variable for tracing request/execution flows
 current_run_id: ContextVar[str] = ContextVar("run_id", default="system")
 
+
 def setup_logging():
     """Initializes and configures Loguru with custom rotation and error isolation."""
     log_dir = "logs"
@@ -17,10 +18,16 @@ def setup_logging():
     latest_log = os.path.join(log_dir, "logichive.jsonl")
     previous_log = os.path.join(log_dir, "logichive_previous.jsonl")
 
-    if os.path.exists(latest_log):
-        if os.path.exists(previous_log):
-            os.remove(previous_log)
-        os.rename(latest_log, previous_log)
+    # In testing environments, multiple pytest workers might try to rename this simultaneously.
+    if os.environ.get("PYTEST_CURRENT_TEST") is None:
+        try:
+            if os.path.exists(latest_log):
+                if os.path.exists(previous_log):
+                    os.remove(previous_log)
+                os.rename(latest_log, previous_log)
+        except (PermissionError, FileNotFoundError):
+            # Ignore lock issues (e.g. concurrent starts)
+            pass
 
     logger.remove()  # Remove default handler
 
@@ -53,11 +60,14 @@ def setup_logging():
         retention="1 month",
     )
 
+
 # Initialize on module load
 setup_logging()
+
 
 def get_logger(name: str):
     """Returns a configured logger with run_id propagation."""
     return logger.bind(name=name).patch(
         lambda record: record["extra"].update(run_id=current_run_id.get())
     )
+

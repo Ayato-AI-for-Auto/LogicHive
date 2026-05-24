@@ -99,6 +99,40 @@ uv run src/mcp_server.py
 
 ---
 
+## 🧪 Rigorous Testing & Deep Fact Verification
+
+LogicHive employs a multi-layered, "Zero-Trust" testing architecture to ensure the reliability of both the hub and the assets it manages. Unlike standard test suites, we perform **Deep Fact Verification** by directly querying physical databases (SQLite/FAISS) to verify that data is correctly "vaulted" and retrieved.
+
+### 1. Unit Tests (Atomic Verification)
+- **Scope**: Individual functions and evaluators.
+- **Goal**: Ensure logic gates (Deterministic, Security, AI) behave correctly at the AST and logic level.
+- **Verification**: Tests invoke storage APIs and then use raw SQL to verify that the bits on the disk match the intended state.
+
+### 2. Integration Tests (Feature Workflows)
+- **Scope**: Orchestrator pipelines and background tasks.
+- **Goal**: Validate that asynchronous verification flows, deduplication, and project isolation work seamlessly together.
+- **Verification**: Simulates concurrent saves and checks that the background "Forensic Auditor" correctly promotes or rejects assets over time.
+
+### 3. System Tests (User End-to-End)
+- **Scope**: Full MCP tool calls and SSE transport layer.
+- **Goal**: Ensure a user can search, save, retrieve, and delete logic through the Model Context Protocol without friction.
+- **Verification**: Operates through the actual `mcp_server` interface, mimicking a real AI agent (like Cursor or Claude) using the service.
+
+### 4. Chaos & Resilience (Negative Testing)
+- **Scope**: Edge cases, performance limits, and intentional failures.
+- **Goal**: Ensure the system handles "Evil Code" gracefully without crashing the hub.
+- **Scenarios**:
+  - **Infinite Loops**: Code that tries to hang the server is killed by hard timeouts.
+  - **Database Locks**: Simulates high-contention or locked DB states to verify retry logic.
+  - **Heavy Imports**: Rejects code that attempts to sneak in un-mocked massive libraries like `torch` or `tensorflow` during the static gate.
+
+To run the suite:
+```powershell
+uv run pytest tests/unit tests/integration tests/system tests/chaos
+```
+
+---
+
 ## 🛡️ Governance & License (SV-COS)
 
 LogicHive is developed under the **Single-Vendor Open Source (SV-COS)** model.
