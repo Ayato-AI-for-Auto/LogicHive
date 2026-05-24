@@ -131,7 +131,7 @@ class EphemeralPythonExecutor(BaseExecutor):
         if pooled_env:
             return [str(pooled_env.python_executable), str(harness_file)]
 
-        offline = os.getenv("LOGICHIVE_OFFLINE", "true").lower() == "true"
+        offline = os.getenv("LOGICHIVE_OFFLINE", "true").lower() in ("true", "1", "yes")
         cmd = ["uv", "run", "--quiet"]
         if offline:
             cmd.append("--offline")
@@ -160,7 +160,11 @@ class EphemeralPythonExecutor(BaseExecutor):
                 "HOMEDRIVE",
                 "HOMEPATH",
                 "ProgramData",
+                "UV_CACHE_DIR",
+                "UV_PYTHON",
+                "UV_PYTHON_INSTALL_DIR",
             ]
+            or k.startswith("UV_")
         }
         process_env.update({"PYTHONPATH": "", "PYTHONNOUSERSITE": "1"})
 

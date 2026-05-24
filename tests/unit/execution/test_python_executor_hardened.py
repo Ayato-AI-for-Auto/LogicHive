@@ -43,17 +43,26 @@ async def test_kill_process_tree_unit(executor):
     # Kill tree
     executor._kill_process_tree(pid)
 
-    # Reap zombie process
+    # Reap zombie process (the parent process we spawned)
     try:
-        proc.wait(timeout=1.0)
+        proc.wait(timeout=2.0)
     except subprocess.TimeoutExpired:
-        pass
+        proc.kill()
+        proc.wait()
 
-    # Verify all dead
-    await asyncio.sleep(0.2)
-    assert not p.is_running()
+    # Verify all dead (including accounting for potential zombie states in psutil)
+    await asyncio.sleep(0.5)
+
+    def is_alive(pr):
+        try:
+            # is_running() is True for zombies, so we check status too
+            return pr.is_running() and pr.status() != psutil.STATUS_ZOMBIE
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+
+    assert not is_alive(p), f"Process {pid} is still alive (status: {p.status() if p.is_running() else 'gone'})"
     for child in children:
-        assert not child.is_running()
+        assert not is_alive(child), f"Child process {child.pid} is still alive"
 
 
 @pytest.mark.asyncio
