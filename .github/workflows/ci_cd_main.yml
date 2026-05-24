@@ -18,6 +18,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  diagnostic:
+    name: Diagnostic Start
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Workflow triggered successfully"
+
   test:
     name: Test and Lint (Docker Target)
     runs-on: ubuntu-latest
