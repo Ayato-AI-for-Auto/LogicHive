@@ -13,16 +13,43 @@ else:
 # --- .env loading strategy ---
 # 1. Look in the same directory as the EXE or project root
 # 2. Look in the user's home directory (~/.logichive/.env) as a fallback
-HOME_ENV = Path.home() / ".logichive" / ".env"
+HOME_DIR = Path.home() / ".logichive"
+HOME_ENV = HOME_DIR / ".env"
 LOCAL_ENV = BASE_DIR / ".env"
 
-if LOCAL_ENV.exists():
-    load_dotenv(LOCAL_ENV)
-elif HOME_ENV.exists():
-    load_dotenv(HOME_ENV)
-else:
-    # Fallback to default CWD-based loading
-    load_dotenv()
+def _load_config():
+    """Tiered configuration loading with prioritized path resolution."""
+    config_source = "None (Using defaults/Env)"
+    
+    # Priority 1: Local .env (next to EXE or project root)
+    if LOCAL_ENV.exists():
+        load_dotenv(LOCAL_ENV)
+        config_source = f"Local: {LOCAL_ENV}"
+    
+    # Priority 2: User Home fallback
+    elif HOME_ENV.exists():
+        load_dotenv(HOME_ENV)
+        config_source = f"Home: {HOME_ENV}"
+    
+    # Default: Standard CWD-based loading or Environment variables
+    else:
+        load_dotenv()
+        if os.getenv("GEMINI_API_KEY"):
+            config_source = "System Environment Variables"
+            
+    return config_source
+
+# Ensure home config directory exists
+try:
+    HOME_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass # Non-critical if fails (e.g. read-only system)
+
+CONFIG_SOURCE = _load_config()
+
+# Inform user about config status during startup (briefly)
+if not getattr(sys, "frozen", False) or os.getenv("LOGICHIVE_DEBUG"):
+    print(f"[*] LogicHive Configuration Source: {CONFIG_SOURCE}")
 
 # ==========================================
 # 🛡️ LogicHive: User Configuration Section
