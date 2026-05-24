@@ -5,6 +5,7 @@ import aiosqlite
 
 from core.config import SQLITE_DB_PATH
 from core.logging_config import get_logger
+from core.migration import run_migrations
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,11 @@ async def get_db_connection() -> aiosqlite.Connection:
     Includes loop-affinity check for Windows stability.
     """
     import time
+
+    # Run migrations synchronously before DB connection is used
+    # This is safe because it's at application startup / first use
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, run_migrations)
 
     start_time = time.perf_counter()
     logger.info("[TRACE] SQLite: Requesting DB connection...")

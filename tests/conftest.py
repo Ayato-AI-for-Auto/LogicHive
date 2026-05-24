@@ -1,5 +1,37 @@
 import asyncio
 import os
+import sqlite3
+
+import pytest
+from core.config import SQLITE_DB_PATH
+from loguru import logger
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    
+    # If test failed, dump DB metadata to logs
+    if report.when == "call" and report.failed:
+        logger.error(f"Test {item.name} failed. Dumping DB metadata...")
+        try:
+            db_path = os.environ.get("SQLITE_DB_PATH", SQLITE_DB_PATH)
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                # Dump table list
+                tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+                logger.error(f"Current tables: {tables}")
+                # Dump migration versions
+                if "schema_migrations" in [t[0] for t in tables]:
+                    versions = conn.execute("SELECT * FROM schema_migrations").fetchall()
+                    logger.error(f"Applied migrations: {versions}")
+                conn.close()
+        except Exception as e:
+            logger.error(f"Failed to dump DB metadata: {e}")
+
+# ... existing conftest.py content continues below ...
+import asyncio
+import os
 
 import pytest
 
@@ -16,7 +48,6 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from unittest.mock import AsyncMock, MagicMock, patch
-
 
 class FakeLogicIntelligence:
     """

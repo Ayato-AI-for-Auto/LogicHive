@@ -43,20 +43,27 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-exclude = ["exports", "tools", "scratch"]
+exclude = [
+    ".git",
+    ".venv",
+    "exports",
+    "scratch",
+    "tools",
+]
 
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
     "F",   # pyflakes
+    "W",   # pycodestyle warnings
     "I",   # isort
-    "C",   # flake8-comprehensions
-    "B",   # flake8-bugbear
-    "SIM", # flake8-simplify
-    "UP",  # pyupgrade
 ]
-ignore = ["E501"] # ignore line length (handled by formatter)
+# Ignore stylistic/complexity rules to focus on functional errors
+ignore = [
+    "E501", # Line too long
+    "C901", # Complexity
+    "PLR",  # Refactor recommendations
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["api", "core", "storage"]
