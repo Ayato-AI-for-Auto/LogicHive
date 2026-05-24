@@ -17,7 +17,9 @@ a = Analysis(
     datas=[],
     hiddenimports=[
         'fastmcp',
-        'google-genai',
+        'google.genai',
+        'google.genai.types',
+        'google',
         'aiosqlite',
         'numpy',
         'faiss',
