@@ -1,4 +1,4 @@
-name: LogicHive CI/CD
+name: LogicHive CI/CD # Triggering update
 
 on:
   push:
