@@ -1,3 +1,10 @@
+## [0.9.3](https://github.com/ayato-labs/LogicHive/compare/v0.9.2...v0.9.3) (2026-05-24)
+
+
+### Bug Fixes
+
+* use sys.argv[0] instead of __file__ in spec file ([fa9a642](https://github.com/ayato-labs/LogicHive/commit/fa9a642264727676d6b27d775bca068ce6ff27ff))
+
 ## [0.9.2](https://github.com/ayato-labs/LogicHive/compare/v0.9.1...v0.9.2) (2026-05-24)
 
 
