@@ -476,9 +476,19 @@ if __name__ == "__main__":
 
     from core import __version__
     from core.config import HOST, PORT
+    from core.system_info import SystemFingerprint
 
     try:
-        logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
+        # Improved logging for discoverability (User Request)
+        base_url = f"http://{HOST}:{PORT}/sse"
+        logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
+
+        if HOST == "0.0.0.0":
+            ips = SystemFingerprint.get_local_ips()
+            logger.info("Server is accessible at:")
+            for ip in ips:
+                logger.info(f"  - http://{ip}:{PORT}/sse")
+        
         mcp.run(transport="sse", host=HOST, port=PORT)
     except Exception as e:
         import traceback

@@ -1,4 +1,5 @@
 import platform
+import socket
 import sys
 from datetime import datetime
 
@@ -8,6 +9,38 @@ class SystemFingerprint:
     Generates and manages a deterministic 'fingerprint' of the system environment.
     Used to detect environment drift (Bit Rot) in logic assets.
     """
+
+    @staticmethod
+    def get_local_ips() -> list[str]:
+        """
+        Retrieves all local IPv4 addresses of the current machine.
+        Useful for logging accessible endpoints when binding to 0.0.0.0.
+        """
+        ips = []
+        try:
+            # Try getting the 'main' IP first (standard trick)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                # doesn't even have to be reachable
+                s.connect(("8.8.8.8", 1))
+                main_ip = s.getsockname()[0]
+                ips.append(main_ip)
+            except Exception:
+                pass
+            finally:
+                s.close()
+
+            # Also try to get all IPs using socket.gethostbyname_ex
+            hostname = socket.gethostname()
+            for ip in socket.gethostbyname_ex(hostname)[2]:
+                if ip not in ips and not ip.startswith("127."):
+                    ips.append(ip)
+
+        except Exception:
+            pass
+
+        # Ensure localhost is included if empty, or just return what we found
+        return ips if ips else ["127.0.0.1"]
 
     @staticmethod
     def get_current() -> dict:
