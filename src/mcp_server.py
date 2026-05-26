@@ -475,10 +475,22 @@ if __name__ == "__main__":
     import sys
 
     from core import __version__
-    from core.config import HOST, PORT
+    from core.config import HOST, PORT, validate_config_lazy
     from core.system_info import SystemFingerprint
 
     try:
+        # Improved configuration validation (User Request)
+        is_valid, error_msg = validate_config_lazy()
+        if not is_valid:
+            print(f"\n[!] CONFIGURATION ERROR: {error_msg}")
+            print("Please check your .env file or environment variables.")
+            
+            # Prevent immediate exit if frozen to allow user to read the message
+            if getattr(sys, "frozen", False):
+                print("\n" + "=" * 60)
+                input("Press Enter to exit...")
+            sys.exit(1)
+
         # Improved logging for discoverability (User Request)
         base_url = f"http://{HOST}:{PORT}/sse"
         logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
