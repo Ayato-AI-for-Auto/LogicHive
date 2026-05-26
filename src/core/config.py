@@ -85,12 +85,18 @@ def _validate_gemini_api_key(api_key):
 
 # Validate configuration
 if (MODEL_TYPE == "gemini" or EMBEDDING_PROVIDER == "gemini"):
+    # Allow missing key during testing
+    is_testing = "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true"
     if not GEMINI_API_KEY:
-        print("\n[WARNING] GEMINI_API_KEY is not set.")
-        print("LogicHive requires a Gemini API Key to function in 'gemini' mode.")
-        print("Please set the GEMINI_API_KEY environment variable or create a .env file.\n")
-        raise ValueError("LogicHive requires a GEMINI_API_KEY when running in 'gemini' mode.")
-    if not _validate_gemini_api_key(GEMINI_API_KEY):
+        if is_testing:
+            print("\n[INFO] GEMINI_API_KEY is missing, but LOGICHIVE_TESTING is enabled. Using dummy key for tests.")
+            GEMINI_API_KEY = "dummy_key_for_testing"
+        else:
+            print("\n[WARNING] GEMINI_API_KEY is not set.")
+            print("LogicHive requires a Gemini API Key to function in 'gemini' mode.")
+            print("Please set the GEMINI_API_KEY environment variable or create a .env file.\n")
+            raise ValueError("LogicHive requires a GEMINI_API_KEY when running in 'gemini' mode.")
+    if not is_testing and not _validate_gemini_api_key(GEMINI_API_KEY):
         raise ValueError("LogicHive detected an invalid GEMINI_API_KEY. Please provide a valid key.")
 
 # 2. Ollama Fallback (Internal use or alternative)
