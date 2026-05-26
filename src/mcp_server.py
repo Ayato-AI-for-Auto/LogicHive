@@ -472,8 +472,22 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 if __name__ == "__main__":
+    import sys
     from core import __version__
     from core.config import HOST, PORT
 
-    logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
-    mcp.run(transport="sse", host=HOST, port=PORT)
+    try:
+        logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
+        mcp.run(transport="sse", host=HOST, port=PORT)
+    except Exception as e:
+        import traceback
+        print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        
+        # Prevent terminal window from closing immediately when running as compiled EXE
+        if getattr(sys, "frozen", False):
+            print("\n" + "=" * 60)
+            print("The server encountered a fatal error and stopped.")
+            input("Press Enter to close this window...")
+            sys.exit(1)
+        raise

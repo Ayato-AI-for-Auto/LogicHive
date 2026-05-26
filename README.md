@@ -78,27 +78,29 @@ See [.env.example](.env.example) and [ADR-005](docs/adr/005-configuration-resolu
 
 ---
 
-## 🚀 Quick Setup (Dual Distribution)
+## 🚀 Quick Setup & 120-Second Cursor Integration
 
-LogicHive offers two ways to run the server, completely circumventing any enterprise container licensing friction.
+To start using LogicHive immediately, follow these simple steps.
 
-### Option A: Windows Native EXE (Zero Friction)
-For Windows-heavy corporate environments, you do not need Docker at all.
+> [!TIP]
+> **Demo Workflow in Action**  
+> *(Insert Demo GIF showing LogicHive saving a verified Python function and suggesting it inside Cursor here)*
 
+### Step 1: Run the LogicHive Server
+
+LogicHive offers two friction-free distribution methods:
+
+#### Option A: Windows Native EXE (Zero Friction & No Docker)
 1. Download `LogicHive-MCP.exe` from the [Latest Release](https://github.com/ayato-labs/LogicHive/releases).
-2. Double-click the `.exe` (or run it via Command Prompt).
+2. Run the `.exe` via double-click or Command Prompt:
+   ```cmd
+   LogicHive-MCP.exe
+   ```
 3. The server runs natively on `http://localhost:10880/sse`.
 
-*Note: Because LogicHive uses network-based SSE, **a single Windows machine running the `.exe` can serve your entire team**—even if they are on Mac or Linux clients.*
-
-### Option B: OCI Container (Docker / Podman)
-LogicHive is also distributed as an **OCI-compliant Container Image** for cloud-native deployment.
-
-> **Note on Licensing**: Because this is a standard OCI image, you can run it using 100% free alternatives like **Podman**, **Rancher Desktop**, or standard Docker Engine on Linux.
-
+#### Option B: OCI Container (Docker / Podman)
+Run the pre-built image using standard container runtimes:
 ```bash
-docker pull ghcr.io/ayato-labs/logichive-hub:latest
-
 docker run -d \
   -p 10880:10880 \
   -e GEMINI_API_KEY=your_api_key_here \
@@ -107,19 +109,23 @@ docker run -d \
   ghcr.io/ayato-labs/logichive-hub:latest
 ```
 
-### 🔌 Connecting to AI Clients (MCP SSE)
+---
 
-LogicHive now runs as a **Streamable HTTP (SSE)** server. Unlike traditional Stdio-based MCP servers, you do not need to specify a launch command in your config. Instead, point your client to the SSE URL.
+### Step 2: Connect to AI Clients (MCP SSE)
 
-- **SSE Endpoint**: `http://localhost:10880/sse`
+Because LogicHive uses the **Streamable HTTP (SSE)** transport layer, setup is instant and does not require local script execution paths.
 
-#### For Cursor / VS Code
-Add a new MCP server with:
-- **Type**: `SSE`
-- **URL**: `http://localhost:10880/sse`
+#### For Cursor
+1. Navigate to **Settings > Features > MCP**.
+2. Click **+ Add New MCP Server**.
+3. Configure it as follows:
+   * **Name**: `logichive`
+   * **Type**: `SSE`
+   * **URL**: `http://localhost:10880/sse`
+4. Click **Save**.
 
 #### For Claude Desktop
-Add the following to your `%APPDATA%\Claude\claude_desktop_config.json`:
+Add the following configuration block to your `%APPDATA%\Claude\claude_desktop_config.json`:
 
 ```json
 {

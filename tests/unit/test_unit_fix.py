@@ -53,10 +53,12 @@ async def test_python_static_evaluator_pure():
 
 
 @pytest.mark.asyncio
-async def test_vector_store_initialization_filtering():
+async def test_vector_store_initialization_filtering(tmp_path):
     """Verifies that VectorIndexManager correctly filters dimensions and 'null' strings."""
     # We use a custom dimension for testing
     manager = VectorIndexManager(dimension=3)
+    manager._index_path = str(tmp_path / "test_faiss.bin")
+    manager._mapping_path = str(tmp_path / "test_faiss.json")
 
     dummy_rows = [
         {"name": "valid", "embedding": "[0.1, 0.2, 0.3]", "project": "test"},

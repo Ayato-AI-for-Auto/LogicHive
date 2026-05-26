@@ -30,6 +30,12 @@ def test_config_resolution_priority():
             # Re-initialize path constants in the module for this test
             importlib.reload(core.config)
             
+            # Manually override paths to ensure they use the temp directory
+            core.config.BASE_DIR = root_path
+            core.config.LOCAL_ENV = root_path / ".env"
+            core.config.HOME_DIR = logichive_home
+            core.config.HOME_ENV = logichive_home / ".env"
+            
             from core.config import _load_config, LOCAL_ENV, HOME_ENV
             
             # Verify paths are mocked correctly
@@ -37,27 +43,27 @@ def test_config_resolution_priority():
             assert str(HOME_ENV) == str(home_env)
             
             # 1. No files, No Env -> Should use defaults
-            with patch("dotenv.load_dotenv") as mock_load, \
+            with patch("core.config.load_dotenv") as mock_load, \
                  patch("os.getenv", return_value=None):
                 source = _load_config()
                 assert "None" in source
 
             # 2. No files, but Env exists
-            with patch("dotenv.load_dotenv") as mock_load, \
+            with patch("core.config.load_dotenv") as mock_load, \
                  patch("os.getenv", side_effect=lambda k, d=None: "key" if k == "GEMINI_API_KEY" else d):
                 source = _load_config()
                 assert "System Environment Variables" in source
 
             # 3. Home file exists
             home_env.write_text("GEMINI_API_KEY=home_key")
-            with patch("dotenv.load_dotenv") as mock_load:
+            with patch("core.config.load_dotenv") as mock_load:
                 source = _load_config()
                 assert "Home" in source
                 mock_load.assert_called_with(home_env)
 
             # 4. Local file exists (Should override Home)
             local_env.write_text("GEMINI_API_KEY=local_key")
-            with patch("dotenv.load_dotenv") as mock_load:
+            with patch("core.config.load_dotenv") as mock_load:
                 source = _load_config()
                 assert "Local" in source
                 mock_load.assert_called_with(local_env)

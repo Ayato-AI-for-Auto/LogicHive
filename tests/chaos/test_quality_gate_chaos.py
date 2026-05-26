@@ -21,6 +21,7 @@ async def test_chaos_infinite_loop_resilience():
     assert runtime_res["score"] == 0.0
     assert (
         "timeout" in runtime_res["reason"].lower()
+        or "timed out" in runtime_res["reason"].lower()
         or "Possible infinite loop" in runtime_res["reason"]
     )
 

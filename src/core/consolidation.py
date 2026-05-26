@@ -61,37 +61,30 @@ class LogicIntelligence:
 
     async def generate_embedding(self, text: str) -> list[float]:
         """
-        Generates embedding for the given text.
-        NOTE: Per system architecture, this project uses gemini-embedding-001 exclusively.
-        Input is truncated to stay within the 2,048 token limit.
+        Generates embedding for the given text using the configured provider.
+        Input is truncated to stay within limits.
         """
         import time
+        from core.embedding import embedding_service
 
         start_time = time.perf_counter()
         logger.info(
             f"[TRACE] LogicIntelligence: Starting embedding generation (input_len={len(text)})"
         )
-        if not self.gemini_client:
-            logger.warning("Consolidation: Gemini API Key missing for embeddings.")
-            return []
 
         # Heuristic truncation: 7,000 chars is roughly 1750-2000 tokens
         safe_text = text[:7000]
 
         try:
-            response = self.gemini_client.models.embed_content(
-                model=self.embedding_model,
-                contents=[safe_text],
-                config=types.EmbedContentConfig(output_dimensionality=VECTOR_DIMENSION),
-            )
+            vector = embedding_service.get_embedding(safe_text)
             duration = time.perf_counter() - start_time
             logger.info(
                 f"[TRACE] LogicIntelligence: Embedding generated successfully in {duration:.4f}s"
             )
-            return response.embeddings[0].values
+            return vector
         except Exception as e:
             logger.error(
-                f"[TRACE] LogicIntelligence: Gemini Embedding (001) failed: {e}", exc_info=True
+                f"[TRACE] LogicIntelligence: Embedding generation failed: {e}", exc_info=True
             )
             raise AIProviderError(f"Embedding generation failed: {e}") from e
 
