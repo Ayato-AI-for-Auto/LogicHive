@@ -42,21 +42,85 @@ def _load_config():
         load_dotenv()
         if os.getenv("GEMINI_API_KEY"):
             config_source = "System Environment Variables"
+        else:
+            # --- FIRST RUN / MISSING CONFIG LOGIC ---
+            _create_default_env_if_missing()
 
     return config_source
 
+
+def _create_default_env_if_missing():
+    """Generates a template .env file to help user onboarding."""
+    if LOCAL_ENV.exists() or HOME_ENV.exists():
+        return
+
+    # Determine where to create the template
+    target_env = LOCAL_ENV
+    
+    # If in frozen EXE and dist directory, we might want to put it in home instead
+    # to avoid permissions issues in Program Files, but for MVP local is fine.
+
+    template = """# ==========================================
+# 🛡️ LogicHive: Configuration Template
+# ==========================================
+
+# --- 1. Provider Selection ---
+# Choose your AI and Embedding providers.
+# Options: gemini, ollama
+MODEL_TYPE=gemini
+EMBEDDING_PROVIDER=gemini
+
+# --- 2. Gemini Settings (Recommended) ---
+# Get your key at: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=
+
+# --- 3. Ollama Settings (Alternative) ---
+# If you prefer local-only, install Ollama (https://ollama.com)
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=mistral-large
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# --- 4. Server Settings ---
+PORT=10880
+HOST=0.0.0.0
+
+# --- 5. LogicHive Quality Gate ---
+# Minimum score (0-100) for an asset to be accepted into the vault.
+QUALITY_GATE_THRESHOLD=70
+"""
+    try:
+        HOME_DIR.mkdir(parents=True, exist_ok=True)
+        HOME_ENV.write_text(template, encoding="utf-8")
+        print(f"\n[INFO] Initial configuration template created at: {HOME_ENV}")
+        print("[ACTION] Please edit this file and provide your GEMINI_API_KEY to start.\n")
+    except Exception as e:
+        print(f"[ERROR] Failed to create configuration template: {e}")
+
+
 CONFIG_SOURCE = _load_config()
 
-# Inform user about config status during startup (briefly)
-if not getattr(sys, "frozen", False) or os.getenv("LOGICHIVE_DEBUG"):
-    print(f"[*] LogicHive Configuration Source: {CONFIG_SOURCE}")
 
+# --- Validation Helpers ---
 
-# ==========================================
-# 🛡️ LogicHive: User Configuration Section
-# ==========================================
-# 機密情報や環境固有の設定を一箇所にまとめます。
-# 必要に応じて環境変数での上書き(Override)も可能です。
+def validate_config_lazy():
+    """
+    Performs runtime validation of critical settings.
+    Returns (is_valid, error_message).
+    """
+    # Skip validation during pytest runs
+    if "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true":
+        return True, ""
+
+    if MODEL_TYPE == "gemini" or EMBEDDING_PROVIDER == "gemini":
+        if not GEMINI_API_KEY:
+            return False, "GEMINI_API_KEY is missing. Required for 'gemini' mode."
+        
+        # Optionally verify key validity here if needed
+        # if not _validate_gemini_api_key(GEMINI_API_KEY):
+        #    return False, "GEMINI_API_KEY is invalid."
+    
+    return True, ""
+
 
 # 1. AI & Models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -68,7 +132,7 @@ OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
 FASTEMBED_MODEL = os.getenv("FASTEMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
 
 def _validate_gemini_api_key(api_key):
-    # Skip validation during pytest runs or testing environments to avoid breaking test suites
+    # Skip validation during pytest runs
     if "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true":
         return True
     if not api_key:
@@ -76,32 +140,15 @@ def _validate_gemini_api_key(api_key):
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
-        # Attempt to list models to verify the key is valid (low overhead call)
         list(client.models.list(config={"page_size": 1}))
         return True
     except Exception as e:
-        print(f"\n[ERROR] Gemini API Key validation failed: {e}")
+        logger.warning(f"Gemini API Key validation failed: {e}")
         return False
-
-# Validate configuration
-if (MODEL_TYPE == "gemini" or EMBEDDING_PROVIDER == "gemini"):
-    # Allow missing key during testing
-    is_testing = "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true"
-    if not GEMINI_API_KEY:
-        if is_testing:
-            print("\n[INFO] GEMINI_API_KEY is missing, but LOGICHIVE_TESTING is enabled. Using dummy key for tests.")
-            GEMINI_API_KEY = "dummy_key_for_testing"
-        else:
-            print("\n[WARNING] GEMINI_API_KEY is not set.")
-            print("LogicHive requires a Gemini API Key to function in 'gemini' mode.")
-            print("Please set the GEMINI_API_KEY environment variable or create a .env file.\n")
-            raise ValueError("LogicHive requires a GEMINI_API_KEY when running in 'gemini' mode.")
-    if not is_testing and not _validate_gemini_api_key(GEMINI_API_KEY):
-        raise ValueError("LogicHive detected an invalid GEMINI_API_KEY. Please provide a valid key.")
 
 # 2. Ollama Fallback (Internal use or alternative)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral-large-3:675b-cloud")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 
 # 3. Server Config
 PORT = int(os.getenv("PORT", "10880"))
