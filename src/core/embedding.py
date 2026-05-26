@@ -1,13 +1,12 @@
 import logging
-import os
 import sys
 
 from core.config import (
     EMBEDDING_MODEL_ID,
-    GEMINI_API_KEY,
     EMBEDDING_PROVIDER,
-    OLLAMA_EMBEDDING_MODEL,
     FASTEMBED_MODEL,
+    GEMINI_API_KEY,
+    OLLAMA_EMBEDDING_MODEL,
     OLLAMA_URL,
     VECTOR_DIMENSION,
 )

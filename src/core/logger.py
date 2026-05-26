@@ -1,7 +1,7 @@
-from loguru import logger
 import sys
-import os
 from pathlib import Path
+
+from loguru import logger
 
 # Log directory setup
 LOG_DIR = Path("logs")

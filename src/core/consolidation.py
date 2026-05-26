@@ -12,7 +12,6 @@ from core.config import (
     MODEL_TYPE,
     OLLAMA_MODEL,
     OLLAMA_URL,
-    VECTOR_DIMENSION,
 )
 from core.exceptions import AIProviderError
 from core.logging_config import get_logger
@@ -65,6 +64,7 @@ class LogicIntelligence:
         Input is truncated to stay within limits.
         """
         import time
+
         from core.embedding import embedding_service
 
         start_time = time.perf_counter()

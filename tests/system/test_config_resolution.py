@@ -1,13 +1,13 @@
-import os
-import shutil
+import importlib
 import tempfile
 from pathlib import Path
-import pytest
 from unittest.mock import patch
-import importlib
+
+import pytest
 
 # Access the function directly from the module if possible, or simulate it
 import core.config
+
 
 def test_config_resolution_priority():
     """
@@ -19,29 +19,29 @@ def test_config_resolution_priority():
         home_path = root_path / "fake_home"
         logichive_home = home_path / ".logichive"
         logichive_home.mkdir(parents=True)
-        
+
         local_env = root_path / ".env"
         home_env = logichive_home / ".env"
-        
+
         # Mock Path.home and BASE_DIR
         with patch("core.config.BASE_DIR", root_path), \
              patch("pathlib.Path.home", return_value=home_path):
-            
+
             # Re-initialize path constants in the module for this test
             importlib.reload(core.config)
-            
+
             # Manually override paths to ensure they use the temp directory
             core.config.BASE_DIR = root_path
             core.config.LOCAL_ENV = root_path / ".env"
             core.config.HOME_DIR = logichive_home
             core.config.HOME_ENV = logichive_home / ".env"
-            
-            from core.config import _load_config, LOCAL_ENV, HOME_ENV
-            
+
+            from core.config import HOME_ENV, LOCAL_ENV, _load_config
+
             # Verify paths are mocked correctly
             assert str(LOCAL_ENV) == str(local_env)
             assert str(HOME_ENV) == str(home_env)
-            
+
             # 1. No files, No Env -> Should use defaults
             with patch("core.config.load_dotenv") as mock_load, \
                  patch("os.getenv", return_value=None):
