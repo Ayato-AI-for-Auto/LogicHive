@@ -488,7 +488,7 @@ if __name__ == "__main__":
             logger.info("Server is accessible at:")
             for ip in ips:
                 logger.info(f"  - http://{ip}:{PORT}/sse")
-        
+
         mcp.run(transport="sse", host=HOST, port=PORT)
     except Exception as e:
         import traceback
