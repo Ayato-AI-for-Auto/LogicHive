@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+from PyInstaller.utils.hooks import copy_metadata
 
 block_cipher = None
 
@@ -14,7 +15,7 @@ a = Analysis(
     [os.path.abspath(os.path.join(script_dir, '..', '..', 'src', 'mcp_server.py'))],
     pathex=[os.path.abspath(os.path.join(script_dir, '..', '..', 'src'))],
     binaries=[],
-    datas=[],
+    datas=copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp'),
     hiddenimports=[
         'fastmcp',
         'google.genai',
