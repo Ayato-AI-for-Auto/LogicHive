@@ -121,7 +121,9 @@ jobs:
   build_exe:
     name: Build and Upload Windows EXE
     needs: release_version
-    if: needs.release_version.outputs.new_release_published == 'true'
+    if: |
+      needs.release_version.outputs.new_release_published == 'true' || 
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     runs-on: windows-latest
     permissions:
       contents: write
@@ -156,8 +158,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ needs.release_version.outputs.new_release_version }}
         run: |
-          $exe_file = "dist/LogicHive-MCP.exe"
           if ("${{ github.ref_name }}" -eq "develop") {
              $exe_file = "dist/LogicHive-MCP-dev.exe"
+             $tag = "v-develop"
+             # Create pre-release if it does not exist
+             gh release create $tag --prerelease --title "LogicHive Development Pre-release" --notes "Rolling pre-release build for the develop branch." --target "develop" 2>$null
+             gh release upload $tag $exe_file --clobber
+          } else {
+             $exe_file = "dist/LogicHive-MCP.exe"
+             gh release upload "v$env:RELEASE_VERSION" $exe_file --clobber
           }
-          gh release upload "v$env:RELEASE_VERSION" $exe_file --clobber

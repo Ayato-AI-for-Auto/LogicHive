@@ -20,8 +20,8 @@ logger.add(
     LOG_FILE,
     format="{time:YYYY-MM-DDTHH:mm:ss.SSSZ} | {level} | {message} | {extra}",
     serialize=True,
-    rotation="2",
-    retention="2",
+    rotation="2 MB",
+    retention=2,
     level="DEBUG",
 )
 
@@ -32,8 +32,8 @@ logger.add(
     format="{time:YYYY-MM-DDTHH:mm:ss.SSSZ} | {level} | {message} | {extra}",
     serialize=True,
     level="ERROR",
-    rotation="2",
-    retention="2",
+    rotation="2 MB",
+    retention=2,
 )
 
 # Add stdout for development visibility
