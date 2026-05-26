@@ -26,6 +26,8 @@ def get_ngrok_public_url(port: int = 4040, max_retries: int = 10, delay: int = 2
                 return tunnels[0]["public_url"]
         except httpx.ConnectError:
             # Expected if ngrok hasn't started yet, continue retrying
+            import logging
+            logging.debug("ngrok not started yet, retrying...")
             pass
         except Exception as e:
             # Print other unexpected errors to stderr instead of silent pass

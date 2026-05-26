@@ -23,6 +23,8 @@ test_faiss_*.bin
 test_faiss_*.json
 last_run.txt
 *.txt
+*.log
+*.jsonl
 
 # Build and Temp
 build/

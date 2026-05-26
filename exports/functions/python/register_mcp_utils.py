@@ -140,7 +140,9 @@ def register():
             try:
                 with open(path, encoding="utf-8") as f:
                     content = json.load(f)
-            except:
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to load MCP config at {path}: {e}")
                 continue
         if "mcpServers" not in content:
             content["mcpServers"] = {}

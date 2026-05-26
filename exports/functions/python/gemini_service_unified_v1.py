@@ -55,5 +55,7 @@ class GeminiService:
                 cleaned = match.group(1)
             try:
                 return json.loads(cleaned)
-            except:
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to parse JSON response: {e}")
                 return {}
