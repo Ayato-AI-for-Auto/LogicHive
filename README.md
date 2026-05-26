@@ -15,14 +15,27 @@ LogicHive uses a **Hybrid Deterministic Gate** to veto non-factual AI opinions:
 - **AI (20%)**: Forensic auditing by LLMs.
 - **Execution (10%)**: Isolated runtime validation.
 
+> [!IMPORTANT]
+> LogicHive values **verifiability over correctness**. If an AI-generated logic atom lacks assertion tests, it is rejected by the Fact Gate, preventing low-quality code from polluting your knowledge base.
+
 ---
 
 ## 🌟 Key Features
 
 - **Hybrid Knowledge Search**: Semantic and exact-match search for code patterns.
 - **Verification Quality Gate**: Automated testing and linting before code is "vaulted".
-- **MCP Integration**: Seamlessly expose complex logic to AI agents.
+- **MCP Streamable HTTP (SSE) Integration**: Centralized deployment serving multiple clients (Cursor, Claude Desktop) concurrently.
 - **Project Isolation**: Manage logic assets across multiple namespaces and projects.
+
+---
+
+## 💼 Business Value & ROI
+
+LogicHive turns transient AI interactions into reusable corporate assets:
+1. **API Cost Optimization**: Drastically reduces LLM input tokens by injecting precise logic atoms instead of massive code context.
+2. **Preventing Technical Debt**: Automatically blocks un-asserted, redundant, or complex code, slashing future maintenance costs.
+3. **Secure AI Governance**: Filters out security vulnerabilities and runs isolated dynamic execution tests before storing assets.
+4. **Capitalizing Organizational Knowledge**: Ensures critical domain logic is preserved and shared, eliminating project silo effects and key-person risks.
 
 ---
 
