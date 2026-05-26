@@ -27,6 +27,8 @@ jobs:
   test:
     name: Test and Lint (Native Target)
     runs-on: ubuntu-latest
+    env:
+      LOGICHIVE_TESTING: true
     steps:
       - uses: actions/checkout@v4
       
