@@ -41,12 +41,16 @@ def _load_config():
             
     return config_source
 
+from src.core.logger import get_logger
+logger = get_logger("config")
+
+# ... (rest of code)
 # Ensure home config directory exists
 try:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
 except Exception as e:
-    import logging
-    logging.error(f"Failed to create home config directory at {HOME_DIR}: {e}")
+    logger.error(f"Failed to create home config directory at {HOME_DIR}: {e}")
+
 
 
 CONFIG_SOURCE = _load_config()
