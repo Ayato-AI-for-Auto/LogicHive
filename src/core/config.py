@@ -42,7 +42,7 @@ def _load_config():
         load_dotenv()
         if os.getenv("GEMINI_API_KEY"):
             config_source = "System Environment Variables"
-        else:
+        elif not ("pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true"):
             # --- FIRST RUN / MISSING CONFIG LOGIC ---
             _create_default_env_if_missing()
 
@@ -51,6 +51,10 @@ def _load_config():
 
 def _create_default_env_if_missing():
     """Generates a template .env file to help user onboarding."""
+    # Skip during testing to avoid side effects in tests
+    if "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true":
+        return
+
     if LOCAL_ENV.exists() or HOME_ENV.exists():
         return
 

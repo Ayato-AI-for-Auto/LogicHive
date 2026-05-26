@@ -49,9 +49,14 @@ def setup_logging():
 
     # Strictly keep 2 generations
     if os.path.exists(latest_log):
-        if os.path.exists(previous_log):
-            os.remove(previous_log)
-        os.rename(latest_log, previous_log)
+        try:
+            if os.path.exists(previous_log):
+                os.remove(previous_log)
+            os.rename(latest_log, previous_log)
+        except PermissionError:
+            # On Windows, logs can be locked by other processes (like active pytest workers)
+            # We skip rotation rather than crashing.
+            pass
 
     logger.remove()
 
