@@ -1,4 +1,4 @@
-# [0.10.0-develop.1](https://github.com/ayato-labs/LogicHive/compare/v0.9.8...v0.10.0-develop.1) (2026-05-26)
+# [0.10.0.dev1](https://github.com/ayato-labs/LogicHive/compare/v0.9.8...v0.10.0.dev1) (2026-05-26)
 
 
 ### Bug Fixes
