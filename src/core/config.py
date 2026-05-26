@@ -54,9 +54,6 @@ def _create_default_env_if_missing():
     if LOCAL_ENV.exists() or HOME_ENV.exists():
         return
 
-    # Determine where to create the template
-    target_env = LOCAL_ENV
-    
     # If in frozen EXE and dist directory, we might want to put it in home instead
     # to avoid permissions issues in Program Files, but for MVP local is fine.
 
@@ -114,11 +111,11 @@ def validate_config_lazy():
     if MODEL_TYPE == "gemini" or EMBEDDING_PROVIDER == "gemini":
         if not GEMINI_API_KEY:
             return False, "GEMINI_API_KEY is missing. Required for 'gemini' mode."
-        
+
         # Optionally verify key validity here if needed
         # if not _validate_gemini_api_key(GEMINI_API_KEY):
         #    return False, "GEMINI_API_KEY is invalid."
-    
+
     return True, ""
 
 

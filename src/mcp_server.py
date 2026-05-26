@@ -484,7 +484,7 @@ if __name__ == "__main__":
         if not is_valid:
             print(f"\n[!] CONFIGURATION ERROR: {error_msg}")
             print("Please check your .env file or environment variables.")
-            
+
             # Prevent immediate exit if frozen to allow user to read the message
             if getattr(sys, "frozen", False):
                 print("\n" + "=" * 60)
