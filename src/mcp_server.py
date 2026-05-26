@@ -475,21 +475,38 @@ if __name__ == "__main__":
     import sys
 
     from core import __version__
-    from core.config import HOST, PORT, validate_config_lazy
+    from core.config import HOST, PORT, save_api_key, validate_config_lazy
     from core.system_info import SystemFingerprint
 
     try:
         # Improved configuration validation (User Request)
-        is_valid, error_msg = validate_config_lazy()
+        is_valid, error_msg, config_path = validate_config_lazy()
         if not is_valid:
             print(f"\n[!] CONFIGURATION ERROR: {error_msg}")
-            print("Please check your .env file or environment variables.")
-
-            # Prevent immediate exit if frozen to allow user to read the message
-            if getattr(sys, "frozen", False):
-                print("\n" + "=" * 60)
-                input("Press Enter to exit...")
-            sys.exit(1)
+            
+            # Interactive Setup Flow
+            print("\n" + "=" * 60)
+            print("Welcome to LogicHive MCP! It looks like this is your first run.")
+            print("Would you like to enter your GEMINI_API_KEY now?")
+            print("(Get one for free at: https://aistudio.google.com/app/apikey)")
+            print("=" * 60)
+            
+            ans = input("\nEnter GEMINI_API_KEY (or press Enter to skip and edit .env manually): ").strip()
+            if ans:
+                if save_api_key(ans):
+                    print(f"[SUCCESS] API Key saved to {config_path}")
+                    # Re-verify
+                    is_valid, _, _ = validate_config_lazy()
+                else:
+                    print("[ERROR] Failed to save API key. Please check file permissions.")
+            
+            if not is_valid:
+                print(f"\nPlease edit your configuration file manually at:\n  {config_path}")
+                # Prevent immediate exit if frozen to allow user to read the message
+                if getattr(sys, "frozen", False):
+                    print("\n" + "=" * 60)
+                    input("Press Enter to exit...")
+                sys.exit(1)
 
         # Improved logging for discoverability (User Request)
         base_url = f"http://{HOST}:{PORT}/sse"

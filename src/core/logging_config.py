@@ -86,6 +86,15 @@ def setup_logging():
     logger.configure(patcher=patcher)
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
+    # --- NOISE REDUCTION ---
+    # Silence third-party library info logs that clutter the CLI
+    logging.getLogger("faiss").setLevel(logging.WARNING)
+
+    import warnings
+    # Suppress Swig/Faiss specific deprecation warnings
+    warnings.filterwarnings("ignore", message="builtin type .* has no __module__ attribute")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="faiss")
+
 def get_logger(name: str):
     return logger.bind(name=name)
 

@@ -98,6 +98,37 @@ QUALITY_GATE_THRESHOLD=70
         print(f"[ERROR] Failed to create configuration template: {e}")
 
 
+def save_api_key(api_key: str):
+    """Saves the provided API key to the active .env file."""
+    # We prefer the Home .env for persistence in frozen mode
+    target_env = HOME_ENV
+
+    # Read existing content if any
+    content = ""
+    if target_env.exists():
+        content = target_env.read_text(encoding="utf-8")
+
+    if "GEMINI_API_KEY=" in content:
+        # Replace existing key line
+        import re
+        new_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", content)
+    else:
+        # Append to end
+        new_content = content.rstrip() + f"\nGEMINI_API_KEY={api_key}\n"
+
+    try:
+        HOME_DIR.mkdir(parents=True, exist_ok=True)
+        target_env.write_text(new_content, encoding="utf-8")
+        # Reload env in the current process
+        os.environ["GEMINI_API_KEY"] = api_key
+        global GEMINI_API_KEY
+        GEMINI_API_KEY = api_key
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to save API key: {e}")
+        return False
+
+
 CONFIG_SOURCE = _load_config()
 
 
@@ -106,22 +137,17 @@ CONFIG_SOURCE = _load_config()
 def validate_config_lazy():
     """
     Performs runtime validation of critical settings.
-    Returns (is_valid, error_message).
+    Returns (is_valid, error_message, config_path).
     """
     # Skip validation during pytest runs
     if "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true":
-        return True, ""
+        return True, "", ""
 
     if MODEL_TYPE == "gemini" or EMBEDDING_PROVIDER == "gemini":
         if not GEMINI_API_KEY:
-            return False, "GEMINI_API_KEY is missing. Required for 'gemini' mode."
+            return False, "GEMINI_API_KEY is missing.", str(HOME_ENV)
 
-        # Optionally verify key validity here if needed
-        # if not _validate_gemini_api_key(GEMINI_API_KEY):
-        #    return False, "GEMINI_API_KEY is invalid."
-
-    return True, ""
-
+    return True, "", str(HOME_ENV)
 
 # 1. AI & Models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
