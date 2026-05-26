@@ -1,3 +1,13 @@
+# [0.10.0-dev.2](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.1...v0.10.0-dev.2) (2026-05-26)
+
+
+### Features
+
+* implement configuration management system with automated template generation and initialize FastMCP server with lifespan management ([9e20a3e](https://github.com/ayato-labs/LogicHive/commit/9e20a3e4516380aa5d3be3ec4560407a1b23079c))
+* implement environment-based configuration loading and structured logging configuration ([b0053d2](https://github.com/ayato-labs/LogicHive/commit/b0053d251343e5353c1f028b308faee3146008e0))
+* implement tiered configuration loading system and initialize MCP server infrastructure ([e0e844d](https://github.com/ayato-labs/LogicHive/commit/e0e844d1e8606d281723a1b540cc74d69dcb4c32))
+* initialize FastMCP server with tools for searching, retrieving, and saving functions in LogicHive ([54af9de](https://github.com/ayato-labs/LogicHive/commit/54af9deb9693b784e473bdec963b6d5cec258f0c))
+
 # [0.10.0-dev.1](https://github.com/ayato-labs/LogicHive/compare/v0.9.8...v0.10.0-dev.1) (2026-05-26)
 
 
