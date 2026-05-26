@@ -57,16 +57,6 @@ class ExecutorFactory:
         cls._load_plugins()
         lang = language.lower()
 
-        from core.config import EXECUTION_DRIVER
-
-        # If docker is requested and we have a docker variant, return it
-        if EXECUTION_DRIVER == "docker" and lang == "python":
-            # For now, we only have docker for python
-            from .docker import DockerPythonExecutor
-
-            logger.debug(f"ExecutorFactory: Returning DockerPythonExecutor for {lang}")
-            return DockerPythonExecutor()
-
         executor = cls._executors.get(lang)
         if not executor:
             logger.warning(f"ExecutorFactory: No executor found for language '{language}'")

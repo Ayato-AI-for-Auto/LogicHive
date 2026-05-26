@@ -156,8 +156,8 @@ DEFAULT_POOL_SPECS = {
 }
 
 # 6. Execution Driver (Security Hardening)
-# "local" (uv/venv), "docker" (isolated container)
-EXECUTION_DRIVER = os.getenv("EXECUTION_DRIVER", "local").lower()
+# LogicHive defaults to local execution using uv/venv.
+EXECUTION_DRIVER = "local"
 
 # Legacy / Platform Compat
 TRANSPORT = os.getenv("TRANSPORT", "http")
