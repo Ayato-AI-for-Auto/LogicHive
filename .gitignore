@@ -25,6 +25,8 @@ last_run.txt
 *.txt
 *.log
 *.jsonl
+logs/
+
 
 # Build and Temp
 build/
