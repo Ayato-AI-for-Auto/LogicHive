@@ -23,14 +23,12 @@ class InterceptHandler(logging.Handler):
 
 def json_serializer(record):
     exception = record["exception"]
-    # Ensure extra name defaults to logger name
-    name = record["extra"].get("name", record["name"])
     
     subset = {
         "timestamp": record["time"].isoformat(),
         "level": record["level"].name,
         "message": record["message"],
-        "name": name,
+        "name": record["extra"]["name"],
         "function": record["function"],
         "line": record["line"],
         "run_id": record["extra"].get("run_id", "system"),
@@ -79,6 +77,8 @@ def setup_logging():
     )
 
     def patcher(record):
+        # Ensure 'name' is in extra so the console formatter doesn't raise a KeyError
+        record["extra"]["name"] = record["extra"].get("name", record["name"])
         record["extra"]["run_id"] = current_run_id.get()
         record["extra"]["serialized"] = json_serializer(record)
 

@@ -584,7 +584,7 @@ if __name__ == "__main__":
                 ips = SystemFingerprint.get_local_ips()
                 logger.info("Server is accessible at:")
                 for ip in ips:
-                    logger.info(f"  - http://{ip}:{current_port}/sse")
+                    logger.info(f"  > http://{ip}:{current_port}/sse")
 
             mcp.run(transport="sse", host=HOST, port=current_port)
             break # Success!
