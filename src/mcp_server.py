@@ -475,6 +475,8 @@ if __name__ == "__main__":
     import sys
     import traceback
     import uvicorn
+    import psutil
+    import socket
 
     from core import __version__
     from core.config import HOST, PORT, save_config, validate_config_lazy
@@ -485,6 +487,28 @@ if __name__ == "__main__":
         if getattr(sys, "frozen", False):
             print("\n" + "=" * 60)
             input("Press Enter to exit...")
+
+    def get_conflicting_process(port: int):
+        """Identifies the process currently using the specified port."""
+        try:
+            for conn in psutil.net_connections(kind='inet'):
+                if conn.laddr.port == port and conn.status == 'LISTEN':
+                    return psutil.Process(conn.pid)
+        except Exception:
+            pass
+        return None
+
+    def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
+        """Finds the first available port starting from start_port."""
+        port = start_port
+        while port < 65535:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind((host, port))
+                    return port
+                except OSError:
+                    port += 1
+        return start_port
 
     # --- MONKEYPATCH UVICORN ---
     # Uvicorn's Server.startup calls sys.exit(1) directly on socket errors.
@@ -503,83 +527,115 @@ if __name__ == "__main__":
     uvicorn.Server.startup = resilient_startup
     # ---------------------------
 
-    try:
-        # Improved configuration validation (User Request)
-        is_valid, error_msg, config_path = validate_config_lazy()
-        if not is_valid:
-            # Interactive Setup Flow
-            print("\n" + "=" * 60)
-            print(f"Welcome to LogicHive MCP (v{__version__})!")
-            print("It looks like this is your first run or your configuration is incomplete.")
-            print("=" * 60)
-            
-            print("\nStep 1: Choose your AI & Embedding Provider")
-            print("  [1] Ollama & Fastembed (Local-first, No API Key needed) - DEFAULT")
-            print("  [2] Google Gemini (Cloud-based, requires API Key)")
-            
-            choice = input("\nSelect [1] or [2] (default 1): ").strip()
-            
-            if choice == "2":
-                print("\nStep 2: Configure Gemini")
-                key = input("Enter your GEMINI_API_KEY: ").strip()
-                if key:
-                    save_config({
-                        "MODEL_TYPE": "gemini",
-                        "EMBEDDING_PROVIDER": "gemini",
-                        "GEMINI_API_KEY": key
-                    })
-                    print(f"[SUCCESS] Configuration saved to {config_path}")
-                else:
-                    print("[WARNING] No key provided. Gemini mode will require manual .env editing.")
-            else:
-                # Default: Ollama & Fastembed
-                save_config({
-                    "MODEL_TYPE": "ollama",
-                    "EMBEDDING_PROVIDER": "ollama"
-                })
-                print("[SUCCESS] Local-first mode (Ollama/Fastembed) selected.")
-                print("[NOTE] Ensure Ollama is installed and running (https://ollama.com)")
-
-            # Re-verify after setup
-            is_valid, error_msg, _ = validate_config_lazy()
-            
+    # Use a loop to allow retries or port changes without restarting the process
+    current_port = PORT
+    while True:
+        try:
+            # Improved configuration validation (User Request)
+            is_valid, error_msg, config_path = validate_config_lazy()
             if not is_valid:
-                print(f"\n[!] CONFIGURATION STILL INCOMPLETE: {error_msg}")
-                print(f"Please edit your configuration file manually at:\n  {config_path}")
-                wait_on_error()
-                sys.exit(1)
+                # Interactive Setup Flow
+                print("\n" + "=" * 60)
+                print(f"Welcome to LogicHive MCP (v{__version__})!")
+                print("It looks like this is your first run or your configuration is incomplete.")
+                print("=" * 60)
+                
+                print("\nStep 1: Choose your AI & Embedding Provider")
+                print("  [1] Ollama & Fastembed (Local-first, No API Key needed) - DEFAULT")
+                print("  [2] Google Gemini (Cloud-based, requires API Key)")
+                
+                choice = input("\nSelect [1] or [2] (default 1): ").strip()
+                
+                if choice == "2":
+                    print("\nStep 2: Configure Gemini")
+                    key = input("Enter your GEMINI_API_KEY: ").strip()
+                    if key:
+                        save_config({
+                            "MODEL_TYPE": "gemini",
+                            "EMBEDDING_PROVIDER": "gemini",
+                            "GEMINI_API_KEY": key
+                        })
+                        print(f"[SUCCESS] Configuration saved to {config_path}")
+                    else:
+                        print("[WARNING] No key provided. Gemini mode will require manual .env editing.")
+                else:
+                    # Default: Ollama & Fastembed
+                    save_config({
+                        "MODEL_TYPE": "ollama",
+                        "EMBEDDING_PROVIDER": "ollama"
+                    })
+                    print("[SUCCESS] Local-first mode (Ollama/Fastembed) selected.")
+                    print("[NOTE] Ensure Ollama is installed and running (https://ollama.com)")
 
-        # Improved logging for discoverability (User Request)
-        base_url = f"http://{HOST}:{PORT}/sse"
-        logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
+                # Re-verify after setup
+                is_valid, error_msg, _ = validate_config_lazy()
+                
+                if not is_valid:
+                    print(f"\n[!] CONFIGURATION STILL INCOMPLETE: {error_msg}")
+                    print(f"Please edit your configuration file manually at:\n  {config_path}")
+                    wait_on_error()
+                    sys.exit(1)
 
-        if HOST == "0.0.0.0":
-            ips = SystemFingerprint.get_local_ips()
-            logger.info("Server is accessible at:")
-            for ip in ips:
-                logger.info(f"  - http://{ip}:{PORT}/sse")
+            # Improved logging for discoverability (User Request)
+            base_url = f"http://{HOST}:{current_port}/sse"
+            logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
 
-        mcp.run(transport="sse", host=HOST, port=PORT)
+            if HOST == "0.0.0.0":
+                ips = SystemFingerprint.get_local_ips()
+                logger.info("Server is accessible at:")
+                for ip in ips:
+                    logger.info(f"  - http://{ip}:{current_port}/sse")
 
-    except OSError as e:
-        if e.errno == 10048 or "10048" in str(e):
-            print(f"\n[!] NETWORK ERROR: Port {PORT} is already in use.")
-            print(f"LogicHive cannot start because another application (or another instance of LogicHive)")
-            print(f"is already using this port.")
-            print("\nTo fix this:")
-            print(f"  1. Close any existing LogicHive-MCP.exe windows.")
-            print(f"  2. Or, change the PORT in your configuration file:")
-            print(f"     {config_path}")
+            mcp.run(transport="sse", host=HOST, port=current_port)
+            break # Success!
+
+        except OSError as e:
+            if e.errno == 10048 or "10048" in str(e):
+                print(f"\n[!] NETWORK ERROR: Port {current_port} is already in use.")
+                
+                # Diagnostics
+                proc = get_conflicting_process(current_port)
+                if proc:
+                    print(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
+                
+                print("\nHow would you like to resolve this?")
+                print(f"  [R] Retry (tries {current_port} again)")
+                if proc:
+                    print(f"  [K] Kill conflicting process ({proc.name()}) and start")
+                print(f"  [A] Auto-find an available port")
+                print("  [E] Exit")
+                
+                res = input("\nSelect [R/K/A/E]: ").strip().upper()
+                
+                if res == "R":
+                    continue
+                elif res == "K" and proc:
+                    try:
+                        print(f"Terminating {proc.name()}...")
+                        proc.terminate()
+                        proc.wait(timeout=5)
+                        continue
+                    except Exception as kill_err:
+                        print(f"[ERROR] Could not terminate process: {kill_err}")
+                elif res == "A":
+                    new_port = find_available_port(current_port + 1, HOST)
+                    print(f"\nFound available port: {new_port}")
+                    ans = input(f"Use port {new_port} and update your .env? [Y/n]: ").strip().lower()
+                    if ans != "n":
+                        save_config({"PORT": new_port})
+                        current_port = new_port
+                    continue
+                else:
+                    wait_on_error()
+                    sys.exit(1)
+            
+            print(f"\n[FATAL OS ERROR]: {e}")
+            traceback.print_exc()
             wait_on_error()
             sys.exit(1)
-        
-        print(f"\n[FATAL OS ERROR]: {e}")
-        traceback.print_exc()
-        wait_on_error()
-        sys.exit(1)
 
-    except Exception as e:
-        print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        wait_on_error()
-        sys.exit(1)
+        except Exception as e:
+            print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            wait_on_error()
+            sys.exit(1)
