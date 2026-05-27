@@ -473,10 +473,35 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 if __name__ == "__main__":
     import sys
+    import traceback
+    import uvicorn
 
     from core import __version__
     from core.config import HOST, PORT, save_config, validate_config_lazy
     from core.system_info import SystemFingerprint
+
+    def wait_on_error():
+        """Prevents the terminal window from closing immediately in frozen mode."""
+        if getattr(sys, "frozen", False):
+            print("\n" + "=" * 60)
+            input("Press Enter to exit...")
+
+    # --- MONKEYPATCH UVICORN ---
+    # Uvicorn's Server.startup calls sys.exit(1) directly on socket errors.
+    # We override this to raise an exception instead, so we can handle it and wait_on_error.
+    original_startup = uvicorn.Server.startup
+    async def resilient_startup(self, sockets=None):
+        try:
+            await original_startup(self, sockets=sockets)
+        except SystemExit as e:
+            # If uvicorn tried to exit, it's likely a bind error (OSError)
+            # Re-raise as OSError so our outer block can catch it
+            if not self.started:
+                raise OSError(10048, "Port binding failed (detected via SystemExit)") from e
+            raise
+
+    uvicorn.Server.startup = resilient_startup
+    # ---------------------------
 
     try:
         # Improved configuration validation (User Request)
@@ -521,10 +546,7 @@ if __name__ == "__main__":
             if not is_valid:
                 print(f"\n[!] CONFIGURATION STILL INCOMPLETE: {error_msg}")
                 print(f"Please edit your configuration file manually at:\n  {config_path}")
-                # Prevent immediate exit if frozen to allow user to read the message
-                if getattr(sys, "frozen", False):
-                    print("\n" + "=" * 60)
-                    input("Press Enter to exit...")
+                wait_on_error()
                 sys.exit(1)
 
         # Improved logging for discoverability (User Request)
@@ -538,15 +560,26 @@ if __name__ == "__main__":
                 logger.info(f"  - http://{ip}:{PORT}/sse")
 
         mcp.run(transport="sse", host=HOST, port=PORT)
+
+    except OSError as e:
+        if e.errno == 10048 or "10048" in str(e):
+            print(f"\n[!] NETWORK ERROR: Port {PORT} is already in use.")
+            print(f"LogicHive cannot start because another application (or another instance of LogicHive)")
+            print(f"is already using this port.")
+            print("\nTo fix this:")
+            print(f"  1. Close any existing LogicHive-MCP.exe windows.")
+            print(f"  2. Or, change the PORT in your configuration file:")
+            print(f"     {config_path}")
+            wait_on_error()
+            sys.exit(1)
+        
+        print(f"\n[FATAL OS ERROR]: {e}")
+        traceback.print_exc()
+        wait_on_error()
+        sys.exit(1)
+
     except Exception as e:
-        import traceback
         print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-
-        # Prevent terminal window from closing immediately when running as compiled EXE
-        if getattr(sys, "frozen", False):
-            print("\n" + "=" * 60)
-            print("The server encountered a fatal error and stopped.")
-            input("Press Enter to close this window...")
-            sys.exit(1)
-        raise
+        wait_on_error()
+        sys.exit(1)
