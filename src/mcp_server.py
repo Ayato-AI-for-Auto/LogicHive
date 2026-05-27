@@ -475,33 +475,52 @@ if __name__ == "__main__":
     import sys
 
     from core import __version__
-    from core.config import HOST, PORT, save_api_key, validate_config_lazy
+    from core.config import HOST, PORT, save_config, validate_config_lazy
     from core.system_info import SystemFingerprint
 
     try:
         # Improved configuration validation (User Request)
         is_valid, error_msg, config_path = validate_config_lazy()
         if not is_valid:
-            print(f"\n[!] CONFIGURATION ERROR: {error_msg}")
-            
             # Interactive Setup Flow
             print("\n" + "=" * 60)
-            print("Welcome to LogicHive MCP! It looks like this is your first run.")
-            print("Would you like to enter your GEMINI_API_KEY now?")
-            print("(Get one for free at: https://aistudio.google.com/app/apikey)")
+            print(f"Welcome to LogicHive MCP (v{__version__})!")
+            print("It looks like this is your first run or your configuration is incomplete.")
             print("=" * 60)
             
-            ans = input("\nEnter GEMINI_API_KEY (or press Enter to skip and edit .env manually): ").strip()
-            if ans:
-                if save_api_key(ans):
-                    print(f"[SUCCESS] API Key saved to {config_path}")
-                    # Re-verify
-                    is_valid, _, _ = validate_config_lazy()
+            print("\nStep 1: Choose your AI & Embedding Provider")
+            print("  [1] Ollama & Fastembed (Local-first, No API Key needed) - DEFAULT")
+            print("  [2] Google Gemini (Cloud-based, requires API Key)")
+            
+            choice = input("\nSelect [1] or [2] (default 1): ").strip()
+            
+            if choice == "2":
+                print("\nStep 2: Configure Gemini")
+                key = input("Enter your GEMINI_API_KEY: ").strip()
+                if key:
+                    save_config({
+                        "MODEL_TYPE": "gemini",
+                        "EMBEDDING_PROVIDER": "gemini",
+                        "GEMINI_API_KEY": key
+                    })
+                    print(f"[SUCCESS] Configuration saved to {config_path}")
                 else:
-                    print("[ERROR] Failed to save API key. Please check file permissions.")
+                    print("[WARNING] No key provided. Gemini mode will require manual .env editing.")
+            else:
+                # Default: Ollama & Fastembed
+                save_config({
+                    "MODEL_TYPE": "ollama",
+                    "EMBEDDING_PROVIDER": "ollama"
+                })
+                print("[SUCCESS] Local-first mode (Ollama/Fastembed) selected.")
+                print("[NOTE] Ensure Ollama is installed and running (https://ollama.com)")
+
+            # Re-verify after setup
+            is_valid, error_msg, _ = validate_config_lazy()
             
             if not is_valid:
-                print(f"\nPlease edit your configuration file manually at:\n  {config_path}")
+                print(f"\n[!] CONFIGURATION STILL INCOMPLETE: {error_msg}")
+                print(f"Please edit your configuration file manually at:\n  {config_path}")
                 # Prevent immediate exit if frozen to allow user to read the message
                 if getattr(sys, "frozen", False):
                     print("\n" + "=" * 60)

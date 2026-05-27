@@ -98,34 +98,36 @@ QUALITY_GATE_THRESHOLD=70
         print(f"[ERROR] Failed to create configuration template: {e}")
 
 
-def save_api_key(api_key: str):
-    """Saves the provided API key to the active .env file."""
+def save_config(updates: dict):
+    """Saves multiple configuration updates to the active .env file."""
     # We prefer the Home .env for persistence in frozen mode
     target_env = HOME_ENV
-
+    
     # Read existing content if any
     content = ""
     if target_env.exists():
         content = target_env.read_text(encoding="utf-8")
-
-    if "GEMINI_API_KEY=" in content:
-        # Replace existing key line
-        import re
-        new_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", content)
-    else:
-        # Append to end
-        new_content = content.rstrip() + f"\nGEMINI_API_KEY={api_key}\n"
-
+    
+    for key, value in updates.items():
+        if f"{key}=" in content:
+            import re
+            content = re.sub(f"{key}=.*", f"{key}={value}", content)
+        else:
+            content = content.rstrip() + f"\n{key}={value}\n"
+    
     try:
         HOME_DIR.mkdir(parents=True, exist_ok=True)
-        target_env.write_text(new_content, encoding="utf-8")
-        # Reload env in the current process
-        os.environ["GEMINI_API_KEY"] = api_key
-        global GEMINI_API_KEY
-        GEMINI_API_KEY = api_key
+        target_env.write_text(content, encoding="utf-8")
+        
+        # Update current process environment
+        for key, value in updates.items():
+            os.environ[key] = str(value)
+            # Update global variables in this module
+            if key in globals():
+                globals()[key] = value
         return True
     except Exception as e:
-        print(f"[ERROR] Failed to save API key: {e}")
+        print(f"[ERROR] Failed to save configuration: {e}")
         return False
 
 
