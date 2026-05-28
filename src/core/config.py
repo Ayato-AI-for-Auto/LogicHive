@@ -83,7 +83,7 @@ OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 
 # --- 4. Server Settings ---
 PORT=10880
-HOST=0.0.0.0
+HOST=127.0.0.1
 
 # --- 5. LogicHive Quality Gate ---
 # Minimum score (0-100) for an asset to be accepted into the vault.
@@ -181,7 +181,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 
 # 3. Server Config
 PORT = int(os.getenv("PORT", "10880"))
-HOST = os.getenv("HOST", "0.0.0.0")
+HOST = os.getenv("HOST", "127.0.0.1")
 
 # 4. Search & Vector Config
 VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))

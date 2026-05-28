@@ -479,7 +479,8 @@ if __name__ == "__main__":
     import socket
 
     from core import __version__
-    from core.config import HOST, PORT, save_config, validate_config_lazy
+    from core.config import save_config, validate_config_lazy
+    import core.config
     from core.system_info import SystemFingerprint
 
     def wait_on_error():
@@ -528,7 +529,7 @@ if __name__ == "__main__":
     # ---------------------------
 
     # Use a loop to allow retries or port changes without restarting the process
-    current_port = PORT
+    current_port = core.config.PORT
     while True:
         try:
             # Improved configuration validation (User Request)
@@ -546,26 +547,40 @@ if __name__ == "__main__":
                 
                 choice = input("\nSelect [1] or [2] (default 1): ").strip()
                 
+                config_updates = {}
                 if choice == "2":
                     print("\nStep 2: Configure Gemini")
                     key = input("Enter your GEMINI_API_KEY: ").strip()
                     if key:
-                        save_config({
+                        config_updates.update({
                             "MODEL_TYPE": "gemini",
                             "EMBEDDING_PROVIDER": "gemini",
                             "GEMINI_API_KEY": key
                         })
-                        print(f"[SUCCESS] Configuration saved to {config_path}")
                     else:
                         print("[WARNING] No key provided. Gemini mode will require manual .env editing.")
                 else:
                     # Default: Ollama & Fastembed
-                    save_config({
+                    config_updates.update({
                         "MODEL_TYPE": "ollama",
                         "EMBEDDING_PROVIDER": "ollama"
                     })
-                    print("[SUCCESS] Local-first mode (Ollama/Fastembed) selected.")
-                    print("[NOTE] Ensure Ollama is installed and running (https://ollama.com)")
+
+                print("\nStep 3: Choose Network Sharing Mode")
+                print("  [1] Local Only (Recommended, Secure) - DEFAULT")
+                print("  [2] LAN/Wi-Fi Share (Allows team access, no authentication)")
+                
+                share_choice = input("\nSelect [1] or [2] (default 1): ").strip()
+                if share_choice == "2":
+                    config_updates["HOST"] = "0.0.0.0"
+                    print("[NOTE] Server will bind to 0.0.0.0 to allow team access.")
+                else:
+                    config_updates["HOST"] = "127.0.0.1"
+                    print("[NOTE] Server will bind to 127.0.0.1 (local only).")
+                
+                if config_updates:
+                    save_config(config_updates)
+                    print(f"[SUCCESS] Configuration saved to {config_path}")
 
                 # Re-verify after setup
                 is_valid, error_msg, _ = validate_config_lazy()
@@ -577,16 +592,27 @@ if __name__ == "__main__":
                     sys.exit(1)
 
             # Improved logging for discoverability (User Request)
-            base_url = f"http://{HOST}:{current_port}/sse"
+            host_val = core.config.HOST
+            base_url = f"http://{host_val}:{current_port}/sse"
             logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
 
-            if HOST == "0.0.0.0":
-                ips = SystemFingerprint.get_local_ips()
+            if host_val == "0.0.0.0":
+                import socket
+                hostname = socket.gethostname().lower()
+                logger.warning("=" * 60)
+                logger.warning("🛡️ SECURITY NOTICE: LAN/Wi-Fi sharing is active (HOST=0.0.0.0).")
+                logger.warning("There is no built-in authentication in this version.")
+                logger.warning("Only share LogicHive on trusted private Wi-Fi/networks.")
+                logger.warning("=" * 60)
+
                 logger.info("Server is accessible at:")
+                logger.info(f"  > http://localhost:{current_port}/sse")
+                logger.info(f"  > http://{hostname}.local:{current_port}/sse (Team URL via mDNS)")
+                ips = SystemFingerprint.get_local_ips()
                 for ip in ips:
                     logger.info(f"  > http://{ip}:{current_port}/sse")
 
-            mcp.run(transport="sse", host=HOST, port=current_port)
+            mcp.run(transport="sse", host=host_val, port=current_port)
             break # Success!
 
         except OSError as e:
@@ -618,7 +644,7 @@ if __name__ == "__main__":
                     except Exception as kill_err:
                         print(f"[ERROR] Could not terminate process: {kill_err}")
                 elif res == "A":
-                    new_port = find_available_port(current_port + 1, HOST)
+                    new_port = find_available_port(current_port + 1, core.config.HOST)
                     print(f"\nFound available port: {new_port}")
                     ans = input(f"Use port {new_port} and update your .env? [Y/n]: ").strip().lower()
                     if ans != "n":
