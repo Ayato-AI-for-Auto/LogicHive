@@ -181,7 +181,7 @@ def main(page: ft.Page):
         multiline=True,
         min_lines=8,
         max_lines=8,
-        text_style=ft.TextStyle(family="Consolas"),
+        text_style=ft.TextStyle(font_family="Consolas"),
         expand=True
     )
 

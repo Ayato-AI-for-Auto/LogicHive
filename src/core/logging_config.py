@@ -57,7 +57,9 @@ def rotate_previous_execution_log(filepath):
             pass
 
 def setup_logging():
-    log_dir = "logs"
+    # Use user's home directory for logs to avoid permission issues in Program Files
+    # and to centralize logs for different execution methods.
+    log_dir = os.path.expanduser("~/.logichive/logs")
     os.makedirs(log_dir, exist_ok=True)
 
     logger.remove()

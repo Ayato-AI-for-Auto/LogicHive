@@ -190,6 +190,10 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 # ⚙️ Internal System Configuration
 # ==========================================
 
+# Use ~/.logichive for ALL persistent data (Logs, DB, FAISS, Pools)
+# This avoids permission issues in Program Files and centralizes backups.
+LOGICHIVE_HOME = HOME_DIR
+
 # Handle Cloud Run or other container environments
 IS_CLOUD = os.getenv("K_SERVICE") is not None or os.name != "nt"
 
@@ -197,8 +201,8 @@ if IS_CLOUD:
     # Use /tmp for ALL transient operations in the cloud
     DATA_DIR = Path("/tmp/logic-hive")
 else:
-    # Local dev: Consolidate to storage/data at root
-    DATA_DIR = BASE_DIR / "storage" / "data"
+    # Use centralized data directory in home
+    DATA_DIR = LOGICHIVE_HOME / "data"
 
 # Ensure transient directory exists
 try:
@@ -227,7 +231,7 @@ FAISS_MAPPING_PATH = os.getenv("FAISS_MAPPING_PATH", str(DATA_DIR / "faiss_mappi
 
 # 5. Virtual Environment Pooling (Pre-warming)
 ENABLE_ENV_POOLING = os.getenv("ENABLE_ENV_POOLING", "true").lower() == "true"
-POOL_BASE_DIR = DATA_DIR / "pools"
+POOL_BASE_DIR = LOGICHIVE_HOME / "pools"
 POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "1"))  # per spec
 
 # Default specs for pre-warming
