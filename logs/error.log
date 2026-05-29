@@ -155,3 +155,17 @@ AttributeError: 'PoolManager' object has no attribute '_uv_semaphore'
 {"timestamp": "2026-05-26T21:06:18.344344+09:00", "level": "ERROR", "message": "  [x] fail_draft: FAILED - Logic Error: Code execution failed or test case assertions failed. [AssertionError] ", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system"}
 {"timestamp": "2026-05-26T21:06:18.613920+09:00", "level": "ERROR", "message": "  [x] fail_draft: FAILED - Logic Error: Code execution failed or test case assertions failed. [AssertionError] ", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system"}
 {"timestamp": "2026-05-27T21:36:58.133931+09:00", "level": "ERROR", "message": "Testing standard log intercept", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system"}
+{"timestamp": "2026-05-27T22:29:23.288382+09:00", "level": "ERROR", "message": "Task exception was never retrieved\nfuture: <Task finished name='Task-56' coro=<PoolManager._prepare_env() done, defined at C:\\Users\\saiha\\My_Service\\programing\\MCP\\LogicHive\\src\\core\\execution\\pool.py:203> exception=AttributeError(\"'PoolManager' object has no attribute '_uv_semaphore'\")>", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system", "exception": {"type": "AttributeError", "value": "'PoolManager' object has no attribute '_uv_semaphore'", "traceback": "(type=<class 'AttributeError'>, value=AttributeError(\"'PoolManager' object has no attribute '_uv_semaphore'\"), traceback=<traceback object at 0x00000213FD83D780>)"}}
+Traceback (most recent call last):
+
+> File "C:\Users\saiha\My_Service\programing\MCP\LogicHive\src\core\execution\pool.py", line 205, in _prepare_env
+    async with self._uv_semaphore:
+               └ <core.execution.pool.PoolManager object at 0x00000213FD84D2D0>
+
+AttributeError: 'PoolManager' object has no attribute '_uv_semaphore'
+{"timestamp": "2026-05-27T22:29:27.451449+09:00", "level": "ERROR", "message": "EvaluationManager: Evaluator 'crash_test' failed: CRASH SIMULATION", "name": "core.evaluation.manager", "function": "_run_evaluators", "line": 175, "run_id": "system"}
+{"timestamp": "2026-05-27T22:29:29.565997+09:00", "level": "ERROR", "message": "Migration failed: near \";\": syntax error", "name": "core.migration", "function": "run_migrations", "line": 47, "run_id": "system"}
+{"timestamp": "2026-05-27T22:29:30.326633+09:00", "level": "ERROR", "message": "ERROR: do_save_async - Immediate Rejection (structural): Structural error detected (unbalanced brackets).", "name": "core.tracer", "function": "async_wrapper", "line": 56, "run_id": "278f8058-6a26-42ef-b2ff-6b72dd7dce8f"}
+{"timestamp": "2026-05-27T22:29:45.784802+09:00", "level": "ERROR", "message": "Executor: Resource monitor crashed: name 'pid' is not defined", "name": "core.execution.python", "function": "_monitor_resources", "line": 234, "run_id": "system"}
+{"timestamp": "2026-05-27T22:29:47.768372+09:00", "level": "ERROR", "message": "  [x] fail_draft: FAILED - Logic Error: Code execution failed or test case assertions failed. [AssertionError] ", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system"}
+{"timestamp": "2026-05-27T22:29:48.089090+09:00", "level": "ERROR", "message": "  [x] fail_draft: FAILED - Logic Error: Code execution failed or test case assertions failed. [AssertionError] ", "name": "logging", "function": "callHandlers", "line": 1706, "run_id": "system"}
