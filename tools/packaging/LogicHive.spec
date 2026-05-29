@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 
 block_cipher = None
 
@@ -14,7 +14,7 @@ sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
 # Common data and metadata
-common_datas = copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp') + copy_metadata('flet') + copy_metadata('flet_desktop')
+common_datas = copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp') + copy_metadata('flet') + copy_metadata('flet_desktop') + collect_data_files('flet')
 common_hiddenimports = [
     'fastmcp',
     'google.genai',
