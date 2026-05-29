@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from core.logger import get_logger
+from core.logging_config import get_logger
 
 logger = get_logger("config")
 

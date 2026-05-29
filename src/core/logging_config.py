@@ -50,11 +50,12 @@ def setup_logging():
     logger.remove()
 
     # 1. Console Sink (Human Readable)
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[name]}</cyan> - {message}",
-        level="DEBUG",
-    )
+    if sys.stderr is not None:
+        logger.add(
+            sys.stderr,
+            format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[name]}</cyan> - {message}",
+            level="DEBUG",
+        )
 
     # 2. Main JSON Sink
     logger.add(
