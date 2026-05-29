@@ -164,8 +164,59 @@ def main(page: ft.Page):
 
     # --- Helper Functions ---
 
+    def get_client_json():
+        import json
+        data = {
+            "mcpServers": {
+                "logichive": {
+                    "url": f"http://{config_state['HOST']}:{config_state['PORT']}/sse"
+                }
+            }
+        }
+        return json.dumps(data, indent=2)
+
+    client_json_field = ft.TextField(
+        value=get_client_json(),
+        read_only=True,
+        multiline=True,
+        min_lines=8,
+        max_lines=8,
+        text_style=ft.TextStyle(family="Consolas"),
+        expand=True
+    )
+
+    def copy_client_json(_):
+        page.set_clipboard(get_client_json())
+        page.snack_bar = ft.SnackBar(ft.Text("Copied to clipboard!"))
+        page.snack_bar.open = True
+        page.update()
+
+    copy_button = ft.IconButton(
+        icon=ft.Icons.COPY,
+        on_click=copy_client_json,
+        tooltip="Copy JSON"
+    )
+
+    client_setup_section = ft.Column([
+        ft.Text(
+            "Client Setup (Cline / Custom SSE Client)", size=18, weight=ft.FontWeight.BOLD
+        ),
+        ft.Text(
+            "Copy and paste this into your client's MCP settings file:",
+            size=14,
+            color=ft.Colors.GREY_400,
+        ),
+        ft.Row(
+            [client_json_field, copy_button],
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        ),
+    ])
+
     def update_state(key, value):
         config_state[key] = value
+        if key in ("HOST", "PORT"):
+            client_json_field.value = get_client_json()
+            client_json_field.update()
 
     def save_settings():
         try:
@@ -198,10 +249,12 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
                 ft.Row([host_input, port_input]),
-                ft.VerticalDivider(),
                 save_button,
+                ft.Divider(),
+                client_setup_section,
             ],
             spacing=20,
+            scroll=ft.ScrollMode.ADAPTIVE,
         ),
         padding=20,
     )
