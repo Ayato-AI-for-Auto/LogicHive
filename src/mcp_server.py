@@ -535,61 +535,15 @@ if __name__ == "__main__":
             # Improved configuration validation (User Request)
             is_valid, error_msg, config_path = validate_config_lazy()
             if not is_valid:
-                # Interactive Setup Flow
                 print("\n" + "=" * 60)
-                print(f"Welcome to LogicHive MCP (v{__version__})!")
-                print("It looks like this is your first run or your configuration is incomplete.")
+                print(f"LogicHive MCP (v{__version__}) - [ERROR]")
                 print("=" * 60)
-                
-                print("\nStep 1: Choose your AI & Embedding Provider")
-                print("  [1] Ollama & Fastembed (Local-first, No API Key needed) - DEFAULT")
-                print("  [2] Google Gemini (Cloud-based, requires API Key)")
-                
-                choice = input("\nSelect [1] or [2] (default 1): ").strip()
-                
-                config_updates = {}
-                if choice == "2":
-                    print("\nStep 2: Configure Gemini")
-                    key = input("Enter your GEMINI_API_KEY: ").strip()
-                    if key:
-                        config_updates.update({
-                            "MODEL_TYPE": "gemini",
-                            "EMBEDDING_PROVIDER": "gemini",
-                            "GEMINI_API_KEY": key
-                        })
-                    else:
-                        print("[WARNING] No key provided. Gemini mode will require manual .env editing.")
-                else:
-                    # Default: Ollama & Fastembed
-                    config_updates.update({
-                        "MODEL_TYPE": "ollama",
-                        "EMBEDDING_PROVIDER": "ollama"
-                    })
-
-                print("\nStep 3: Choose Network Sharing Mode")
-                print("  [1] Local Only (Recommended, Secure) - DEFAULT")
-                print("  [2] LAN/Wi-Fi Share (Allows team access, no authentication)")
-                
-                share_choice = input("\nSelect [1] or [2] (default 1): ").strip()
-                if share_choice == "2":
-                    config_updates["HOST"] = "0.0.0.0"
-                    print("[NOTE] Server will bind to 0.0.0.0 to allow team access.")
-                else:
-                    config_updates["HOST"] = "127.0.0.1"
-                    print("[NOTE] Server will bind to 127.0.0.1 (local only).")
-                
-                if config_updates:
-                    save_config(config_updates)
-                    print(f"[SUCCESS] Configuration saved to {config_path}")
-
-                # Re-verify after setup
-                is_valid, error_msg, _ = validate_config_lazy()
-                
-                if not is_valid:
-                    print(f"\n[!] CONFIGURATION STILL INCOMPLETE: {error_msg}")
-                    print(f"Please edit your configuration file manually at:\n  {config_path}")
-                    wait_on_error()
-                    sys.exit(1)
+                print(f"\n[!] CONFIGURATION INCOMPLETE: {error_msg}")
+                print(f"Please use the LogicHive Settings tool (logichive-settings.exe) to configure the system.")
+                print(f"Or edit your configuration file manually at:\n  {config_path}")
+                print("=" * 60)
+                wait_on_error()
+                sys.exit(1)
 
             # Improved logging for discoverability (User Request)
             host_val = core.config.HOST

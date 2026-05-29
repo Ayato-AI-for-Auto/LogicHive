@@ -26,6 +26,7 @@ dependencies = [
     "pandas",
     "pyinstaller",
     "psutil",
+    "flet",
     "aiohttp>=3.13.5",
     "pydantic>=2.12.5",
     "loguru>=0.7.3",
