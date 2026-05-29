@@ -1,14 +1,14 @@
 import sys
 from pathlib import Path
 
+import flet as ft
+
 # Ensure src is in path for imports
 src_path = str(Path(__file__).parent.resolve())
 if src_path not in sys.path:
     sys.path.append(src_path)
 
-import flet as ft
-
-from core.config import (
+from core.config import (  # noqa: E402
     CONFIG_SOURCE,
     GEMINI_API_KEY,
     HOST,
@@ -16,8 +16,8 @@ from core.config import (
     PORT,
     save_config,
 )
-from core.logging_config import get_logger
-from orchestrator import check_integrity
+from core.logging_config import get_logger  # noqa: E402
+from orchestrator import check_integrity  # noqa: E402
 
 logger = get_logger("settings_ui")
 
@@ -104,7 +104,9 @@ def main(page: ft.Page):
             report = await check_integrity()
             integrity_result_area.controls.clear()
 
-            status_color = ft.colors.GREEN if report["status"] == "Healthy" else ft.colors.AMBER
+            status_color = (
+                ft.colors.GREEN if report["status"] == "Healthy" else ft.colors.AMBER
+            )
             if report["status"] == "Error":
                 status_color = ft.colors.RED
 
@@ -119,15 +121,21 @@ def main(page: ft.Page):
 
             for component, details in report["details"].items():
                 comp_status = details.get("status", "Unknown")
-                comp_color = ft.colors.GREEN if comp_status == "Healthy" else ft.colors.AMBER
+                comp_color = (
+                    ft.colors.GREEN if comp_status == "Healthy" else ft.colors.AMBER
+                )
 
                 integrity_result_area.controls.append(
                     ft.ExpansionTile(
-                        title=ft.Text(f"{component.upper()}: {comp_status}", color=comp_color),
+                        title=ft.Text(
+                            f"{component.upper()}: {comp_status}", color=comp_color
+                        ),
                         subtitle=ft.Text(details.get("message", "")),
                         controls=[
                             ft.Container(
-                                content=ft.Text(str(details.get("details", "")), size=12),
+                                content=ft.Text(
+                                    str(details.get("details", "")), size=12
+                                ),
                                 padding=10,
                                 bgcolor=ft.colors.GREY_900,
                                 border_radius=5,
@@ -136,12 +144,15 @@ def main(page: ft.Page):
                     )
                 )
             logger.info(
-                "Integrity check completed successfully", extra={"report_status": report["status"]}
+                "Integrity check completed successfully",
+                extra={"report_status": report["status"]}
             )
         except Exception as ex:
             logger.exception("Integrity check failed with an unexpected error")
             integrity_result_area.controls.clear()
-            integrity_result_area.controls.append(ft.Text(f"Error: {ex}", color=ft.colors.RED))
+            integrity_result_area.controls.append(
+                ft.Text(f"Error: {ex}", color=ft.colors.RED)
+            )
 
         page.update()
 

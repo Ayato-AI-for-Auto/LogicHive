@@ -226,9 +226,9 @@ class EphemeralPythonExecutor(BaseExecutor):
                         self._kill_process_tree(process.pid)
                         break
                 except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                    logger.error(f"Failed to access process {pid}: {e}")
+                    logger.error(f"Failed to access process {process.pid}: {e}")
                 except Exception as e:
-                    logger.exception(f"Unexpected error accessing process {pid}: {e}")
+                    logger.exception(f"Unexpected error accessing process {process.pid}: {e}")
                 await asyncio.sleep(0.5)
         except Exception as e:
             logger.error(f"Executor: Resource monitor crashed: {e}")

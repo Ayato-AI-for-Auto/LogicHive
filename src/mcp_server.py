@@ -53,7 +53,7 @@ async def search_functions(
     language: str = None,
     project: str = None,
     wait_for_previous: bool = False,
-) -> str:
+    ) -> str:
     """
     Search for high-quality, reusable code functions within the LogicHive vault using Hybrid Search.
     This is the primary tool for knowledge retrieval. Use it when you need to find existing
@@ -70,12 +70,15 @@ async def search_functions(
     5. Project Filter: Restrict search to a specific project (e.g., "ayato-studio").
 
     Args:
-        query: Search term, exact name, or #tag.
-        limit: Max results. Default 5.
-        language: Optional language to filter by (e.g., 'python', 'javascript').
-        project: Optional project name to narrow the search.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+    query: Search term, exact name, or #tag.
+    limit: Max results. Default 5.
+    language: Optional language to filter by (e.g., 'python', 'javascript').
+    project: Optional project name to narrow the search.
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+        to complete before starting. Set to false (or omit) to run in parallel. 
+        Use true when this tool depends on the output of previous tools.
     """
+
     try:
         results = await orchestrator.do_search_async(query, limit, language, project=project)
         if not results:
@@ -122,7 +125,9 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
     Args:
         name: The precise, case-sensitive name of the function (e.g., "save_log").
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+            to complete before starting. Set to false (or omit) to run in parallel. 
+            Use true when this tool depends on the output of previous tools.
     """
     try:
         f_data = await orchestrator.do_get_async(name, project=project)
@@ -145,9 +150,14 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
             if warning:
                 drift_header = f"> [!WARNING]\n> {warning.replace(chr(10), chr(10) + '> ')}\n\n"
 
-        return f"**Function: {name}**\n\n{drift_header}{desc}\n\n**Tags:** {tags}\n**Dependencies:** {deps}\n\n```{lang}\n{code}\n```"
+        response = (
+            f"**Function: {name}**\n\n{drift_header}{desc}\n\n"
+            f"**Tags:** {tags}\n**Dependencies:** {deps}\n\n"
+            f"```{lang}\n{code}\n```"
+        )
+        return response
     except Exception as e:
-        logger.error(f"MCP Server: Error in get_function: {e}")
+        logger.error(f"MCP Server: Error in get_function: {name} - {e}")
         return f"LogicHive Error: Failed to retrieve function. Detail: {str(e)}"
 
 
@@ -181,14 +191,12 @@ async def save_function(
             mock_imports=mock_imports,
             timeout=timeout,
         )
-        return (
-            (
-                f"Asset '{name}' (Project: {project}) has been accepted and saved with status 'pending'.\n"
-                "Verification is running in the background. Use 'get_verification_status' to check progress."
+        if success:
+            return (
+                f"Asset '{name}' (Project: {project}) has been accepted and saved.\n"
+                "Verification is running in the background. Use 'get_verification_status'."
             )
-            if success
-            else "Failed to initiate save (Unknown Error)"
-        )
+        return "Failed to initiate save (Unknown Error)"
     except SyntaxValidationError as e:
         # User feedback Tip #3: Prominent Syntax Error Reporting
         details = e.details or {}
@@ -246,7 +254,9 @@ async def debug_db(wait_for_previous: bool = False) -> str:
     Debug tool to inspect LogicHive database configuration and table structure.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+            to complete before starting. Set to false (or omit) to run in parallel. 
+            Use true when this tool depends on the output of previous tools.
     """
 
     from core.config import SQLITE_DB_PATH
@@ -279,7 +289,9 @@ async def delete_function(
     Args:
         name: The case-sensitive name of the function to delete.
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+            to complete before starting. Set to false (or omit) to run in parallel. 
+            Use true when this tool depends on the output of previous tools.
     """
     success = await do_delete_async(name, project=project)
     if success:
@@ -301,7 +313,9 @@ async def list_functions(
         project: Optional project name to filter by.
         tags: Optional list of tags to filter by.
         limit: Max results. Default 50.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+            to complete before starting. Set to false (or omit) to run in parallel. 
+            Use true when this tool depends on the output of previous tools.
     """
     try:
         results = await orchestrator.do_list_async(project=project, tags=tags, limit=limit)
@@ -334,7 +348,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     including DB status, Vector store synchronization, and Environment pools.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
+            to complete before starting. Set to false (or omit) to run in parallel. 
+            Use true when this tool depends on the output of previous tools.
     """
 
     from storage.vector_store import vector_manager
