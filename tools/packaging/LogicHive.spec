@@ -14,7 +14,7 @@ sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
 # Common data and metadata
-common_datas = copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp') + copy_metadata('flet')
+common_datas = copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp') + copy_metadata('flet') + copy_metadata('flet_desktop')
 common_hiddenimports = [
     'fastmcp',
     'google.genai',
@@ -26,7 +26,9 @@ common_hiddenimports = [
     'radon',
     'sqlite3',
     'psutil',
-    'flet'
+    'flet',
+    'flet_desktop',
+    'flet_runtime'
 ]
 
 # --- 1. Engine Binary (Hub) ---
