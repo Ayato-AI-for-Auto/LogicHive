@@ -1,30 +1,25 @@
-import asyncio
-import os
 import sys
 from pathlib import Path
-
-import flet as ft
-from loguru import logger
 
 # Ensure src is in path for imports
 src_path = str(Path(__file__).parent.resolve())
 if src_path not in sys.path:
     sys.path.append(src_path)
 
+import flet as ft
+
 from core.config import (
+    CONFIG_SOURCE,
     GEMINI_API_KEY,
     HOST,
     MODEL_TYPE,
     PORT,
-    CONFIG_SOURCE,
     save_config,
-    validate_config_lazy,
-    HOME_ENV,
 )
+from core.logging_config import get_logger
 from orchestrator import check_integrity
 
-# Configure logger for UI
-logger.add("logs/settings_ui.log", rotation="1 MB")
+logger = get_logger("settings_ui")
 
 def main(page: ft.Page):
     page.title = "LogicHive Settings & Control"
@@ -43,17 +38,19 @@ def main(page: ft.Page):
     }
 
     # --- UI Components ---
-    
+
     # Header
     header = ft.Row(
         [
-            ft.Icon(ft.icons.SHIELD_PROTECTED, color=ft.colors.AMBER, size=40),
+            ft.Icon(ft.icons.SECURITY, color=ft.colors.AMBER, size=40),
             ft.Text("LogicHive Dashboard", size=32, weight=ft.FontWeight.BOLD),
         ],
         alignment=ft.MainAxisAlignment.START,
     )
 
-    config_source_text = ft.Text(f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.colors.GREY_400)
+    config_source_text = ft.Text(
+        f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.colors.GREY_400
+    )
 
     # Tab 1: General Settings
     provider_dropdown = ft.Dropdown(
@@ -96,28 +93,34 @@ def main(page: ft.Page):
 
     # Tab 2: Integrity Check
     integrity_result_area = ft.Column(scroll=ft.ScrollMode.ALWAYS, height=400)
-    
-    async def run_integrity_check(e):
+
+    async def run_integrity_check(_e):
         integrity_result_area.controls.clear()
         integrity_result_area.controls.append(ft.ProgressBar(width=400, color="blue"))
         page.update()
+        logger.info("Starting integrity check from UI")
 
         try:
             report = await check_integrity()
             integrity_result_area.controls.clear()
-            
+
             status_color = ft.colors.GREEN if report["status"] == "Healthy" else ft.colors.AMBER
             if report["status"] == "Error":
                 status_color = ft.colors.RED
-            
+
             integrity_result_area.controls.append(
-                ft.Text(f"Status: {report['status']}", size=20, color=status_color, weight=ft.FontWeight.BOLD)
+                ft.Text(
+                    f"Status: {report['status']}",
+                    size=20,
+                    color=status_color,
+                    weight=ft.FontWeight.BOLD,
+                )
             )
-            
+
             for component, details in report["details"].items():
                 comp_status = details.get("status", "Unknown")
                 comp_color = ft.colors.GREEN if comp_status == "Healthy" else ft.colors.AMBER
-                
+
                 integrity_result_area.controls.append(
                     ft.ExpansionTile(
                         title=ft.Text(f"{component.upper()}: {comp_status}", color=comp_color),
@@ -132,10 +135,14 @@ def main(page: ft.Page):
                         ]
                     )
                 )
+            logger.info(
+                "Integrity check completed successfully", extra={"report_status": report["status"]}
+            )
         except Exception as ex:
+            logger.exception("Integrity check failed with an unexpected error")
             integrity_result_area.controls.clear()
             integrity_result_area.controls.append(ft.Text(f"Error: {ex}", color=ft.colors.RED))
-        
+
         page.update()
 
     integrity_button = ft.ElevatedButton(
@@ -150,12 +157,23 @@ def main(page: ft.Page):
         config_state[key] = value
 
     def save_settings():
-        success = save_config(config_state)
-        if success:
-            page.snack_bar = ft.SnackBar(ft.Text("Configuration saved successfully!"))
-            page.snack_bar.open = True
-        else:
-            page.snack_bar = ft.SnackBar(ft.Text("Failed to save configuration."), bgcolor=ft.colors.RED)
+        try:
+            success = save_config(config_state)
+            if success:
+                logger.info("Configuration saved successfully from UI")
+                page.snack_bar = ft.SnackBar(ft.Text("Configuration saved successfully!"))
+                page.snack_bar.open = True
+            else:
+                logger.error("Failed to save configuration from UI")
+                page.snack_bar = ft.SnackBar(
+                    ft.Text("Failed to save configuration."), bgcolor=ft.colors.RED
+                )
+                page.snack_bar.open = True
+        except Exception as ex:
+            logger.exception("Exception occurred while saving configuration")
+            page.snack_bar = ft.SnackBar(
+                ft.Text(f"Error saving config: {ex}"), bgcolor=ft.colors.RED
+            )
             page.snack_bar.open = True
         page.update()
 
@@ -190,7 +208,11 @@ def main(page: ft.Page):
                 content=ft.Container(
                     content=ft.Column(
                         [
-                            ft.Text("System Integrity & Diagnostics", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Text(
+                                "System Integrity & Diagnostics",
+                                size=20,
+                                weight=ft.FontWeight.BOLD,
+                            ),
                             integrity_button,
                             ft.Divider(),
                             integrity_result_area,
@@ -212,4 +234,9 @@ def main(page: ft.Page):
     )
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    logger.info("Starting LogicHive Settings UI")
+    try:
+        ft.app(target=main)
+    except Exception:
+        logger.exception("Fatal error occurred in Settings UI")
+        sys.exit(1)

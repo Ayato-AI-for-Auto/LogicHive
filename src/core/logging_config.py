@@ -23,12 +23,12 @@ class InterceptHandler(logging.Handler):
 
 def json_serializer(record):
     exception = record["exception"]
-    
+
     subset = {
         "timestamp": record["time"].isoformat(),
         "level": record["level"].name,
         "message": record["message"],
-        "name": record["extra"]["name"],
+        "name": record["extra"].get("name", record["name"]),
         "function": record["function"],
         "line": record["line"],
         "run_id": record["extra"].get("run_id", "system"),
@@ -37,54 +37,73 @@ def json_serializer(record):
         subset["exception"] = {
             "type": str(exception.type.__name__),
             "value": str(exception.value),
-            "traceback": str(exception)
+            "traceback": str(exception.traceback)
         }
     return json.dumps(subset)
+
+def rotate_previous_execution_log(filepath):
+    """Keep only the last 2 executions by renaming the current file to _prev."""
+    if os.path.exists(filepath):
+        base, ext = os.path.splitext(filepath)
+        prev_path = f"{base}_prev{ext}"
+        if os.path.exists(prev_path):
+            try:
+                os.remove(prev_path)
+            except OSError:
+                pass
+        try:
+            os.rename(filepath, prev_path)
+        except OSError:
+            pass
 
 def setup_logging():
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)
 
-    # Simplified generation management using loguru's built-in rotation
-    # 'retention=2' ensures only 2 files are kept.
     logger.remove()
 
     # 1. Console Sink (Human Readable)
     if sys.stderr is not None:
+        log_format = (
+            "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+            "<cyan>{extra[name]}</cyan> - {message}"
+        )
         logger.add(
             sys.stderr,
-            format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[name]}</cyan> - {message}",
-            level="DEBUG",
+            format=log_format,
+            level="INFO",
         )
+
+    # Manual rotation for keeping exact last 2 executions
+    main_log_path = os.path.join(log_dir, "logichive.jsonl")
+    error_log_path = os.path.join(log_dir, "error.log")
+
+    rotate_previous_execution_log(main_log_path)
+    rotate_previous_execution_log(error_log_path)
 
     # 2. Main JSON Sink
     logger.add(
-        os.path.join(log_dir, "logichive.jsonl"),
+        main_log_path,
         format="{extra[serialized]}",
         level="DEBUG",
-        rotation="10 MB",
-        retention=2,
         enqueue=True,
     )
 
     # 3. Isolated Error Sink
     logger.add(
-        os.path.join(log_dir, "error.log"),
+        error_log_path,
         format="{extra[serialized]}",
         level="ERROR",
-        rotation="10 MB",
-        retention=2,
         enqueue=True,
     )
 
     def patcher(record):
-        # Ensure 'name' is in extra so the console formatter doesn't raise a KeyError
         record["extra"]["name"] = record["extra"].get("name", record["name"])
         record["extra"]["run_id"] = current_run_id.get()
         record["extra"]["serialized"] = json_serializer(record)
 
     logger.configure(patcher=patcher)
-    
+
     # Bridge standard logging to loguru
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
@@ -97,3 +116,4 @@ def get_logger(name: str):
 
 # Initialize on import
 setup_logging()
+

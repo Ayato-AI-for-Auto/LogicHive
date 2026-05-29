@@ -46,9 +46,9 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          # Run linting on the whole repository. 
-          # E,F,W,I are selected; E501 (line length) is ignored to keep noise low while respecting the 100-char limit.
-          uv run ruff check . --select E,F,W,I --ignore E501,F401,F841 --line-length 100
+          # Run linting on the whole repository using pyproject.toml rules.
+          # Line length is 100, and non-core files have relaxed rules via per-file-ignores.
+          uv run ruff check .
 
       - name: Run tests
         run: |

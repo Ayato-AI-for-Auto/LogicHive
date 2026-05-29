@@ -44,31 +44,32 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-# Explicitly target src and tests
-include = ["src/**/*.py", "tests/**/*.py"]
+
+# Do not strictly exclude everything; CI wants to check all files but with relaxed rules outside core logic
 exclude = [
     ".git",
     ".venv",
-    "exports",
-    "scratch",
-    "tools",
     "dist",
     "build",
+    "node_modules",
 ]
 
 [tool.ruff.lint]
-# Apply standards but allow flexibility on non-critical rules
 select = [
     "E",   # pycodestyle errors
     "F",   # pyflakes
     "W",   # pycodestyle warnings
     "I",   # isort
+    "C90", # mccabe (complexity)
+    "T20", # flake8-print
 ]
-# Ignore stylistic/complexity rules to focus on functional errors
-ignore = [
-    "C901", # Complexity
-    "PLR",  # Refactor recommendations
-]
+
+[tool.ruff.lint.per-file-ignores]
+# Relax rules for non-core scripts (exports, scratch, tools)
+"scratch/**/*.py" = ["T201", "E501", "C901", "F401", "F841"]
+"tools/**/*.py" = ["T201", "E501", "C901"]
+"exports/**/*.py" = ["T201", "E501", "C901"]
+"tests/**/*.py" = ["T201"] # Tests can use print
 
 [tool.ruff.lint.isort]
 known-first-party = ["api", "core", "storage"]

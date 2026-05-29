@@ -472,15 +472,15 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 if __name__ == "__main__":
-    import sys
-    import traceback
-    import uvicorn
-    import psutil
     import socket
+    import sys
 
-    from core import __version__
-    from core.config import save_config, validate_config_lazy
+    import psutil
+    import uvicorn
+
     import core.config
+    from core import __version__
+    from core.config import validate_config_lazy
     from core.system_info import SystemFingerprint
 
     def wait_on_error():
@@ -532,31 +532,38 @@ if __name__ == "__main__":
     current_port = core.config.PORT
     while True:
         try:
-            # Improved configuration validation (User Request)
-            is_valid, error_msg, config_path = validate_config_lazy()
-            if not is_valid:
-                print("\n" + "=" * 60)
-                print(f"LogicHive MCP (v{__version__}) - [ERROR]")
-                print("=" * 60)
-                print(f"\n[!] CONFIGURATION INCOMPLETE: {error_msg}")
-                print(f"Please use the LogicHive Settings tool (logichive-settings.exe) to configure the system.")
-                print(f"Or edit your configuration file manually at:\n  {config_path}")
-                print("=" * 60)
-                wait_on_error()
-                sys.exit(1)
+            if not os.environ.get("LOGICHIVE_TESTING"):
+                # Improved configuration validation (User Request)
+                is_valid, error_msg, config_path = validate_config_lazy()
+                if not is_valid:
+                    logger.error("\n" + "=" * 60)
+                    logger.error(f"LogicHive MCP (v{__version__}) - [ERROR]")
+                    logger.error("=" * 60)
+                    logger.error(f"\n[!] CONFIGURATION INCOMPLETE: {error_msg}")
+                    logger.error(
+                        "Please use the LogicHive Settings tool (logichive-settings.exe) "
+                        "to configure the system."
+                    )
+                    logger.error(f"Or edit your configuration file manually at:\n  {config_path}")
+                    logger.error("=" * 60)
+                    wait_on_error()
+                    sys.exit(1)
 
-            # Improved logging for discoverability (User Request)
+            # Apply settings
             host_val = core.config.HOST
-            base_url = f"http://{host_val}:{current_port}/sse"
-            logger.info(f"Starting LogicHive MCP Server (v{__version__}) on {base_url}")
+
+            # Start network listeners
+            logger.info("=" * 60)
+            logger.info(f"Starting LogicHive Hub (v{__version__})")
+            logger.info(f"AI Provider: {core.config.MODEL_TYPE.upper()}")
+            logger.info(f"Network: {host_val}:{current_port}")
 
             if host_val == "0.0.0.0":
-                import socket
-                hostname = socket.gethostname().lower()
+                hostname = socket.gethostname()
                 logger.warning("=" * 60)
-                logger.warning("🛡️ SECURITY NOTICE: LAN/Wi-Fi sharing is active (HOST=0.0.0.0).")
-                logger.warning("There is no built-in authentication in this version.")
-                logger.warning("Only share LogicHive on trusted private Wi-Fi/networks.")
+                logger.warning(" LAN SHARING IS ENABLED (0.0.0.0)")
+                logger.warning(" This server is accessible from other computers on your network.")
+                logger.warning(" Do not use this on public networks.")
                 logger.warning("=" * 60)
 
                 logger.info("Server is accessible at:")
@@ -567,55 +574,29 @@ if __name__ == "__main__":
                     logger.info(f"  > http://{ip}:{current_port}/sse")
 
             mcp.run(transport="sse", host=host_val, port=current_port)
-            break # Success!
+            break  # Success!
 
         except OSError as e:
             if e.errno == 10048 or "10048" in str(e):
-                print(f"\n[!] NETWORK ERROR: Port {current_port} is already in use.")
-                
+                logger.error(f"\n[!] NETWORK ERROR: Port {current_port} is already in use.")
+
                 # Diagnostics
                 proc = get_conflicting_process(current_port)
                 if proc:
-                    print(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
-                
-                print("\nHow would you like to resolve this?")
-                print(f"  [R] Retry (tries {current_port} again)")
-                if proc:
-                    print(f"  [K] Kill conflicting process ({proc.name()}) and start")
-                print(f"  [A] Auto-find an available port")
-                print("  [E] Exit")
-                
-                res = input("\nSelect [R/K/A/E]: ").strip().upper()
-                
-                if res == "R":
-                    continue
-                elif res == "K" and proc:
-                    try:
-                        print(f"Terminating {proc.name()}...")
-                        proc.terminate()
-                        proc.wait(timeout=5)
-                        continue
-                    except Exception as kill_err:
-                        print(f"[ERROR] Could not terminate process: {kill_err}")
-                elif res == "A":
-                    new_port = find_available_port(current_port + 1, core.config.HOST)
-                    print(f"\nFound available port: {new_port}")
-                    ans = input(f"Use port {new_port} and update your .env? [Y/n]: ").strip().lower()
-                    if ans != "n":
-                        save_config({"PORT": new_port})
-                        current_port = new_port
-                    continue
-                else:
-                    wait_on_error()
-                    sys.exit(1)
-            
-            print(f"\n[FATAL OS ERROR]: {e}")
-            traceback.print_exc()
+                    logger.error(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
+
+                logger.error("Please change the PORT in settings or kill the conflicting process.")
+                wait_on_error()
+                sys.exit(1)
+
+            logger.error(f"\n[FATAL OS ERROR]: {e}")
+            logger.exception("Traceback:")
             wait_on_error()
             sys.exit(1)
 
         except Exception as e:
-            print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            logger.error(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}")
+            logger.exception("Traceback:")
             wait_on_error()
             sys.exit(1)
+

@@ -102,23 +102,23 @@ def save_config(updates: dict):
     """Saves multiple configuration updates to the active .env file."""
     # We prefer the Home .env for persistence in frozen mode
     target_env = HOME_ENV
-    
+
     # Read existing content if any
     content = ""
     if target_env.exists():
         content = target_env.read_text(encoding="utf-8")
-    
+
     for key, value in updates.items():
         if f"{key}=" in content:
             import re
             content = re.sub(f"{key}=.*", f"{key}={value}", content)
         else:
             content = content.rstrip() + f"\n{key}={value}\n"
-    
+
     try:
         HOME_DIR.mkdir(parents=True, exist_ok=True)
         target_env.write_text(content, encoding="utf-8")
-        
+
         # Update current process environment
         for key, value in updates.items():
             os.environ[key] = str(value)

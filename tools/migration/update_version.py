@@ -2,6 +2,7 @@ import re
 import sys
 from pathlib import Path
 
+
 def update_version(version):
     # 1. Update pyproject.toml
     pyproject_path = Path("pyproject.toml")
