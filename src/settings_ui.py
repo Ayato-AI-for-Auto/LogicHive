@@ -42,14 +42,14 @@ def main(page: ft.Page):
     # Header
     header = ft.Row(
         [
-            ft.Icon(ft.icons.SECURITY, color=ft.colors.AMBER, size=40),
+            ft.Icon(ft.Icons.SHIELD, color=ft.Colors.AMBER, size=40),
             ft.Text("LogicHive Dashboard", size=32, weight=ft.FontWeight.BOLD),
         ],
         alignment=ft.MainAxisAlignment.START,
     )
 
     config_source_text = ft.Text(
-        f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.colors.GREY_400
+        f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.Colors.GREY_400
     )
 
     # Tab 1: General Settings
@@ -60,7 +60,7 @@ def main(page: ft.Page):
             ft.dropdown.Option("gemini", "Google Gemini (Cloud)"),
             ft.dropdown.Option("ollama", "Ollama (Local)"),
         ],
-        on_change=lambda e: update_state("MODEL_TYPE", e.control.value),
+        on_select=lambda e: update_state("MODEL_TYPE", e.control.value),
     )
 
     gemini_key_input = ft.TextField(
@@ -86,9 +86,9 @@ def main(page: ft.Page):
 
     save_button = ft.ElevatedButton(
         "Save Configuration",
-        icon=ft.icons.SAVE,
+        icon=ft.Icons.SAVE,
         on_click=lambda _: save_settings(),
-        style=ft.ButtonStyle(color=ft.colors.WHITE, bgcolor=ft.colors.BLUE_700),
+        style=ft.ButtonStyle(color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE_700),
     )
 
     # Tab 2: Integrity Check
@@ -105,10 +105,10 @@ def main(page: ft.Page):
             integrity_result_area.controls.clear()
 
             status_color = (
-                ft.colors.GREEN if report["status"] == "Healthy" else ft.colors.AMBER
+                ft.Colors.GREEN if report["status"] == "Healthy" else ft.Colors.AMBER
             )
             if report["status"] == "Error":
-                status_color = ft.colors.RED
+                status_color = ft.Colors.RED
 
             integrity_result_area.controls.append(
                 ft.Text(
@@ -122,7 +122,7 @@ def main(page: ft.Page):
             for component, details in report["details"].items():
                 comp_status = details.get("status", "Unknown")
                 comp_color = (
-                    ft.colors.GREEN if comp_status == "Healthy" else ft.colors.AMBER
+                    ft.Colors.GREEN if comp_status == "Healthy" else ft.Colors.AMBER
                 )
 
                 integrity_result_area.controls.append(
@@ -137,7 +137,7 @@ def main(page: ft.Page):
                                     str(details.get("details", "")), size=12
                                 ),
                                 padding=10,
-                                bgcolor=ft.colors.GREY_900,
+                                bgcolor=ft.Colors.GREY_900,
                                 border_radius=5,
                             )
                         ]
@@ -151,14 +151,14 @@ def main(page: ft.Page):
             logger.exception("Integrity check failed with an unexpected error")
             integrity_result_area.controls.clear()
             integrity_result_area.controls.append(
-                ft.Text(f"Error: {ex}", color=ft.colors.RED)
+                ft.Text(f"Error: {ex}", color=ft.Colors.RED)
             )
 
         page.update()
 
     integrity_button = ft.ElevatedButton(
         "Run Integrity Check",
-        icon=ft.icons.HEALTH_AND_SAFETY,
+        icon=ft.Icons.HEALTH_AND_SAFETY,
         on_click=run_integrity_check,
     )
 
@@ -177,64 +177,73 @@ def main(page: ft.Page):
             else:
                 logger.error("Failed to save configuration from UI")
                 page.snack_bar = ft.SnackBar(
-                    ft.Text("Failed to save configuration."), bgcolor=ft.colors.RED
+                    ft.Text("Failed to save configuration."), bgcolor=ft.Colors.RED
                 )
                 page.snack_bar.open = True
         except Exception as ex:
             logger.exception("Exception occurred while saving configuration")
             page.snack_bar = ft.SnackBar(
-                ft.Text(f"Error saving config: {ex}"), bgcolor=ft.colors.RED
+                ft.Text(f"Error saving config: {ex}"), bgcolor=ft.Colors.RED
             )
             page.snack_bar.open = True
         page.update()
 
     # --- Layout ---
+    config_tab_content = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("AI Provider & API Keys", size=20, weight=ft.FontWeight.BOLD),
+                provider_dropdown,
+                gemini_key_input,
+                ft.Divider(),
+                ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
+                ft.Row([host_input, port_input]),
+                ft.VerticalDivider(),
+                save_button,
+            ],
+            spacing=20,
+        ),
+        padding=20,
+    )
+
+    health_tab_content = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text(
+                    "System Integrity & Diagnostics",
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                integrity_button,
+                ft.Divider(),
+                integrity_result_area,
+            ],
+            spacing=20,
+        ),
+        padding=20,
+    )
+
     tabs = ft.Tabs(
-        selected_index=0,
-        animation_duration=300,
-        tabs=[
-            ft.Tab(
-                text="Configuration",
-                icon=ft.icons.SETTINGS,
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Text("AI Provider & API Keys", size=20, weight=ft.FontWeight.BOLD),
-                            provider_dropdown,
-                            gemini_key_input,
-                            ft.Divider(),
-                            ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
-                            ft.Row([host_input, port_input]),
-                            ft.VerticalDivider(),
-                            save_button,
-                        ],
-                        spacing=20,
-                    ),
-                    padding=20,
+        length=2,
+        expand=True,
+        content=ft.Column(
+            expand=True,
+            controls=[
+                ft.TabBar(
+                    tabs=[
+                        ft.Tab(label="Configuration", icon=ft.Icons.SETTINGS),
+                        ft.Tab(label="System Health", icon=ft.Icons.DASHBOARD),
+                    ]
                 ),
-            ),
-            ft.Tab(
-                text="System Health",
-                icon=ft.icons.DASHBOARD,
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Text(
-                                "System Integrity & Diagnostics",
-                                size=20,
-                                weight=ft.FontWeight.BOLD,
-                            ),
-                            integrity_button,
-                            ft.Divider(),
-                            integrity_result_area,
-                        ],
-                        spacing=20,
-                    ),
-                    padding=20,
+                ft.TabBarView(
+                    expand=True,
+                    controls=[
+                        config_tab_content,
+                        health_tab_content,
+                    ],
                 ),
-            ),
-        ],
-        expand=1,
+            ],
+        ),
     )
 
     page.add(
@@ -247,7 +256,7 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     logger.info("Starting LogicHive Settings UI")
     try:
-        ft.app(target=main)
+        ft.run(main)
     except Exception:
         logger.exception("Fatal error occurred in Settings UI")
         sys.exit(1)
