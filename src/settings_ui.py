@@ -22,102 +22,63 @@ from orchestrator import check_integrity  # noqa: E402
 logger = get_logger("settings_ui")
 
 
-def main(page: ft.Page):
-    page.title = "LogicHive Settings & Control"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.padding = 30
-    page.window_width = 800
-    page.window_height = 800
-    page.window_resizable = True
+class LogicHiveUI:
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.config_state = {}
+        self.integrity_result_area = ft.Column(scroll=ft.ScrollMode.ALWAYS, height=400)
+        self.client_json_field = None
+        self.page.title = "LogicHive Settings & Control"
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.padding = 30
+        self.page.window_width = 800
+        self.page.window_height = 800
+        self.page.window_resizable = True
 
-    # --- State Variables ---
-    from core.config import ENABLE_GPU
-    config_state = {
-        "MODEL_TYPE": MODEL_TYPE,
-        "GEMINI_API_KEY": GEMINI_API_KEY or "",
-        "HOST": HOST,
-        "PORT": str(PORT),
-        "ENABLE_GPU": ENABLE_GPU,
-    }
+    def initialize_state(self):
+        from core.config import ENABLE_GPU
 
-    # --- UI Components ---
+        self.config_state = {
+            "MODEL_TYPE": MODEL_TYPE,
+            "GEMINI_API_KEY": GEMINI_API_KEY or "",
+            "HOST": HOST,
+            "PORT": str(PORT),
+            "ENABLE_GPU": ENABLE_GPU,
+        }
 
-    # Header
-    header = ft.Row(
-        [
-            ft.Icon(ft.Icons.SHIELD, color=ft.Colors.AMBER, size=40),
-            ft.Text("LogicHive Dashboard", size=32, weight=ft.FontWeight.BOLD),
-        ],
-        alignment=ft.MainAxisAlignment.START,
-    )
+    def get_client_json(self):
+        import json
 
-    config_source_text = ft.Text(
-        f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.Colors.GREY_400
-    )
+        data = {
+            "mcpServers": {
+                "logichive": {
+                    "url": f"http://{self.config_state['HOST']}:{self.config_state['PORT']}/mcp"
+                }
+            }
+        }
+        return json.dumps(data, indent=2)
 
-    # Tab 1: General Settings
-    provider_dropdown = ft.Dropdown(
-        label="AI Provider",
-        value=config_state["MODEL_TYPE"],
-        options=[
-            ft.dropdown.Option("gemini", "Google Gemini (Cloud)"),
-            ft.dropdown.Option("ollama", "Ollama (Local)"),
-        ],
-        on_select=lambda e: update_state("MODEL_TYPE", e.control.value),
-    )
+    def update_state(self, key, value):
+        self.config_state[key] = value
+        if key in ("HOST", "PORT"):
+            self.client_json_field.value = self.get_client_json()
+            self.client_json_field.update()
 
-    gemini_key_input = ft.TextField(
-        label="Gemini API Key",
-        value=config_state["GEMINI_API_KEY"],
-        password=True,
-        can_reveal_password=True,
-        on_change=lambda e: update_state("GEMINI_API_KEY", e.control.value),
-        width=500,
-    )
-
-    host_input = ft.TextField(
-        label="Host (127.0.0.1 for local, 0.0.0.0 for LAN)",
-        value=config_state["HOST"],
-        on_change=lambda e: update_state("HOST", e.control.value),
-    )
-
-    port_input = ft.TextField(
-        label="Port",
-        value=config_state["PORT"],
-        on_change=lambda e: update_state("PORT", e.control.value),
-    )
-
-    gpu_toggle = ft.Switch(
-        label="Enable GPU Support (Requires ~5GB additional disk space)",
-        value=config_state.get("ENABLE_GPU", False),
-        on_change=lambda e: update_state("ENABLE_GPU", e.control.value),
-    )
-
-    save_button = ft.ElevatedButton(
-        "Save Configuration",
-        icon=ft.Icons.SAVE,
-        on_click=lambda _: save_settings(),
-        style=ft.ButtonStyle(color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE_700),
-    )
-
-    # Tab 2: Integrity Check
-    integrity_result_area = ft.Column(scroll=ft.ScrollMode.ALWAYS, height=400)
-
-    async def run_integrity_check(_e):
-        integrity_result_area.controls.clear()
-        integrity_result_area.controls.append(ft.ProgressBar(width=400, color="blue"))
-        page.update()
+    async def run_integrity_check(self, _e):
+        self.integrity_result_area.controls.clear()
+        self.integrity_result_area.controls.append(ft.ProgressBar(width=400, color="blue"))
+        self.page.update()
         logger.info("Starting integrity check from UI")
 
         try:
             report = await check_integrity()
-            integrity_result_area.controls.clear()
+            self.integrity_result_area.controls.clear()
 
             status_color = ft.Colors.GREEN if report["status"] == "Healthy" else ft.Colors.AMBER
             if report["status"] == "Error":
                 status_color = ft.Colors.RED
 
-            integrity_result_area.controls.append(
+            self.integrity_result_area.controls.append(
                 ft.Text(
                     f"Status: {report['status']}",
                     size=20,
@@ -130,7 +91,7 @@ def main(page: ft.Page):
                 comp_status = details.get("status", "Unknown")
                 comp_color = ft.Colors.GREEN if comp_status == "Healthy" else ft.Colors.AMBER
 
-                integrity_result_area.controls.append(
+                self.integrity_result_area.controls.append(
                     ft.ExpansionTile(
                         title=ft.Text(f"{component.upper()}: {comp_status}", color=comp_color),
                         subtitle=ft.Text(details.get("message", "")),
@@ -149,156 +110,210 @@ def main(page: ft.Page):
             )
         except Exception as ex:
             logger.exception("Integrity check failed with an unexpected error")
-            integrity_result_area.controls.clear()
-            integrity_result_area.controls.append(ft.Text(f"Error: {ex}", color=ft.Colors.RED))
+            self.integrity_result_area.controls.clear()
+            self.integrity_result_area.controls.append(ft.Text(f"Error: {ex}", color=ft.Colors.RED))
 
-        page.update()
+        self.page.update()
 
-    integrity_button = ft.ElevatedButton(
-        "Run Integrity Check",
-        icon=ft.Icons.HEALTH_AND_SAFETY,
-        on_click=run_integrity_check,
-    )
-
-    # --- Helper Functions ---
-
-    def get_client_json():
-        import json
-
-        data = {
-            "mcpServers": {
-                "logichive": {"url": f"http://{config_state['HOST']}:{config_state['PORT']}/mcp"}
-            }
-        }
-        return json.dumps(data, indent=2)
-
-    client_json_field = ft.TextField(
-        value=get_client_json(),
-        read_only=True,
-        multiline=True,
-        min_lines=8,
-        max_lines=8,
-        text_style=ft.TextStyle(font_family="Consolas"),
-        expand=True,
-    )
-
-    def copy_client_json(_):
-        page.clipboard.set(get_client_json())
-        page.snack_bar = ft.SnackBar(ft.Text("Copied to clipboard!"))
-        page.snack_bar.open = True
-        page.update()
-
-    copy_button = ft.IconButton(icon=ft.Icons.COPY, on_click=copy_client_json, tooltip="Copy JSON")
-
-    client_setup_section = ft.Column(
-        [
-            ft.Text("Client Setup (Cline / Custom SSE Client)", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text(
-                "Copy and paste this into your client's MCP settings file:",
-                size=14,
-                color=ft.Colors.GREY_400,
-            ),
-            ft.Row(
-                [client_json_field, copy_button],
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            ),
-        ]
-    )
-
-    def update_state(key, value):
-        config_state[key] = value
-        if key in ("HOST", "PORT"):
-            client_json_field.value = get_client_json()
-            client_json_field.update()
-
-    def save_settings():
+    def save_settings(self, _e):
         try:
-            success = save_config(config_state)
+            success = save_config(self.config_state)
             if success:
                 logger.info("Configuration saved successfully from UI")
-                page.snack_bar = ft.SnackBar(ft.Text("Configuration saved successfully!"))
-                page.snack_bar.open = True
+                self.page.snack_bar = ft.SnackBar(ft.Text("Configuration saved successfully!"))
+                self.page.snack_bar.open = True
             else:
                 logger.error("Failed to save configuration from UI")
-                page.snack_bar = ft.SnackBar(
+                self.page.snack_bar = ft.SnackBar(
                     ft.Text("Failed to save configuration."), bgcolor=ft.Colors.RED
                 )
-                page.snack_bar.open = True
+                self.page.snack_bar.open = True
         except Exception as ex:
             logger.exception("Exception occurred while saving configuration")
-            page.snack_bar = ft.SnackBar(
+            self.page.snack_bar = ft.SnackBar(
                 ft.Text(f"Error saving config: {ex}"), bgcolor=ft.Colors.RED
             )
-            page.snack_bar.open = True
-        page.update()
+            self.page.snack_bar.open = True
+        self.page.update()
 
-    # --- Layout ---
-    config_tab_content = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text("AI Provider & API Keys", size=20, weight=ft.FontWeight.BOLD),
-                provider_dropdown,
-                gemini_key_input,
-                ft.Divider(),
-                ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
-                ft.Row([host_input, port_input]),
-                gpu_toggle,
-                save_button,
-                ft.Divider(),
-                client_setup_section,
+    def build_config_tab(self):
+        # AI Provider settings
+        provider_dropdown = ft.Dropdown(
+            label="AI Provider",
+            value=self.config_state["MODEL_TYPE"],
+            options=[
+                ft.dropdown.Option("gemini", "Google Gemini (Cloud)"),
+                ft.dropdown.Option("ollama", "Ollama (Local)"),
             ],
-            spacing=20,
-            scroll=ft.ScrollMode.ADAPTIVE,
-        ),
-        padding=20,
-    )
+            on_select=lambda e: self.update_state("MODEL_TYPE", e.control.value),
+        )
 
-    health_tab_content = ft.Container(
-        content=ft.Column(
+        gemini_key_input = ft.TextField(
+            label="Gemini API Key",
+            value=self.config_state["GEMINI_API_KEY"],
+            password=True,
+            can_reveal_password=True,
+            on_change=lambda e: self.update_state("GEMINI_API_KEY", e.control.value),
+            width=500,
+        )
+
+        # Network Settings
+        host_input = ft.TextField(
+            label="Host (127.0.0.1 for local, 0.0.0.0 for LAN)",
+            value=self.config_state["HOST"],
+            on_change=lambda e: self.update_state("HOST", e.control.value),
+        )
+
+        port_input = ft.TextField(
+            label="Port",
+            value=self.config_state["PORT"],
+            on_change=lambda e: self.update_state("PORT", e.control.value),
+        )
+
+        gpu_toggle = ft.Switch(
+            label="Enable GPU Support (Requires ~5GB additional disk space)",
+            value=self.config_state.get("ENABLE_GPU", False),
+            on_change=lambda e: self.update_state("ENABLE_GPU", e.control.value),
+        )
+
+        save_button = ft.ElevatedButton(
+            "Save Configuration",
+            icon=ft.Icons.SAVE,
+            on_click=self.save_settings,
+            style=ft.ButtonStyle(color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE_700),
+        )
+
+        # Client Setup Section
+        self.client_json_field = ft.TextField(
+            value=self.get_client_json(),
+            read_only=True,
+            multiline=True,
+            min_lines=8,
+            max_lines=8,
+            text_style=ft.TextStyle(font_family="Consolas"),
+            expand=True,
+        )
+
+        def copy_client_json(_):
+            self.page.clipboard.set(self.get_client_json())
+            self.page.snack_bar = ft.SnackBar(ft.Text("Copied to clipboard!"))
+            self.page.snack_bar.open = True
+            self.page.update()
+
+        copy_button = ft.IconButton(
+            icon=ft.Icons.COPY, on_click=copy_client_json, tooltip="Copy JSON"
+        )
+
+        client_setup_section = ft.Column(
             [
                 ft.Text(
-                    "System Integrity & Diagnostics",
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
+                    "Client Setup (Cline / Custom SSE Client)", size=18, weight=ft.FontWeight.BOLD
                 ),
-                integrity_button,
-                ft.Divider(),
-                integrity_result_area,
-            ],
-            spacing=20,
-        ),
-        padding=20,
-    )
+                ft.Text(
+                    "Copy and paste this into your client's MCP settings file:",
+                    size=14,
+                    color=ft.Colors.GREY_400,
+                ),
+                ft.Row(
+                    [self.client_json_field, copy_button],
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                ),
+            ]
+        )
 
-    tabs = ft.Tabs(
-        length=2,
-        expand=True,
-        content=ft.Column(
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("AI Provider & API Keys", size=20, weight=ft.FontWeight.BOLD),
+                    provider_dropdown,
+                    gemini_key_input,
+                    ft.Divider(),
+                    ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Row([host_input, port_input]),
+                    gpu_toggle,
+                    save_button,
+                    ft.Divider(),
+                    client_setup_section,
+                ],
+                spacing=20,
+                scroll=ft.ScrollMode.ADAPTIVE,
+            ),
+            padding=20,
+        )
+
+    def build_health_tab(self):
+        integrity_button = ft.ElevatedButton(
+            "Run Integrity Check",
+            icon=ft.Icons.HEALTH_AND_SAFETY,
+            on_click=self.run_integrity_check,
+        )
+
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text(
+                        "System Integrity & Diagnostics",
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    integrity_button,
+                    ft.Divider(),
+                    self.integrity_result_area,
+                ],
+                spacing=20,
+            ),
+            padding=20,
+        )
+
+    def build(self):
+        self.initialize_state()
+
+        header = ft.Row(
+            [
+                ft.Icon(ft.Icons.SHIELD, color=ft.Colors.AMBER, size=40),
+                ft.Text("LogicHive Dashboard", size=32, weight=ft.FontWeight.BOLD),
+            ],
+            alignment=ft.MainAxisAlignment.START,
+        )
+
+        config_source_text = ft.Text(
+            f"Config Source: {CONFIG_SOURCE}", size=12, color=ft.Colors.GREY_400
+        )
+
+        tabs = ft.Tabs(
+            length=2,
             expand=True,
-            controls=[
-                ft.TabBar(
-                    tabs=[
-                        ft.Tab(label="Configuration", icon=ft.Icons.SETTINGS),
-                        ft.Tab(label="System Health", icon=ft.Icons.DASHBOARD),
-                    ]
-                ),
-                ft.TabBarView(
-                    expand=True,
-                    controls=[
-                        config_tab_content,
-                        health_tab_content,
-                    ],
-                ),
-            ],
-        ),
-    )
+            content=ft.Column(
+                expand=True,
+                controls=[
+                    ft.TabBar(
+                        tabs=[
+                            ft.Tab(label="Configuration", icon=ft.Icons.SETTINGS),
+                            ft.Tab(label="System Health", icon=ft.Icons.DASHBOARD),
+                        ]
+                    ),
+                    ft.TabBarView(
+                        expand=True,
+                        controls=[
+                            self.build_config_tab(),
+                            self.build_health_tab(),
+                        ],
+                    ),
+                ],
+            ),
+        )
 
-    page.add(
-        header,
-        config_source_text,
-        ft.Divider(),
-        tabs,
-    )
+        self.page.add(
+            header,
+            config_source_text,
+            ft.Divider(),
+            tabs,
+        )
+
+
+def main(page: ft.Page):
+    app = LogicHiveUI(page)
+    app.build()
 
 
 if __name__ == "__main__":

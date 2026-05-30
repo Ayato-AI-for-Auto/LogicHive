@@ -162,6 +162,54 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
         return f"LogicHive Error: Failed to retrieve function. Detail: {str(e)}"
 
 
+def _format_syntax_error(e: SyntaxValidationError) -> str:
+    """Format a syntax validation error into a user-friendly markdown report."""
+    details = e.details or {}
+    eval_details = details.get("eval_details", {}).get("static_analysis", {})
+    inner_details = eval_details.get("details", {})
+
+    line = inner_details.get("line", "?")
+    offset = inner_details.get("offset", "?")
+    text = inner_details.get("text", "N/A")
+
+    md = [
+        "### ❌ IMMEDIATE REJECTION: Syntax Error",
+        f"**Message**: {str(e)}",
+        f"- **Line**: {line}",
+        f"- **Offset**: {offset}",
+        f"\n**Context**:\n```python\n{text.strip()}\n```",
+        "\nPlease correct the syntax before attempting to save again.",
+    ]
+    return "\n".join(md)
+
+
+def _format_validation_error(e: ValidationError) -> str:
+    """Format a quality gate validation error into a user-friendly markdown report."""
+    details = e.details or {}
+    score = details.get("score", 0)
+    reason = details.get("reason", str(e))
+    eval_details = details.get("eval_details", {})
+
+    # Build a helpful report
+    report = [f"Quality Gate REJECTED: {reason}", f"Final Score: {score:.1f}/100"]
+
+    if eval_details:
+        report.append("\nBreakdown:")
+        for tool_name, res in eval_details.items():
+            tool_score = res.get("score", 0)
+            tool_reason = res.get("reason", "N/A")
+            report.append(f"- {tool_name}: {tool_score:.1f} ({tool_reason})")
+
+            # Show traceback or stderr if available (Crucial for debugging)
+            inner_details = res.get("details", {}) or {}
+            if inner_details.get("traceback"):
+                report.append(f"  [TRACEBACK]\n{inner_details['traceback']}")
+            elif inner_details.get("stderr"):
+                report.append(f"  [STDERR]\n{inner_details['stderr']}")
+
+    return "\n".join(report)
+
+
 @mcp.tool()
 @trace_execution
 async def save_function(
@@ -199,49 +247,9 @@ async def save_function(
             )
         return "Failed to initiate save (Unknown Error)"
     except SyntaxValidationError as e:
-        # User feedback Tip #3: Prominent Syntax Error Reporting
-        details = e.details or {}
-        eval_details = details.get("eval_details", {}).get("static_analysis", {})
-        inner_details = eval_details.get("details", {})
-
-        line = inner_details.get("line", "?")
-        offset = inner_details.get("offset", "?")
-        text = inner_details.get("text", "N/A")
-
-        md = [
-            "### ❌ IMMEDIATE REJECTION: Syntax Error",
-            f"**Message**: {str(e)}",
-            f"- **Line**: {line}",
-            f"- **Offset**: {offset}",
-            f"\n**Context**:\n```python\n{text.strip()}\n```",
-            "\nPlease correct the syntax before attempting to save again.",
-        ]
-        return "\n".join(md)
+        return _format_syntax_error(e)
     except ValidationError as e:
-        # Extract rich details for better transparency (User feedback Tip #1)
-        details = e.details or {}
-        score = details.get("score", 0)
-        reason = details.get("reason", str(e))
-        eval_details = details.get("eval_details", {})
-
-        # Build a helpful report
-        report = [f"Quality Gate REJECTED: {reason}", f"Final Score: {score:.1f}/100"]
-
-        if eval_details:
-            report.append("\nBreakdown:")
-            for tool_name, res in eval_details.items():
-                tool_score = res.get("score", 0)
-                tool_reason = res.get("reason", "N/A")
-                report.append(f"- {tool_name}: {tool_score:.1f} ({tool_reason})")
-
-                # Show traceback or stderr if available (Crucial for debugging)
-                inner_details = res.get("details", {}) or {}
-                if inner_details.get("traceback"):
-                    report.append(f"  [TRACEBACK]\n{inner_details['traceback']}")
-                elif inner_details.get("stderr"):
-                    report.append(f"  [STDERR]\n{inner_details['stderr']}")
-
-        return "\n".join(report)
+        return _format_validation_error(e)
     except LogicHiveError as e:
         return (
             f"LogicHive SYSTEM ERROR: {str(e)}\n\n(This is likely a transient infrastructure "
