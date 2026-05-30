@@ -15,7 +15,7 @@ We decided to adopt **Streamable HTTP** as the primary transport layer for Logic
 ### Implementation Details:
 - **FastAPI Wrapper**: To handle modern browser-based client requirements (like Cline/Cursor), the server is wrapped in FastAPI with explicit `CORSMiddleware`.
 - **Endpoint**: The server listens on a single Streamable HTTP endpoint (defaulting to `/mcp`).
-- **CORS Handling**: Full preflight (`OPTIONS`) support is provided to prevent `405 Method Not Allowed` errors in webview environments.
+- **CORS Handling**: Full preflight (`OPTIONS`) support is provided, and all response headers are explicitly exposed (`expose_headers=["*"]`). This is critical for webview-based clients to read the MCP session ID from the server's response.
 
 ## Consequences
 - **Multi-client support**: Multiple AI agents across a network can connect to a single LogicHive hub.

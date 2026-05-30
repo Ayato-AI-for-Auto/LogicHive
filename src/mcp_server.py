@@ -589,31 +589,27 @@ if __name__ == "__main__":
                 for ip in ips:
                     logger.info(f"  > http://{ip}:{current_port}/sse")
 
-            # Setup a robust FastAPI wrapper for the MCP server
-            # This ensures guaranteed CORS handling for all endpoints.
-            # Using 'streamable-http' as per ADR-001 (2026 Revision).
-            from fastapi import FastAPI
-            from fastapi.middleware.cors import CORSMiddleware
+            # Create CORS middleware configuration
+            # In order to support webview-based clients (like Cline or VS Code extensions)
+            # that use browser `fetch`, we must:
+            # 1. Allow all origins/methods/headers.
+            # 2. EXPOSE all headers so the client can read the MCP session ID from the response.
+            from starlette.middleware import Middleware
+            from starlette.middleware.cors import CORSMiddleware
             
-            # Create the Starlette app with Streamable HTTP transport
-            # This uses a single endpoint (default /mcp) for bidirectional streaming
-            mcp_app = mcp.http_app(transport="streamable-http")
-            
-            # Create the wrapper app, passing through the FastMCP lifespan
-            app = FastAPI(lifespan=mcp_app.lifespan)
-            
-            # Add CORS middleware at the FastAPI level to handle browser preflights (OPTIONS)
-            app.add_middleware(
+            cors_middleware = Middleware(
                 CORSMiddleware,
                 allow_origins=["*"],
                 allow_credentials=True,
                 allow_methods=["*"],
                 allow_headers=["*"],
+                expose_headers=["*"],  # CRITICAL: Allows client to read session headers
             )
-            
-            # Mount the FastMCP app at the root
-            app.mount("/", mcp_app)
 
+            # Create the app instance using Streamable HTTP with our middleware
+            # This ensures FastMCP integrates the middleware into its internal routing/lifespan.
+            app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
+            
             # Inform user about the Streamable HTTP endpoint
             logger.info("Server is accessible via Streamable HTTP at:")
             logger.info(f"  > http://localhost:{current_port}/mcp")
@@ -625,6 +621,7 @@ if __name__ == "__main__":
             import fastmcp
             log_level = fastmcp.settings.log_level.lower()
             
+            # Start the server
             uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
             
             break  # Success!
