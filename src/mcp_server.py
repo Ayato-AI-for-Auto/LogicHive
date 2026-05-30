@@ -243,7 +243,10 @@ async def save_function(
 
         return "\n".join(report)
     except LogicHiveError as e:
-        return f"LogicHive SYSTEM ERROR: {str(e)}\n\n(This is likely a transient infrastructure issue, not a problem with your code. Please try again in a few moments.)"
+        return (
+            f"LogicHive SYSTEM ERROR: {str(e)}\n\n(This is likely a transient infrastructure "
+            "issue, not a problem with your code. Please try again in a few moments.)"
+        )
     except Exception as e:
         return f"Unexpected Error: {str(e)}"
 
@@ -362,16 +365,19 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
         # 1. DB Check
         db_exists = os.path.exists(SQLITE_DB_PATH)
         status.append(
-            f"### 1. Database\n- Path: `{SQLITE_DB_PATH}`\n- Status: {'✅ Connected' if db_exists else '❌ Missing'}"
+            f"### 1. Database\n- Path: `{SQLITE_DB_PATH}`\n- Status: "
+            f"{'✅ Connected' if db_exists else '❌ Missing'}"
         )
 
         if db_exists:
             count = await sqlite_storage.get_function_count()
             # New: Get count of assets that SHOULD be in FAISS (have embeddings)
             db = await get_db_connection()
-            async with db.execute(
-                "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
-            ) as cursor:
+            sql = (
+                "SELECT COUNT(*) FROM logichive_functions "
+                "WHERE embedding IS NOT NULL AND embedding != 'null'"
+            )
+            async with db.execute(sql) as cursor:
                 row = await cursor.fetchone()
                 expected_count = row[0] if row else 0
 
@@ -380,7 +386,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
         # 2. Vector Store Check
         faiss_exists = os.path.exists(FAISS_INDEX_PATH)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
+            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: "
+            f"{'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
         )
 
         if faiss_exists and db_exists:
@@ -391,7 +398,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
                 idx_size = vector_manager.index.ntotal if vector_manager.index else 0
                 if idx_size != expected_count:
                     status.append(
-                        f"- **Desync Detected**: DB({expected_count} verified) vs FAISS-Memory({idx_size}). Rebuild recommended."
+                        f"- **Desync Detected**: DB({expected_count} verified) vs "
+                        f"FAISS-Memory({idx_size}). Rebuild recommended."
                     )
                 else:
                     status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
@@ -401,7 +409,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
         pool = PoolManager.get_instance()
         status.append(
-            f"### 3. Environment Pool\n- Base Dir: `{pool.base_dir}`\n- GPU Available: {'✅' if pool.has_gpu else '❌'}"
+            f"### 3. Environment Pool\n- Base Dir: `{pool.base_dir}`\n- GPU Available: "
+            f"{'✅' if pool.has_gpu else '❌'}"
         )
 
         return "\n".join(status)
@@ -503,7 +512,7 @@ if __name__ == "__main__":
     def wait_on_error():
         """Prevents the terminal window from closing immediately in frozen mode."""
         if getattr(sys, "frozen", False):
-            print("\n" + "=" * 60)
+            logger.info("=" * 60)
             input("Press Enter to exit...")
 
     def get_conflicting_process(port: int):
@@ -513,7 +522,9 @@ if __name__ == "__main__":
                 if conn.laddr.port == port and conn.status == "LISTEN":
                     return psutil.Process(conn.pid)
         except Exception as e:
-            logger.debug(f"Diagnostics: Failed to check for conflicting process on port {port}: {e}")
+            logger.debug(
+                f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
+            )
         return None
 
     def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
@@ -622,7 +633,6 @@ if __name__ == "__main__":
                     logger.info(f"  > http://{ip}:{current_port}/mcp (IP Fallback)")
 
             import uvicorn
-
 
             log_level = fastmcp.settings.log_level.lower()
 

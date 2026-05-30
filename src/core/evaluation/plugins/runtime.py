@@ -80,7 +80,10 @@ class RuntimeEvaluator(BaseEvaluator):
                 # Suggest environmental overhead as a possibility (User feedback Tip #2)
                 return EvaluationResult(
                     score=0.0,
-                    reason=f"Infrastructure Failure: Execution timed out after {timeout} seconds. (Possible causes: Infinite loop, heavy imports, or environment overhead)",
+                    reason=(
+                        f"Infrastructure Failure: Execution timed out after {timeout} seconds. "
+                        "(Possible causes: Infinite loop, heavy imports, or environment overhead)"
+                    ),
                     is_system_error=True,
                     details={
                         "status": result.status.value,
@@ -120,7 +123,10 @@ class RuntimeEvaluator(BaseEvaluator):
                 # Infrastructure error
                 return EvaluationResult(
                     score=0.0,
-                    reason=f"Infrastructure Error: Execution environment error. {result.logs.stderr}",
+                    reason=(
+                        "Infrastructure Error: Execution environment error. "
+                        f"{result.logs.stderr}"
+                    ),
                     is_system_error=True,
                     details={"status": result.status.value},
                 )

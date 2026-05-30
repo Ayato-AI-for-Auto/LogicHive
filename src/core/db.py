@@ -3,7 +3,6 @@ from functools import wraps
 
 import aiosqlite
 
-from core.config import SQLITE_DB_PATH
 from core.logging_config import get_logger
 from core.migration import run_migrations
 

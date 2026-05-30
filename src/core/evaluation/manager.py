@@ -152,7 +152,10 @@ class EvaluationManager:
         if not is_draft and not test_code:
             return {
                 "score": 40.0,
-                "reason": "Unverified Asset: No test code provided. Use [AI-DRAFT] in description to skip verification check.",
+                "reason": (
+                    "Unverified Asset: No test code provided. "
+                    "Use [AI-DRAFT] in description to skip verification check."
+                ),
                 "details": {"system": "Rigor Gate", "status": "missing_tests"},
             }
         kwargs["_is_draft"] = is_draft  # Internal use

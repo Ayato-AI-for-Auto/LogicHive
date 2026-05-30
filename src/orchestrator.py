@@ -282,7 +282,7 @@ async def _run_async_verification_pipeline(
         if status == "verified" and embedding:
             # Update DB with embedding
             await sqlite_storage.update_function_embedding(name, project, embedding)
-            
+
             # Sync to FAISS
             await vector_manager.upsert_vector(
                 name,

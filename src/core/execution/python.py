@@ -42,8 +42,10 @@ class EphemeralPythonExecutor(BaseExecutor):
                     child.kill()
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     logger.trace(
-                        f"Executor: Child process {child.pid} already gone while killing process tree."
+                        f"Executor: Child process {child.pid} already "
+                        "gone while killing process tree."
                     )
+
             parent.kill()
             logger.debug(f"Executor: Process tree for PID {pid} killed.")
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -292,7 +294,10 @@ results = {{
 }}
 
 def block_network(*args, **kwargs):
-    raise Exception("NETWORK_ACCESS_DENIED: LogicHive sandbox prevents network calls during verification.")
+    raise Exception(
+        "NETWORK_ACCESS_DENIED: LogicHive sandbox prevents network "
+        "calls during verification."
+    )
 
 def apply_sandbox():
     import socket
@@ -334,7 +339,9 @@ def run_user_code():
             # Tests are expected to raise AssertionError on failure
             exec({json.dumps(test_code)}, globals())
             if {mock_list_str}:
-                results["main_result"] = f"Tests Passed (with Mocks: {{', '.join({mock_list_str})}})"
+                results["main_result"] = (
+                    f"Tests Passed (with Mocks: {{', '.join({mock_list_str})}})"
+                )
             else:
                 results["main_result"] = "Tests Passed"
         else:

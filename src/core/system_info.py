@@ -88,19 +88,22 @@ class SystemFingerprint:
         current_py = ".".join(current.get("python_version", "0.0.0").split(".")[:2])
         if stored_py != current_py:
             diffs.append(
-                f"Python Version Drift: Stored={stored.get('python_version')}, Current={current.get('python_version')}"
+                f"Python Version Drift: Stored={stored.get('python_version')}, "
+                f"Current={current.get('python_version')}"
             )
 
         # 3. High: CPU Arch change
         if stored.get("cpu_arch") != current.get("cpu_arch"):
             diffs.append(
-                f"Architecture Drift: Stored={stored.get('cpu_arch')}, Current={current.get('cpu_arch')}"
+                f"Architecture Drift: Stored={stored.get('cpu_arch')}, "
+                f"Current={current.get('cpu_arch')}"
             )
 
         # 4. Moderate: Execution Driver change (behavior may differ between venv and docker)
         if stored.get("execution_driver") != current.get("execution_driver"):
             diffs.append(
-                f"Execution Driver Change: Stored={stored.get('execution_driver')}, Current={current.get('execution_driver')}"
+                f"Execution Driver Change: Stored={stored.get('execution_driver')}, "
+                f"Current={current.get('execution_driver')}"
             )
 
         return diffs

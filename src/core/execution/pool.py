@@ -6,7 +6,12 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from core.config import DEFAULT_POOL_SPECS, ENABLE_ENV_POOLING, POOL_BASE_DIR, POOL_MAX_SIZE
+from core.config import (
+    DEFAULT_POOL_SPECS,
+    ENABLE_ENV_POOLING,
+    POOL_BASE_DIR,
+    POOL_MAX_SIZE,
+)
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -79,7 +84,8 @@ class PoolManager:
                     try:
                         self.base_dir.rename(cleanup_path)
                         logger.info(
-                            f"PoolManager: Old pools moved to {cleanup_path.name} for background cleanup."
+                            "PoolManager: Old pools moved to "
+                            f"{cleanup_path.name} for background cleanup."
                         )
                         # Now delete the renamed folder
                         shutil.rmtree(cleanup_path, ignore_errors=True)
@@ -104,14 +110,15 @@ class PoolManager:
             except Exception as e:
                 logger.error(f"PoolManager: Initial cleanup failed: {e}", exc_info=True)
 
-        # Fire and forget the heavy cleanup in a separate thread so it doesn't block FastMCP lifespan
+        # Fire and forget the heavy cleanup in a separate thread
+        # so it doesn't block FastMCP lifespan
         import threading
 
         cleanup_thread = threading.Thread(target=_async_cleanup_orchestrator, daemon=True)
         cleanup_thread.start()
 
         logger.info(f"PoolManager: Initialized at {self.base_dir} (GPU Detected: {self.has_gpu})")
-        # Initialize semaphore to limit concurrent 'uv' calls (preventing disk thrashing on Windows)
+        # Initialize semaphore to limit concurrent 'uv' calls
         self._uv_semaphore = asyncio.Semaphore(2)
         self._worker_task = asyncio.create_task(self._background_worker())
 
@@ -188,6 +195,7 @@ class PoolManager:
 
     def _trigger_initial_burst(self):
         from core.config import ENABLE_GPU
+
         for spec_name in self.pools:
             if spec_name == "torch-gpu" and not ENABLE_GPU:
                 continue
@@ -196,6 +204,7 @@ class PoolManager:
 
     def _check_and_replenish_pools(self):
         from core.config import ENABLE_GPU
+
         for spec_name, queue in self.pools.items():
             if queue.qsize() < POOL_MAX_SIZE:
                 if spec_name == "torch-gpu" and not ENABLE_GPU:
@@ -244,8 +253,12 @@ class PoolManager:
                 if packages:
                     pkg_str = " ".join(packages)
                     python_exe_str = str(python_exe)
-                    # Optimization: Use --link-mode=hardlink to save disk space by sharing blocks with global cache
-                    icmd = f'"{uv_path}" pip install --link-mode=hardlink --python "{python_exe_str}" {pkg_str}'
+                    # Optimization: Use --link-mode=hardlink to save disk space
+                    # by sharing blocks with global cache
+                    icmd = (
+                        f'"{uv_path}" pip install --link-mode=hardlink '
+                        f'--python "{python_exe_str}" {pkg_str}'
+                    )
 
                     res = await asyncio.to_thread(run_cmd, icmd)
 

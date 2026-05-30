@@ -40,7 +40,8 @@ class ExecutorFactory:
                     )
             cls._loaded = True
             logger.info(
-                f"ExecutorFactory: Plugin discovery finished. Loaded languages: {list(cls._executors.keys())}"
+                "ExecutorFactory: Plugin discovery finished. "
+                f"Loaded languages: {list(cls._executors.keys())}"
             )
         except Exception as e:
             logger.error(

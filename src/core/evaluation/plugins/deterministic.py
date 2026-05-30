@@ -35,7 +35,8 @@ class DeterministicEvaluator(BaseEvaluator):
             assertion_count = self._count_assertions_regex(test_code, lang)
             is_valid_test = True  # Structural check only for non-python for now
             reasons.append(
-                f"Notice: Deterministic audit for '{lang}' uses structural pattern matching (Level 2)."
+                f"Notice: Deterministic audit for '{lang}' uses "
+                "structural pattern matching (Level 2)."
             )
 
         # 2. Hollow Logic Detection (Python only for now)
@@ -60,7 +61,8 @@ class DeterministicEvaluator(BaseEvaluator):
         if lang == "python" and assertion_count > 0 and not is_valid_test:
             score *= 0.5  # Severe penalty for not calling the code
             reasons.append(
-                "THEATER WARNING: Test code has assertions but NEVER CALLS any function from the target logic."
+                "THEATER WARNING: Test code has assertions but NEVER CALLS "
+                "any function from the target logic."
             )
 
         # C. Hollow Logic Penalty
