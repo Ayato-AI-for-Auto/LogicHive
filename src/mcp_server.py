@@ -589,11 +589,20 @@ if __name__ == "__main__":
                 for ip in ips:
                     logger.info(f"  > http://{ip}:{current_port}/sse")
 
-            # In order to support webview-based clients (like Cline or VS Code extensions)
-            # that use browser `fetch` and enforce CORS, we must manually construct the 
-            # Starlette app and add CORSMiddleware, then run it via uvicorn.
-            app = mcp.http_app(transport="sse")
-            from starlette.middleware.cors import CORSMiddleware
+            # Setup a robust FastAPI wrapper for the MCP server
+            # This ensures guaranteed CORS handling for all endpoints.
+            # Using 'streamable-http' as per ADR-001 (2026 Revision).
+            from fastapi import FastAPI
+            from fastapi.middleware.cors import CORSMiddleware
+            
+            # Create the Starlette app with Streamable HTTP transport
+            # This uses a single endpoint (default /mcp) for bidirectional streaming
+            mcp_app = mcp.http_app(transport="streamable-http")
+            
+            # Create the wrapper app, passing through the FastMCP lifespan
+            app = FastAPI(lifespan=mcp_app.lifespan)
+            
+            # Add CORS middleware at the FastAPI level to handle browser preflights (OPTIONS)
             app.add_middleware(
                 CORSMiddleware,
                 allow_origins=["*"],
@@ -601,15 +610,23 @@ if __name__ == "__main__":
                 allow_methods=["*"],
                 allow_headers=["*"],
             )
+            
+            # Mount the FastMCP app at the root
+            app.mount("/", mcp_app)
 
-            # Get log level from fastmcp settings
+            # Inform user about the Streamable HTTP endpoint
+            logger.info("Server is accessible via Streamable HTTP at:")
+            logger.info(f"  > http://localhost:{current_port}/mcp")
+            ips = SystemFingerprint.get_local_ips()
+            for ip in ips:
+                logger.info(f"  > http://{ip}:{current_port}/mcp")
+
+            import uvicorn
             import fastmcp
             log_level = fastmcp.settings.log_level.lower()
             
-            # Start the server using uvicorn directly
-            import uvicorn
             uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
-
+            
             break  # Success!
 
         except OSError as e:
