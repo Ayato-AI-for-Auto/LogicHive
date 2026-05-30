@@ -1,3 +1,14 @@
+import json
+import logging
+from typing import List, Dict, Any
+import re
+
+logger = logging.getLogger(__name__)
+
+class VerificationEvaluator:
+    def __init__(self, check_score_only_func):
+        self.check_score_only = check_score_only_func
+
     def finalize_verification(
         self,
         name: str,
@@ -12,9 +23,6 @@
 
         # 2. Extract LLM quantitative/qualitative data
         try:
-            # Simple extractor for markdown JSON or raw JSON
-            import re
-
             json_match = re.search(r"\{.*\}", llm_output, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group())

@@ -1,3 +1,5 @@
+import hashlib
+
 def calculate_code_hash(code: str) -> str:
     """
     Calculates a SHA-256 hash for the given source code.

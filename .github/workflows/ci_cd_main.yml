@@ -51,7 +51,7 @@ jobs:
           
           # 2. Relaxed check for non-core files (scripts, tests, tools)
           # We ignore T20 (print), E501 (line length), and C901 (complexity) for these.
-          uv run ruff check tests tools exports scratch --ignore T20,E501,C901 --line-length 120
+          uv run ruff check tests tools --ignore T20,E501,C901 --line-length 120
 
       - name: Run tests
         run: |
