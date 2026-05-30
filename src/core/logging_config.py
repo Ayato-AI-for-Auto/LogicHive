@@ -64,6 +64,17 @@ def setup_logging():
 
     logger.remove()
 
+    # Determine process name to separate logs (settings_ui.py vs mcp_server.py)
+    # This prevents collisions between logichive-hub.exe and logichive-settings.exe.
+    main_script = os.path.basename(sys.argv[0]).lower()
+    if "settings" in main_script:
+        proc_name = "settings"
+    elif "hub" in main_script or "mcp_server" in main_script:
+        proc_name = "hub"
+    else:
+        # Fallback for generic execution
+        proc_name = "app"
+
     # 1. Console Sink (Human Readable)
     if sys.stderr is not None:
         log_format = (
@@ -77,8 +88,8 @@ def setup_logging():
         )
 
     # Manual rotation for keeping exact last 2 executions
-    main_log_path = os.path.join(log_dir, "logichive.jsonl")
-    error_log_path = os.path.join(log_dir, "error.log")
+    main_log_path = os.path.join(log_dir, f"{proc_name}.jsonl")
+    error_log_path = os.path.join(log_dir, f"{proc_name}_error.log")
 
     rotate_previous_execution_log(main_log_path)
     rotate_previous_execution_log(error_log_path)

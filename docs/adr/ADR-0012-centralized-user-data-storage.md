@@ -19,12 +19,16 @@ Consolidate all mutable application state into a single centralized directory in
 The folder structure will be:
 - `~/.logichive/`
   - `.env` (Central configuration)
-  - `logs/` (Rotation-based JSONL and error logs)
+  - `logs/` (Process-isolated rotation logs)
+    - `hub.jsonl`, `hub_error.log` (Hub Server)
+    - `settings.jsonl`, `settings_error.log` (Settings UI)
   - `data/` (SQLite database, FAISS indices, mapping files)
   - `pools/` (Pre-warmed virtual environments for asset execution)
 
 ### Key Changes:
-- **`src/core/logging_config.py`**: Update `log_dir` to `~/.logichive/logs`.
+- **`src/core/logging_config.py`**: 
+    - Update `log_dir` to `~/.logichive/logs`.
+    - Implement process detection to use unique file names (`hub` vs `settings`) to prevent inter-process file locking on Windows.
 - **`src/core/config.py`**: 
     - Redefine `DATA_DIR` to `~/.logichive/data`.
     - Redefine `POOL_BASE_DIR` to `~/.logichive/pools`.

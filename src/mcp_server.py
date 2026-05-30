@@ -589,7 +589,27 @@ if __name__ == "__main__":
                 for ip in ips:
                     logger.info(f"  > http://{ip}:{current_port}/sse")
 
-            mcp.run(transport="sse", host=host_val, port=current_port)
+            # In order to support webview-based clients (like Cline or VS Code extensions)
+            # that use browser `fetch` and enforce CORS, we must manually construct the 
+            # Starlette app and add CORSMiddleware, then run it via uvicorn.
+            app = mcp.http_app(transport="sse")
+            from starlette.middleware.cors import CORSMiddleware
+            app.add_middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+
+            # Get log level from fastmcp settings
+            import fastmcp
+            log_level = fastmcp.settings.log_level.lower()
+            
+            # Start the server using uvicorn directly
+            import uvicorn
+            uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
+
             break  # Success!
 
         except OSError as e:
