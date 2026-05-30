@@ -583,13 +583,6 @@ if __name__ == "__main__":
                 logger.warning(" Do not use this on public networks.")
                 logger.warning("=" * 60)
 
-                logger.info("Server is accessible at:")
-                logger.info(f"  > http://localhost:{current_port}/sse")
-                logger.info(f"  > http://{hostname}.local:{current_port}/sse (Team URL via mDNS)")
-                ips = SystemFingerprint.get_local_ips()
-                for ip in ips:
-                    logger.info(f"  > http://{ip}:{current_port}/sse")
-
             # Create CORS middleware configuration
             # In order to support webview-based clients (like Cline or VS Code extensions)
             # that use browser `fetch`, we must:
