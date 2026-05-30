@@ -1,3 +1,8 @@
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 def recover_embeddings_internal(conn):
     try:
         current_model = embedding_service.model_name

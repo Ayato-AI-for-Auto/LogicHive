@@ -1,6 +1,9 @@
 import asyncio
+
 import pytest
-from mcp_server import save_function, get_verification_status
+
+from mcp_server import get_verification_status, save_function
+
 
 @pytest.mark.asyncio
 async def test_syntax_error_rejection(test_db):
@@ -18,9 +21,9 @@ async def test_timeout_enforcement(test_db):
 
     # We set a short timeout
     res = await save_function(
-        name="slow_func", 
-        code=slow_code, 
-        test_code=test_code, 
+        name="slow_func",
+        code=slow_code,
+        test_code=test_code,
         timeout=1, # 1 second limit
         project="chaos",
         dependencies=[]
@@ -58,16 +61,16 @@ async def test_quality_theater_rejection(test_db):
     # We trigger the fake auditor's theater check via keywords
     theater_code = "def do_nothing():\n    pass # pass keyword triggers fake"
     test_code = "do_nothing()"
-    
+
     await save_function(
-        name="theater_func", 
-        code=theater_code, 
-        test_code=test_code, 
-        description="Just a pass method", 
+        name="theater_func",
+        code=theater_code,
+        test_code=test_code,
+        description="Just a pass method",
         project="chaos"
     )
     await asyncio.sleep(0.5)
-    
+
     status = await get_verification_status(name="theater_func", project="chaos")
     # In fake intel, 'pass' triggers low score
     assert "FAILED" in status or "DRAFT" in status or "Quality Gate" in status

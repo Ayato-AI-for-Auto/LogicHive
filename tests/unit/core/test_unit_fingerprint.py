@@ -1,5 +1,5 @@
-import pytest
 from core.system_info import SystemFingerprint
+
 
 def test_fingerprint_generation():
     """UNIT: Verify that system fingerprint contains required platform keys."""

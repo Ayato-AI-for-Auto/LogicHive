@@ -1,12 +1,11 @@
-import asyncio
 import hashlib
+import importlib
 import os
 import sqlite3
 import sys
-import uuid
-import importlib
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+import uuid
+from unittest.mock import patch
 
 import pytest
 from loguru import logger
@@ -27,6 +26,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Now safe to import internal modules
 import core.config
+
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
@@ -98,29 +98,28 @@ def intelligence_isolation(request):
 @pytest.fixture(autouse=True)
 async def db_isolation(request):
     """Ensures a fresh, unique environment for every single test."""
-    from core.db import close_db_connection
-    import importlib
-    import storage.sqlite_api
     import orchestrator
-    
+    import storage.sqlite_api
+    from core.db import close_db_connection
+
     # 1. Setup unique paths
     test_id = uuid.uuid4().hex[:8]
     unique_home = os.path.join(TEST_ROOT, f"home_{test_id}")
     unique_db = os.path.join(unique_home, "data", "test.db")
     os.makedirs(os.path.dirname(unique_db), exist_ok=True)
-    
+
     # 2. Force environment
     os.environ["LOGICHIVE_HOME"] = unique_home
     os.environ["SQLITE_DB_PATH"] = unique_db
-    
+
     # 3. Reload config and reset singletons
     importlib.reload(core.config)
     await close_db_connection()
     importlib.reload(storage.sqlite_api)
     importlib.reload(orchestrator)
-    
+
     yield
-    
+
     # 4. Cleanup
     await close_db_connection()
     try:
@@ -142,8 +141,9 @@ async def test_db(db_isolation):
 @pytest.fixture(autouse=True)
 async def clear_vector_store():
     try:
-        from storage.vector_store import vector_manager
         import faiss
+
+        from storage.vector_store import vector_manager
         vector_manager.id_to_name = {}
         vector_manager.name_to_id = {}
         vector_manager._current_id = 0

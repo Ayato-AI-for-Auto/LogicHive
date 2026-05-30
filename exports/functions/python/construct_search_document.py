@@ -1,3 +1,7 @@
+from typing import List
+
+
+class DocumentConstructor:
     def construct_search_document(
         self, name: str, description: str, tags: List[str], code: str
     ) -> str:

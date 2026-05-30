@@ -1,3 +1,7 @@
+import subprocess
+import sys
+
+
 def run_command(command, check=True):
     print(f"[EXEC] {' '.join(command)}")
     result = subprocess.run(command, capture_output=True, text=True)
