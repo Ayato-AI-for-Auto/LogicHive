@@ -31,11 +31,13 @@ def main(page: ft.Page):
     page.window_resizable = True
 
     # --- State Variables ---
+    from core.config import ENABLE_GPU
     config_state = {
         "MODEL_TYPE": MODEL_TYPE,
         "GEMINI_API_KEY": GEMINI_API_KEY or "",
         "HOST": HOST,
         "PORT": str(PORT),
+        "ENABLE_GPU": ENABLE_GPU,
     }
 
     # --- UI Components ---
@@ -83,6 +85,12 @@ def main(page: ft.Page):
         label="Port",
         value=config_state["PORT"],
         on_change=lambda e: update_state("PORT", e.control.value),
+    )
+
+    gpu_toggle = ft.Switch(
+        label="Enable GPU Support (Requires ~5GB additional disk space)",
+        value=config_state.get("ENABLE_GPU", False),
+        on_change=lambda e: update_state("ENABLE_GPU", e.control.value),
     )
 
     save_button = ft.ElevatedButton(
@@ -159,7 +167,7 @@ def main(page: ft.Page):
 
         data = {
             "mcpServers": {
-                "logichive": {"url": f"http://{config_state['HOST']}:{config_state['PORT']}/sse"}
+                "logichive": {"url": f"http://{config_state['HOST']}:{config_state['PORT']}/mcp"}
             }
         }
         return json.dumps(data, indent=2)
@@ -234,6 +242,7 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
                 ft.Row([host_input, port_input]),
+                gpu_toggle,
                 save_button,
                 ft.Divider(),
                 client_setup_section,

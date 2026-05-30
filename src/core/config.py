@@ -243,7 +243,8 @@ FAISS_GHOST_REBUILD_THRESHOLD = int(os.getenv("FAISS_GHOST_REBUILD_THRESHOLD", 1
 
 # 5. Virtual Environment Pooling (Pre-warming)
 ENABLE_ENV_POOLING = os.getenv("ENABLE_ENV_POOLING", "true").lower() == "true"
-POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "1"))  # per spec
+ENABLE_GPU = os.getenv("ENABLE_GPU", "false").lower() == "true"
+POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "1"))  # default to 1 to save space
 
 # Default specs for pre-warming
 # Format: {spec_name: [list of critical packages]}

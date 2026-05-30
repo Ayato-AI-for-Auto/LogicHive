@@ -187,16 +187,18 @@ class PoolManager:
                 await asyncio.sleep(10)
 
     def _trigger_initial_burst(self):
+        from core.config import ENABLE_GPU
         for spec_name in self.pools:
-            if spec_name == "torch-gpu" and not self.has_gpu:
+            if spec_name == "torch-gpu" and not ENABLE_GPU:
                 continue
             for _ in range(POOL_MAX_SIZE):
                 asyncio.create_task(self._prepare_env(spec_name))
 
     def _check_and_replenish_pools(self):
+        from core.config import ENABLE_GPU
         for spec_name, queue in self.pools.items():
             if queue.qsize() < POOL_MAX_SIZE:
-                if spec_name == "torch-gpu" and not self.has_gpu:
+                if spec_name == "torch-gpu" and not ENABLE_GPU:
                     continue
                 logger.debug(f"PoolManager: Replenishing {spec_name} (size: {queue.qsize()})")
                 asyncio.create_task(self._prepare_env(spec_name))
@@ -242,7 +244,8 @@ class PoolManager:
                 if packages:
                     pkg_str = " ".join(packages)
                     python_exe_str = str(python_exe)
-                    icmd = f'"{uv_path}" pip install --python "{python_exe_str}" {pkg_str}'
+                    # Optimization: Use --link-mode=hardlink to save disk space by sharing blocks with global cache
+                    icmd = f'"{uv_path}" pip install --link-mode=hardlink --python "{python_exe_str}" {pkg_str}'
 
                     res = await asyncio.to_thread(run_cmd, icmd)
 

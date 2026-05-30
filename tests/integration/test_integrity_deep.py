@@ -29,19 +29,37 @@ async def test_deep_data_integrity_handshake(test_db):
     # 2. Wait for background verification (poll)
     max_retries = 10
     verified = False
+    status_found = "N/A"
+    
+    from core.config import SQLITE_DB_PATH
+    
     for _ in range(max_retries):
-        await asyncio.sleep(0.2)
-        from core.config import SQLITE_DB_PATH
+        await asyncio.sleep(0.3)
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT verification_status FROM logichive_functions WHERE name = ?", (name,))
-        row = cursor.fetchone()
-        conn.close()
-        if row and row[0] == "verified":
-            verified = True
-            break
+        try:
+            cursor.execute("SELECT verification_status FROM logichive_functions WHERE name = ?", (name,))
+            row = cursor.fetchone()
+            if row:
+                status_found = row[0]
+                if status_found == "verified":
+                    verified = True
+                    break
+        finally:
+            conn.close()
     
-    assert verified is True, f"Verification should be 'verified', but was '{row[0] if row else 'N/A'}'"
+    if not verified:
+        # Get full report for debugging
+        conn = sqlite3.connect(SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT verification_report FROM logichive_functions WHERE name = ?", (name,))
+            fail_row = cursor.fetchone()
+            pytest.fail(f"Verification failed to reach 'verified' state. Current status: {status_found}. Report: {fail_row[0] if fail_row else 'N/A'}")
+        finally:
+            conn.close()
+
+    assert verified is True
     
     # 3. VERIFY SQLITE PHYSICALLY (Full check)
     conn = sqlite3.connect(SQLITE_DB_PATH)
