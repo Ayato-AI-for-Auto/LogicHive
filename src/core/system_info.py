@@ -3,6 +3,10 @@ import socket
 import sys
 from datetime import datetime
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class SystemFingerprint:
     """
@@ -25,19 +29,22 @@ class SystemFingerprint:
                 s.connect(("8.8.8.8", 1))
                 main_ip = s.getsockname()[0]
                 ips.append(main_ip)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Fingerprint: Failed to get main IP: {e}")
             finally:
                 s.close()
 
             # Also try to get all IPs using socket.gethostbyname_ex
-            hostname = socket.gethostname()
-            for ip in socket.gethostbyname_ex(hostname)[2]:
-                if ip not in ips and not ip.startswith("127."):
-                    ips.append(ip)
+            try:
+                hostname = socket.gethostname()
+                for ip in socket.gethostbyname_ex(hostname)[2]:
+                    if ip not in ips and not ip.startswith("127."):
+                        ips.append(ip)
+            except Exception as e:
+                logger.debug(f"Fingerprint: Failed to get interface IPs: {e}")
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Fingerprint: Major failure in get_local_ips: {e}")
 
         # Ensure localhost is included if empty, or just return what we found
         return ips if ips else ["127.0.0.1"]

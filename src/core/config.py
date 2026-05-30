@@ -23,6 +23,7 @@ HOME_DIR = Path.home() / ".logichive"
 HOME_ENV = HOME_DIR / ".env"
 LOCAL_ENV = BASE_DIR / ".env"
 
+
 def _load_config():
     """Tiered configuration loading with prioritized path resolution."""
     config_source = "None (Using defaults/Env)"
@@ -111,6 +112,7 @@ def save_config(updates: dict):
     for key, value in updates.items():
         if f"{key}=" in content:
             import re
+
             content = re.sub(f"{key}=.*", f"{key}={value}", content)
         else:
             content = content.rstrip() + f"\n{key}={value}\n"
@@ -136,6 +138,7 @@ CONFIG_SOURCE = _load_config()
 
 # --- Validation Helpers ---
 
+
 def validate_config_lazy():
     """
     Performs runtime validation of critical settings.
@@ -151,6 +154,7 @@ def validate_config_lazy():
 
     return True, "", str(HOME_ENV)
 
+
 # 1. AI & Models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MODEL_TYPE = os.getenv("MODEL_TYPE", "gemini").lower()
@@ -160,6 +164,7 @@ EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "gemini").lower()
 OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
 FASTEMBED_MODEL = os.getenv("FASTEMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
 
+
 def _validate_gemini_api_key(api_key):
     # Skip validation during pytest runs
     if "pytest" in sys.modules or os.getenv("LOGICHIVE_TESTING") == "true":
@@ -168,12 +173,14 @@ def _validate_gemini_api_key(api_key):
         return False
     try:
         from google import genai
+
         client = genai.Client(api_key=api_key)
         list(client.models.list(config={"page_size": 1}))
         return True
     except Exception as e:
         logger.warning(f"Gemini API Key validation failed: {e}")
         return False
+
 
 # 2. Ollama Fallback (Internal use or alternative)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")

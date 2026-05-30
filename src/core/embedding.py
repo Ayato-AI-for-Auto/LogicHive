@@ -84,6 +84,7 @@ class OllamaEmbeddingService:
 
     def get_embedding(self, text: str, is_query: bool = False) -> list[float]:
         import httpx
+
         try:
             resp = httpx.post(
                 f"{self.url}/api/embeddings",
@@ -91,7 +92,7 @@ class OllamaEmbeddingService:
                     "model": self.model_name,
                     "prompt": text,
                 },
-                timeout=15.0
+                timeout=15.0,
             )
             if resp.status_code == 200:
                 vector = resp.json().get("embedding", [])
@@ -132,8 +133,11 @@ class FastEmbedEmbeddingService:
             return
         try:
             from fastembed import TextEmbedding
+
             self._model = TextEmbedding(model_name=self.model_name)
-            logger.info(f"FastEmbedEmbeddingService: Initialized successfully with {self.model_name}")
+            logger.info(
+                f"FastEmbedEmbeddingService: Initialized successfully with {self.model_name}"
+            )
         except ImportError:
             msg = (
                 "\n" + "=" * 80 + "\n"

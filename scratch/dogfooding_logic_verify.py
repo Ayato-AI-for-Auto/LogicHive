@@ -11,7 +11,11 @@ def count_assertions_python(test_code: str) -> int:
             return True
         if isinstance(node, (ast.Num, ast.Str, ast.Bytes, ast.NameConstant)):
             return True
-        return bool(isinstance(node, ast.Compare) and is_constant_expr(node.left) and all(is_constant_expr(comp) for comp in node.comparators))
+        return bool(
+            isinstance(node, ast.Compare)
+            and is_constant_expr(node.left)
+            and all(is_constant_expr(comp) for comp in node.comparators)
+        )
 
     try:
         tree = ast.parse(test_code)
@@ -38,6 +42,7 @@ def count_assertions_python(test_code: str) -> int:
         return count
     except SyntaxError:
         return 0
+
 
 # Logic Atom 2: Hollow Logic Detector
 def find_hollow_methods(code: str) -> list[str]:
@@ -74,6 +79,7 @@ def find_hollow_methods(code: str) -> list[str]:
     except SyntaxError:
         return []
 
+
 # Logic Atom 3: Code Hasher
 import hashlib
 
@@ -82,14 +88,15 @@ def calculate_code_hash(code: str) -> str:
     normalized_code = code.strip().replace("\r\n", "\n")
     return hashlib.sha256(normalized_code.encode("utf-8")).hexdigest()
 
+
 # Tests for verification
 if __name__ == "__main__":
     # Test Assertion Counter
     test_suite = "assert 1 == 1\nassert foo == bar\npytest.assume(x > 0)"
-    print(f"Assertions: {count_assertions_python(test_suite)}") # Should be 2 (1==1 is constant)
+    print(f"Assertions: {count_assertions_python(test_suite)}")  # Should be 2 (1==1 is constant)
 
     # Test Hollow Detector
     code_with_hollow = "def ok():\n  return 1\ndef empty():\n  pass\ndef dots():\n  ...\ndef identity(x):\n  return x"
-    print(f"Hollows: {find_hollow_methods(code_with_hollow)}") # ['empty', 'dots', 'identity']
+    print(f"Hollows: {find_hollow_methods(code_with_hollow)}")  # ['empty', 'dots', 'identity']
 
     print(f"Hash: {calculate_code_hash('print(1)')}")

@@ -34,7 +34,9 @@ def pytest_runtest_makereport(item, call):
             if os.path.exists(db_path):
                 conn = sqlite3.connect(db_path)
                 # Dump table list
-                tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+                tables = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
                 logger.error(f"Current tables: {tables}")
                 # Dump migration versions
                 if "schema_migrations" in [t[0] for t in tables]:

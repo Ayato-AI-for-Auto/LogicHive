@@ -46,9 +46,12 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          # Run linting on the whole repository using pyproject.toml rules.
-          # Line length is 100, and non-core files have relaxed rules via per-file-ignores.
-          uv run ruff check .
+          # 1. Strict check for Core Logic (src)
+          uv run ruff check src --select E,F,W,I,C90,T20 --line-length 100
+          
+          # 2. Relaxed check for non-core files (scripts, tests, tools)
+          # We ignore T20 (print), E501 (line length), and C901 (complexity) for these.
+          uv run ruff check tests tools exports scratch --ignore T20,E501,C901 --line-length 120
 
       - name: Run tests
         run: |

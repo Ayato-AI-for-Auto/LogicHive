@@ -10,9 +10,11 @@ mcp.add_middleware(
     allow_headers=["*"],
 )
 
+
 @mcp.tool()
 def hello() -> str:
     return "world"
+
 
 if __name__ == "__main__":
     # Test if middleware is applied

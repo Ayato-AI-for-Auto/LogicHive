@@ -21,6 +21,7 @@ from orchestrator import check_integrity  # noqa: E402
 
 logger = get_logger("settings_ui")
 
+
 def main(page: ft.Page):
     page.title = "LogicHive Settings & Control"
     page.theme_mode = ft.ThemeMode.DARK
@@ -104,9 +105,7 @@ def main(page: ft.Page):
             report = await check_integrity()
             integrity_result_area.controls.clear()
 
-            status_color = (
-                ft.Colors.GREEN if report["status"] == "Healthy" else ft.Colors.AMBER
-            )
+            status_color = ft.Colors.GREEN if report["status"] == "Healthy" else ft.Colors.AMBER
             if report["status"] == "Error":
                 status_color = ft.Colors.RED
 
@@ -121,38 +120,29 @@ def main(page: ft.Page):
 
             for component, details in report["details"].items():
                 comp_status = details.get("status", "Unknown")
-                comp_color = (
-                    ft.Colors.GREEN if comp_status == "Healthy" else ft.Colors.AMBER
-                )
+                comp_color = ft.Colors.GREEN if comp_status == "Healthy" else ft.Colors.AMBER
 
                 integrity_result_area.controls.append(
                     ft.ExpansionTile(
-                        title=ft.Text(
-                            f"{component.upper()}: {comp_status}", color=comp_color
-                        ),
+                        title=ft.Text(f"{component.upper()}: {comp_status}", color=comp_color),
                         subtitle=ft.Text(details.get("message", "")),
                         controls=[
                             ft.Container(
-                                content=ft.Text(
-                                    str(details.get("details", "")), size=12
-                                ),
+                                content=ft.Text(str(details.get("details", "")), size=12),
                                 padding=10,
                                 bgcolor=ft.Colors.GREY_900,
                                 border_radius=5,
                             )
-                        ]
+                        ],
                     )
                 )
             logger.info(
-                "Integrity check completed successfully",
-                extra={"report_status": report["status"]}
+                "Integrity check completed successfully", extra={"report_status": report["status"]}
             )
         except Exception as ex:
             logger.exception("Integrity check failed with an unexpected error")
             integrity_result_area.controls.clear()
-            integrity_result_area.controls.append(
-                ft.Text(f"Error: {ex}", color=ft.Colors.RED)
-            )
+            integrity_result_area.controls.append(ft.Text(f"Error: {ex}", color=ft.Colors.RED))
 
         page.update()
 
@@ -166,11 +156,10 @@ def main(page: ft.Page):
 
     def get_client_json():
         import json
+
         data = {
             "mcpServers": {
-                "logichive": {
-                    "url": f"http://{config_state['HOST']}:{config_state['PORT']}/sse"
-                }
+                "logichive": {"url": f"http://{config_state['HOST']}:{config_state['PORT']}/sse"}
             }
         }
         return json.dumps(data, indent=2)
@@ -182,7 +171,7 @@ def main(page: ft.Page):
         min_lines=8,
         max_lines=8,
         text_style=ft.TextStyle(font_family="Consolas"),
-        expand=True
+        expand=True,
     )
 
     def copy_client_json(_):
@@ -191,26 +180,22 @@ def main(page: ft.Page):
         page.snack_bar.open = True
         page.update()
 
-    copy_button = ft.IconButton(
-        icon=ft.Icons.COPY,
-        on_click=copy_client_json,
-        tooltip="Copy JSON"
-    )
+    copy_button = ft.IconButton(icon=ft.Icons.COPY, on_click=copy_client_json, tooltip="Copy JSON")
 
-    client_setup_section = ft.Column([
-        ft.Text(
-            "Client Setup (Cline / Custom SSE Client)", size=18, weight=ft.FontWeight.BOLD
-        ),
-        ft.Text(
-            "Copy and paste this into your client's MCP settings file:",
-            size=14,
-            color=ft.Colors.GREY_400,
-        ),
-        ft.Row(
-            [client_json_field, copy_button],
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    ])
+    client_setup_section = ft.Column(
+        [
+            ft.Text("Client Setup (Cline / Custom SSE Client)", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text(
+                "Copy and paste this into your client's MCP settings file:",
+                size=14,
+                color=ft.Colors.GREY_400,
+            ),
+            ft.Row(
+                [client_json_field, copy_button],
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            ),
+        ]
+    )
 
     def update_state(key, value):
         config_state[key] = value
@@ -305,6 +290,7 @@ def main(page: ft.Page):
         ft.Divider(),
         tabs,
     )
+
 
 if __name__ == "__main__":
     logger.info("Starting LogicHive Settings UI")

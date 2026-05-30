@@ -9,6 +9,7 @@ from loguru import logger
 # Context variable for tracing request/execution flows
 current_run_id: ContextVar[str] = ContextVar("run_id", default="system")
 
+
 class InterceptHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -20,6 +21,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
 
 def json_serializer(record):
     exception = record["exception"]
@@ -37,9 +39,10 @@ def json_serializer(record):
         subset["exception"] = {
             "type": str(exception.type.__name__),
             "value": str(exception.value),
-            "traceback": str(exception.traceback)
+            "traceback": str(exception.traceback),
         }
     return json.dumps(subset)
+
 
 def rotate_previous_execution_log(filepath):
     """Keep only the last 2 executions by renaming the current file to _prev."""
@@ -55,6 +58,7 @@ def rotate_previous_execution_log(filepath):
             os.rename(filepath, prev_path)
         except OSError:
             pass
+
 
 def setup_logging():
     # Use user's home directory for logs to avoid permission issues in Program Files
@@ -94,7 +98,7 @@ def setup_logging():
     rotate_previous_execution_log(main_log_path)
     rotate_previous_execution_log(error_log_path)
 
-    # 2. Main JSON Sink
+    # 2. Main JSON Sink (All logs for traceability)
     logger.add(
         main_log_path,
         format="{extra[serialized]}",
@@ -102,7 +106,7 @@ def setup_logging():
         enqueue=True,
     )
 
-    # 3. Isolated Error Sink
+    # 3. Isolated Error Sink (Only ERROR and CRITICAL)
     logger.add(
         error_log_path,
         format="{extra[serialized]}",
@@ -124,9 +128,10 @@ def setup_logging():
     for lib in ["faiss", "swig", "httpx", "uvicorn"]:
         logging.getLogger(lib).setLevel(logging.WARNING)
 
+
 def get_logger(name: str):
     return logger.bind(name=name)
 
+
 # Initialize on import
 setup_logging()
-

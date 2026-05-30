@@ -11,6 +11,7 @@ from core.migration import run_migrations
 @pytest.fixture
 def clean_db():
     from core.db import close_db_connection
+
     # Ensure connection is closed before test
     asyncio.run(close_db_connection())
 
@@ -23,6 +24,7 @@ def clean_db():
     asyncio.run(close_db_connection())
     if db_path.exists():
         db_path.unlink()
+
 
 def test_run_migrations_creates_tables(clean_db):
     """Unit: Verifies that migrations are applied and tracking table created."""
@@ -44,6 +46,7 @@ def test_run_migrations_creates_tables(clean_db):
     assert cursor.fetchone()[0] == 1
 
     conn.close()
+
 
 def test_migration_failure_rolls_back(clean_db):
     """Unit: Verifies that a broken migration doesn't leave the tracking table in a bad state."""

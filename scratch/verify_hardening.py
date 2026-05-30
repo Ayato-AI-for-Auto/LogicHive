@@ -41,7 +41,9 @@ async def verify_hardening():
         if res.is_system_error and "Transient Error" in res.reason:
             print("   [SUCCESS] AI Gate correctly identified transient failure as SYSTEM_ERROR.")
         else:
-            print(f"   [FAILURE] Unexpected result: score={res.score}, is_system_error={res.is_system_error}")
+            print(
+                f"   [FAILURE] Unexpected result: score={res.score}, is_system_error={res.is_system_error}"
+            )
             all_passed = False
     except Exception as e:
         print(f"   [FAILURE] AI Gate crashed instead of returning result: {e}")
@@ -50,13 +52,17 @@ async def verify_hardening():
     # 3. Verify Security Static Differentiation (Syntax Error = Logic Error)
     print("\n3. Testing SecurityStatic Differentiator...")
     sec_gate = SecurityStaticEvaluator()
-    bad_syntax = "def broken(:" # Missing closing paren
+    bad_syntax = "def broken(:"  # Missing closing paren
     try:
         res = await sec_gate.evaluate(bad_syntax, "python")
         if not res.is_system_error and "Logic Error (Syntax Error)" in res.reason:
-            print("   [SUCCESS] Security Gate correctly identified SyntaxError as LOGIC_ERROR (no is_system_error).")
+            print(
+                "   [SUCCESS] Security Gate correctly identified SyntaxError as LOGIC_ERROR (no is_system_error)."
+            )
         else:
-            print(f"   [FAILURE] Unexpected result: score={res.score}, is_system_error={res.is_system_error}")
+            print(
+                f"   [FAILURE] Unexpected result: score={res.score}, is_system_error={res.is_system_error}"
+            )
             all_passed = False
     except Exception as e:
         print(f"   [FAILURE] Security Gate crashed: {e}")
@@ -69,7 +75,11 @@ async def verify_hardening():
     # We find an evaluator that isn't structural
     evaluator_to_mock = next((e for e in manager.evaluators if e.name == "ai_gate"), None)
     if evaluator_to_mock:
-        with patch.object(evaluator_to_mock, 'evaluate', return_value=EvaluationResult(score=0.0, reason="System Failure", is_system_error=True)):
+        with patch.object(
+            evaluator_to_mock,
+            "evaluate",
+            return_value=EvaluationResult(score=0.0, reason="System Failure", is_system_error=True),
+        ):
             # We must provide some code that passes structural check
             good_code = "def foo():\n  return 1"
             good_test = "def test_foo():\n  assert foo() == 1"
@@ -83,12 +93,13 @@ async def verify_hardening():
     else:
         print("   [SKIP] ai_gate not loaded for mocking.")
 
-    print("\n" + "="*40)
+    print("\n" + "=" * 40)
     if all_passed:
         print("FINAL VERIFICATION: PASSED")
     else:
         print("FINAL VERIFICATION: FAILED")
-    print("="*40)
+    print("=" * 40)
+
 
 if __name__ == "__main__":
     asyncio.run(verify_hardening())

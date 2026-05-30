@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import os
@@ -43,8 +42,7 @@ async def sync_embeddings():
                 emb_json = json.dumps(emb)
 
                 await db.execute(
-                    "UPDATE logichive_functions SET embedding = ? WHERE id = ?",
-                    (emb_json, func_id)
+                    "UPDATE logichive_functions SET embedding = ? WHERE id = ?", (emb_json, func_id)
                 )
                 await db.commit()
                 print(f"    ✅ Updated DB for '{name}'")
@@ -69,6 +67,7 @@ async def sync_embeddings():
         print(f"✅ FAISS Sync Complete. Total vectors: {vector_manager.index.ntotal}")
     except Exception as e:
         print(f"❌ FAISS Rebuild failed: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(sync_embeddings())

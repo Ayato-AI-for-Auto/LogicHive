@@ -53,7 +53,7 @@ async def search_functions(
     language: str = None,
     project: str = None,
     wait_for_previous: bool = False,
-    ) -> str:
+) -> str:
     """
     Search for high-quality, reusable code functions within the LogicHive vault using Hybrid Search.
     This is the primary tool for knowledge retrieval. Use it when you need to find existing
@@ -74,8 +74,8 @@ async def search_functions(
     limit: Max results. Default 5.
     language: Optional language to filter by (e.g., 'python', 'javascript').
     project: Optional project name to narrow the search.
-    wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-        to complete before starting. Set to false (or omit) to run in parallel. 
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
         Use true when this tool depends on the output of previous tools.
     """
 
@@ -125,8 +125,8 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
     Args:
         name: The precise, case-sensitive name of the function (e.g., "save_log").
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-            to complete before starting. Set to false (or omit) to run in parallel. 
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
             Use true when this tool depends on the output of previous tools.
     """
     try:
@@ -254,8 +254,8 @@ async def debug_db(wait_for_previous: bool = False) -> str:
     Debug tool to inspect LogicHive database configuration and table structure.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-            to complete before starting. Set to false (or omit) to run in parallel. 
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
             Use true when this tool depends on the output of previous tools.
     """
 
@@ -289,8 +289,8 @@ async def delete_function(
     Args:
         name: The case-sensitive name of the function to delete.
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-            to complete before starting. Set to false (or omit) to run in parallel. 
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
             Use true when this tool depends on the output of previous tools.
     """
     success = await do_delete_async(name, project=project)
@@ -313,8 +313,8 @@ async def list_functions(
         project: Optional project name to filter by.
         tags: Optional list of tags to filter by.
         limit: Max results. Default 50.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-            to complete before starting. Set to false (or omit) to run in parallel. 
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
             Use true when this tool depends on the output of previous tools.
     """
     try:
@@ -348,8 +348,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     including DB status, Vector store synchronization, and Environment pools.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn 
-            to complete before starting. Set to false (or omit) to run in parallel. 
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
             Use true when this tool depends on the output of previous tools.
     """
 
@@ -508,11 +508,11 @@ if __name__ == "__main__":
     def get_conflicting_process(port: int):
         """Identifies the process currently using the specified port."""
         try:
-            for conn in psutil.net_connections(kind='inet'):
-                if conn.laddr.port == port and conn.status == 'LISTEN':
+            for conn in psutil.net_connections(kind="inet"):
+                if conn.laddr.port == port and conn.status == "LISTEN":
                     return psutil.Process(conn.pid)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Diagnostics: Failed to check for conflicting process on port {port}: {e}")
         return None
 
     def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
@@ -531,6 +531,7 @@ if __name__ == "__main__":
     # Uvicorn's Server.startup calls sys.exit(1) directly on socket errors.
     # We override this to raise an exception instead, so we can handle it and wait_on_error.
     original_startup = uvicorn.Server.startup
+
     async def resilient_startup(self, sockets=None):
         try:
             await original_startup(self, sockets=sockets)
@@ -596,7 +597,7 @@ if __name__ == "__main__":
             # 2. EXPOSE all headers so the client can read the MCP session ID from the response.
             from starlette.middleware import Middleware
             from starlette.middleware.cors import CORSMiddleware
-            
+
             cors_middleware = Middleware(
                 CORSMiddleware,
                 allow_origins=["*"],
@@ -609,7 +610,7 @@ if __name__ == "__main__":
             # Create the app instance using Streamable HTTP with our middleware
             # This ensures FastMCP integrates the middleware into its internal routing/lifespan.
             app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
-            
+
             # Inform user about the Streamable HTTP endpoint
             logger.info("Server is accessible via Streamable HTTP at:")
             logger.info(f"  > http://localhost:{current_port}/mcp")
@@ -619,11 +620,12 @@ if __name__ == "__main__":
 
             import uvicorn
             import fastmcp
+
             log_level = fastmcp.settings.log_level.lower()
-            
+
             # Start the server
             uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
-            
+
             break  # Success!
 
         except OSError as e:
@@ -649,4 +651,3 @@ if __name__ == "__main__":
             logger.exception("Traceback:")
             wait_on_error()
             sys.exit(1)
-

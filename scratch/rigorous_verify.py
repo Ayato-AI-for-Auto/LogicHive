@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import sys
@@ -15,6 +14,7 @@ async def rigorous_verify():
     # 1. Integrity Check (System-wide)
     print("[Step 1: System Integrity]")
     from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+
     db_exists = os.path.exists(SQLITE_DB_PATH)
     faiss_exists = os.path.exists(FAISS_INDEX_PATH)
     print(f"  - DB File: {'✅' if db_exists else '❌'}")
@@ -28,7 +28,9 @@ async def rigorous_verify():
     if results:
         print(f"  - Found {len(results)} results:")
         for r in results:
-            print(f"    * {r['name']} (Match: {r.get('similarity', 0):.4f}, Score: {r.get('reliability_score', 0):.2f})")
+            print(
+                f"    * {r['name']} (Match: {r.get('similarity', 0):.4f}, Score: {r.get('reliability_score', 0):.2f})"
+            )
     else:
         print("  - ❌ Search failed to return results.")
 
@@ -47,7 +49,7 @@ async def rigorous_verify():
     print("\n[Step 4: End-to-End Save Test]")
     test_name = f"verify_logic_{os.urandom(2).hex()}"
     test_code = "def verify_me(x: int): return x * 2"
-    test_desc = "Verification asset for system health check. [AI-DRAFT]" # Use draft to pass with minimal testing
+    test_desc = "Verification asset for system health check. [AI-DRAFT]"  # Use draft to pass with minimal testing
 
     print(f"  - Attempting to save '{test_name}'...")
     try:
@@ -56,7 +58,7 @@ async def rigorous_verify():
             code=test_code,
             description=test_desc,
             test_code="assert verify_me(10) == 20",
-            language="python"
+            language="python",
         )
         if success:
             print(f"  - ✅ Success: '{test_name}' saved and verified.")
@@ -64,6 +66,7 @@ async def rigorous_verify():
             print("  - ❌ Save failed (unknown reason).")
     except Exception as e:
         print(f"  - ❌ Save failed with error: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(rigorous_verify())

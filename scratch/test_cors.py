@@ -5,9 +5,11 @@ import uvicorn
 
 mcp = FastMCP("test")
 
+
 @mcp.tool()
 def hello() -> str:
     return "Hello"
+
 
 app = mcp.sse_app()
 app.add_middleware(

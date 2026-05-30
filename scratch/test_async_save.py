@@ -24,7 +24,7 @@ def hello_world_async():
         code=test_code,
         project="dogfooding",
         description="A test function for async flow.",
-        tags=["test", "async"]
+        tags=["test", "async"],
     )
 
     print(f"Save Result: {result}")
@@ -38,8 +38,9 @@ def hello_world_async():
 
     status = await do_get_verification_status("hello_world_async_test", "dogfooding")
     print(f"Final Status: {status['status']}")
-    if status.get('report'):
+    if status.get("report"):
         print("Report received.")
+
 
 if __name__ == "__main__":
     asyncio.run(test_flow())

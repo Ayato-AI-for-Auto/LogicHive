@@ -60,7 +60,9 @@ async def test_kill_process_tree_unit(executor):
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return False
 
-    assert not is_alive(p), f"Process {pid} is still alive (status: {p.status() if p.is_running() else 'gone'})"
+    assert not is_alive(p), (
+        f"Process {pid} is still alive (status: {p.status() if p.is_running() else 'gone'})"
+    )
     for child in children:
         assert not is_alive(child), f"Child process {child.pid} is still alive"
 

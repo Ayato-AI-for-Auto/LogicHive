@@ -1,6 +1,7 @@
 import httpx
 import asyncio
 
+
 async def test_session():
     # 1. Attempt to list tools to trigger session creation
     url = "http://127.0.0.1:10880/mcp"
@@ -13,5 +14,6 @@ async def test_session():
         print(f"Response: {r.text}")
     except Exception as e:
         print(f"Error: {e}")
+
 
 asyncio.run(test_session())

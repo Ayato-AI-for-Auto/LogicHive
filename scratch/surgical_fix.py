@@ -1,6 +1,5 @@
-
 try:
-    with open('src/mcp_server.py', encoding='utf-8') as f:
+    with open("src/mcp_server.py", encoding="utf-8") as f:
         lines = f.readlines()
 
     # Identify the section from line 140
@@ -12,7 +11,9 @@ try:
             new_lines.append(line)
             new_lines.append("        mock_imports = []\n")
             new_lines.append('    """\n')
-            new_lines.append('    Saves a verified, high-quality code asset to the LogicHive vault.\n')
+            new_lines.append(
+                "    Saves a verified, high-quality code asset to the LogicHive vault.\n"
+            )
             new_lines.append('    """\n')
             # Skip the corrupt lines until the docstring ends
             # The corrupt lines were around 155-167.
@@ -22,7 +23,7 @@ try:
             continue
         new_lines.append(line)
 
-    with open('src/mcp_server.py', 'w', encoding='utf-8') as f:
+    with open("src/mcp_server.py", "w", encoding="utf-8") as f:
         f.writelines(new_lines)
     print("Fixed.")
 except Exception as e:

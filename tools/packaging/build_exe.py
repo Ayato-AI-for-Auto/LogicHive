@@ -27,7 +27,10 @@ def build():
         # Run PyInstaller using the spec file
         # Use sys.executable to ensure we use the same python environment
         import sys
-        subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", str(spec_path)], check=True)
+
+        subprocess.run(
+            [sys.executable, "-m", "PyInstaller", "--noconfirm", str(spec_path)], check=True
+        )
         print("\n[SUCCESS] Build complete! You can find the executable in the 'dist' folder.")
 
         # Move to a 'release' folder for distribution if needed

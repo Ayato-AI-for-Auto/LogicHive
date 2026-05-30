@@ -6,6 +6,7 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 def run_migrations():
     """
     Applies pending SQL migrations from src/storage/migrations/
@@ -25,7 +26,9 @@ def run_migrations():
         """)
 
         # 2. Get applied versions
-        applied = {row[0] for row in conn.execute("SELECT version FROM schema_migrations").fetchall()}
+        applied = {
+            row[0] for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+        }
 
         # 3. Find pending migration files (e.g., 001_init.sql)
         migration_files = sorted(list(migrations_dir.glob("*.sql")))

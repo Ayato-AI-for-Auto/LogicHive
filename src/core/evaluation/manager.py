@@ -132,7 +132,7 @@ class EvaluationManager:
         results = await self._run_evaluators(code, lang, **kwargs)
 
         # 3. Handle immediate rejections (Security, Dependency, Structural)
-        rejection = self._check_critical_rejections(results, language)
+        rejection = self._check_critical_rejections(results, language, **kwargs)
         if rejection:
             return rejection
 
@@ -180,8 +180,9 @@ class EvaluationManager:
                 results[name] = res
         return results
 
-    def _check_critical_rejections(self, results, language):
+    def _check_critical_rejections(self, results, language, **kwargs):
         aggregate_system_error = any(v.is_system_error for v in results.values())
+        name = kwargs.get("name", "unknown")
 
         # Structural Veto
         struct = results.get("structural")
@@ -235,7 +236,7 @@ class EvaluationManager:
         run = results.get("runtime")
         if run and run.score == 0 and not any(k in (language or "").lower() for k in ["draft"]):
             # Check is_draft from kwargs indirectly or pass it
-            pass  # Simplified for now
+            logger.debug(f"Evaluator: Assessing code reliability for '{name}'")
 
         return None
 

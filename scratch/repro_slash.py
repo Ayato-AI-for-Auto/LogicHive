@@ -1,6 +1,7 @@
 import httpx
 import asyncio
 
+
 async def test():
     # Try to POST to the message endpoint WITHOUT trailing slash
     url = "http://127.0.0.1:10880/messages"
@@ -12,5 +13,6 @@ async def test():
             print("REPRODUCED! 405 on missing trailing slash.")
     except Exception as e:
         print(f"Error: {e}")
+
 
 asyncio.run(test())
