@@ -9,6 +9,7 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 
+import fastmcp
 from fastmcp import FastMCP
 
 import orchestrator
@@ -604,15 +605,24 @@ if __name__ == "__main__":
             # This ensures FastMCP integrates the middleware into its internal routing/lifespan.
             app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
 
-            # Inform user about the Streamable HTTP endpoint
-            logger.info("Server is accessible via Streamable HTTP at:")
-            logger.info(f"  > http://localhost:{current_port}/mcp")
-            ips = SystemFingerprint.get_local_ips()
-            for ip in ips:
-                logger.info(f"  > http://{ip}:{current_port}/mcp")
+            # Inform user about available endpoints
+            logger.info("Server is accessible at:")
+
+            # 1. Local URL (Always works)
+            logger.info(f"  > http://localhost:{current_port}/mcp (Local)")
+
+            # 2. Team URL via mDNS (Recommended for stability)
+            if host_val == "0.0.0.0":
+                hostname = socket.gethostname().lower()
+                logger.info(f"  > http://{hostname}.local:{current_port}/mcp (Team - Recommended)")
+
+                # 3. IP Fallback (If mDNS is disabled on network)
+                ips = SystemFingerprint.get_local_ips()
+                for ip in ips:
+                    logger.info(f"  > http://{ip}:{current_port}/mcp (IP Fallback)")
 
             import uvicorn
-            import fastmcp
+
 
             log_level = fastmcp.settings.log_level.lower()
 
