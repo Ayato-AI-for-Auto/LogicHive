@@ -142,6 +142,7 @@ def register():
                     content = json.load(f)
             except Exception as e:
                 import logging
+
                 logging.error(f"Failed to load MCP config at {path}: {e}")
                 continue
         if "mcpServers" not in content:

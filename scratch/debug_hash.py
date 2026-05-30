@@ -12,6 +12,7 @@ def calculate_code_hash_v2(code: str) -> str:
     # Create SHA-256 hash
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
+
 def test_calculate_code_hash_v2():
     code1 = "def foo():\n    pass\n"
     code2 = "def foo():\r\n    pass"
@@ -27,9 +28,11 @@ def test_calculate_code_hash_v2():
     assert isinstance(h1, str)
     print("Tests Passed locally!")
 
+
 if __name__ == "__main__":
     try:
         test_calculate_code_hash_v2()
     except Exception:
         import traceback
+
         traceback.print_exc()

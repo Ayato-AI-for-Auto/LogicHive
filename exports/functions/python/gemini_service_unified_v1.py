@@ -57,5 +57,6 @@ class GeminiService:
                 return json.loads(cleaned)
             except Exception as e:
                 import logging
+
                 logging.error(f"Failed to parse JSON response: {e}")
                 return {}

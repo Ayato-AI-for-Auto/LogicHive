@@ -7,6 +7,7 @@ def get_next_version(git_tags: list[str], default_start: str = "v1.0.0") -> str:
             return list(map(int, v[1:].split(".")))
         except Exception as e:
             import logging
+
             logging.error(f"Failed to parse version key: {e}")
             return [0, 0, 0]
 

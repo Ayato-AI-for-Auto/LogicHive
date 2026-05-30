@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 import os
@@ -12,6 +11,7 @@ from orchestrator import do_save_async
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
 
 async def run_dogfooding_pure():
     print("--- LogicHive Dogfooding (Pure Logic) Start ---")
@@ -71,7 +71,7 @@ test_processing()
             description=description,
             test_code=test_code,
             dependencies=["pydantic"],
-            timeout=30
+            timeout=30,
         )
 
         if success:
@@ -83,6 +83,7 @@ test_processing()
         print(f"\n⚠️ REJECTED with Details:\n{e}")
     except Exception as e:
         print(f"\n💥 CRITICAL ERROR:\n{e}")
+
 
 if __name__ == "__main__":
     asyncio.run(run_dogfooding_pure())

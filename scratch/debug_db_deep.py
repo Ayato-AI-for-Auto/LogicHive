@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import sqlite3
@@ -7,8 +6,10 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath("src"))
 
+
 async def debug_db_standalone():
     from core.config import SQLITE_DB_PATH
+
     print("--- LogicHive DB Diagnostics ---")
     print(f"Target DB: {SQLITE_DB_PATH}")
 
@@ -22,7 +23,12 @@ async def debug_db_standalone():
         cursor = conn.cursor()
 
         # 1. Tables check
-        tables = [row["name"] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        tables = [
+            row["name"]
+            for row in cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
         print(f"Detected Tables: {tables}")
 
         # 2. Schema check for logichive_functions
@@ -35,21 +41,28 @@ async def debug_db_standalone():
             # 3. Integrity Check
             print("\n[Integrity Check]")
             row_count = cursor.execute("SELECT COUNT(*) FROM logichive_functions").fetchone()[0]
-            null_embeddings = cursor.execute("SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NULL").fetchone()[0]
+            null_embeddings = cursor.execute(
+                "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NULL"
+            ).fetchone()[0]
             print(f"  - Total Records: {row_count}")
             print(f"  - Records missing embeddings: {null_embeddings}")
 
             # 4. Content Peek
             print("\n[Content Sample]")
-            rows = cursor.execute("SELECT name, reliability_score, language, version FROM logichive_functions LIMIT 5").fetchall()
+            rows = cursor.execute(
+                "SELECT name, reliability_score, language, version FROM logichive_functions LIMIT 5"
+            ).fetchall()
             for r in rows:
-                print(f"  - {r['name']} (v{r['version']}): Score={r['reliability_score']:.2f}, Lang={r['language']}")
+                print(
+                    f"  - {r['name']} (v{r['version']}): Score={r['reliability_score']:.2f}, Lang={r['language']}"
+                )
         else:
             print("❌ ERROR: 'logichive_functions' table missing!")
 
         conn.close()
     except Exception as e:
         print(f"❌ ERROR: Connection failed: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(debug_db_standalone())
