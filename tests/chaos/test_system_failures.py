@@ -46,14 +46,21 @@ async def test_sandbox_network_block(test_db):
     evil_code = "import socket\ndef dial_home(): socket.create_connection(('8.8.8.8', 53))"
     test_code = "res = dial_home()\nassert res is None"
 
-    await save_function(name="evil_func", code=evil_code, test_code=test_code, project="chaos", dependencies=[])
+    await save_function(
+        name="evil_func",
+        code=evil_code,
+        test_code=test_code,
+        project="chaos",
+        dependencies=[],
+    )
     await asyncio.sleep(1.0)
 
     status = await get_verification_status(name="evil_func", project="chaos")
     # In restricted environments, this will result in FAILED (exec error) or ERROR
     assert "FAILED" in status or "ERROR" in status
     # Check for some indication of network failure or denylist
-    assert any(k in status.lower() for k in ["denied", "failure", "timeout", "offline", "unreachable", "error"])
+    error_keys = ["denied", "failure", "timeout", "offline", "unreachable", "error"]
+    assert any(k in status.lower() for k in error_keys)
 
 @pytest.mark.asyncio
 async def test_quality_theater_rejection(test_db):

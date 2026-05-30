@@ -9,7 +9,12 @@ async def test_deterministic_evaluator_pass():
     """UNIT: Verify that deterministic evaluator passes valid code with assertions."""
     evaluator = DeterministicEvaluator()
     code = "def add(a, b):\n    return a + b"
-    test_code = "def test_add():\n    assert add(1, 2) == 3\n    assert add(0, 0) == 0\n    assert add(-1, -1) == -2"
+    test_code = (
+        "def test_add():\n"
+        "    assert add(1, 2) == 3\n"
+        "    assert add(0, 0) == 0\n"
+        "    assert add(-1, -1) == -2"
+    )
 
     result = await evaluator.evaluate(code, language="python", test_code=test_code)
     assert result.score >= 50, "Should score adequately for having assertions."

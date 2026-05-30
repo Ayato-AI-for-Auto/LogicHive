@@ -27,7 +27,11 @@ async def test_kill_process_tree_unit(executor):
         [
             sys.executable,
             "-c",
-            "import time; import subprocess; subprocess.Popen(['python', '-c', 'import time; time.sleep(100)']); time.sleep(100)",
+            (
+                "import time; import subprocess; "
+                "subprocess.Popen(['python', '-c', 'import time; time.sleep(100)']); "
+                "time.sleep(100)"
+            ),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

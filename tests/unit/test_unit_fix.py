@@ -106,7 +106,10 @@ async def test_integrity_counting_logic_query(tmp_path):
     conn.commit()
 
     # The query used in check_integrity:
-    query = "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
+    query = (
+        "SELECT COUNT(*) FROM logichive_functions "
+        "WHERE embedding IS NOT NULL AND embedding != 'null'"
+    )
     cursor.execute(query)
     count = cursor.fetchone()[0]
 

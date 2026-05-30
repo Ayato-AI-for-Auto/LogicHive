@@ -59,7 +59,10 @@ async def test_chaos_database_lock_simulation(test_db):
 
 @pytest.mark.asyncio
 async def test_chaos_heavy_import_blocking(test_db):
-    """CHAOS: Submit code with heavy imports without mocking, ensuring it gets blocked by static analyzer or times out."""
+    """
+    CHAOS: Submit code with heavy imports without mocking,
+    ensuring it gets blocked by static analyzer or times out.
+    """
     name = "chaos_heavy"
     code = "import torch\nimport tensorflow\n\ndef noop(): pass"
     test_code = "noop()"

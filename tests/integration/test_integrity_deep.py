@@ -39,9 +39,13 @@ async def test_deep_data_integrity_handshake(test_db):
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT verification_status FROM logichive_functions WHERE name = ?", (name,))
+            cursor.execute(
+                "SELECT verification_status FROM logichive_functions WHERE name = ?",
+                (name,),
+            )
             row = cursor.fetchone()
             if row:
+
                 status_found = row[0]
                 if status_found == "verified":
                     verified = True
@@ -54,9 +58,16 @@ async def test_deep_data_integrity_handshake(test_db):
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT verification_report FROM logichive_functions WHERE name = ?", (name,))
+            cursor.execute(
+                "SELECT verification_report FROM logichive_functions WHERE name = ?",
+                (name,),
+            )
             fail_row = cursor.fetchone()
-            pytest.fail(f"Verification failed to reach 'verified' state. Current status: {status_found}. Report: {fail_row[0] if fail_row else 'N/A'}")
+            report_msg = fail_row[0] if fail_row else "N/A"
+            pytest.fail(
+                f"Verification failed to reach 'verified' state. "
+                f"Current status: {status_found}. Report: {report_msg}"
+            )
         finally:
             conn.close()
 
