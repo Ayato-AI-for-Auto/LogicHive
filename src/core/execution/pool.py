@@ -54,6 +54,7 @@ class PoolManager:
                 capture_output=True,
                 text=True,
                 check=False,
+                encoding="utf-8",
             )
             return result.returncode == 0
         except Exception as e:
@@ -221,7 +222,11 @@ class PoolManager:
             logger.info(f"PoolManager: Preparing {spec_name} ({env_id}) using {uv_path}...")
 
             def run_cmd(cmd):
-                return subprocess.run(cmd, capture_output=True, text=True, shell=True)
+                # We explicitly use utf-8 encoding to avoid cp932 errors on Japanese Windows
+                # when uv/pip output contains special characters or emojis.
+                return subprocess.run(
+                    cmd, capture_output=True, text=True, shell=True, encoding="utf-8"
+                )
 
             try:
                 # 1. Create venv
