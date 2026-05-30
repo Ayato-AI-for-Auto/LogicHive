@@ -28,10 +28,18 @@ class VectorIndexManager:
         self.id_to_name = {}
         self.name_to_id = {}
         self._current_id = 0
-        self._index_path = FAISS_INDEX_PATH
-        self._mapping_path = FAISS_MAPPING_PATH
         self._lock = asyncio.Lock()
         self._initialized = False
+
+    @property
+    def _index_path(self) -> str:
+        from core.config import get_faiss_index_path
+        return get_faiss_index_path()
+
+    @property
+    def _mapping_path(self) -> str:
+        from core.config import get_faiss_mapping_path
+        return get_faiss_mapping_path()
 
     async def ensure_initialized(self, db_rows: list[dict[str, Any]]):
         if self._initialized:

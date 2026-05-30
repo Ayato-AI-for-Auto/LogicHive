@@ -19,7 +19,8 @@ PROJECT_ROOT = BASE_DIR
 # --- .env loading strategy ---
 # 1. Look in the same directory as the EXE or project root
 # 2. Look in the user's home directory (~/.logichive/.env) as a fallback
-HOME_DIR = Path.home() / ".logichive"
+# Resolve HOME_DIR with override support for testing
+HOME_DIR = Path(os.getenv("LOGICHIVE_HOME", str(Path.home() / ".logichive")))
 HOME_ENV = HOME_DIR / ".env"
 LOCAL_ENV = BASE_DIR / ".env"
 
@@ -197,28 +198,35 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 # ⚙️ Internal System Configuration
 # ==========================================
 
-# Use ~/.logichive for ALL persistent data (Logs, DB, FAISS, Pools)
-# This avoids permission issues in Program Files and centralizes backups.
-LOGICHIVE_HOME = HOME_DIR
+# --- Path Resolution Helpers ---
 
-# Handle Cloud Run or other container environments
-IS_CLOUD = os.getenv("K_SERVICE") is not None or os.name != "nt"
+def get_logic_hive_home() -> Path:
+    return Path(os.getenv("LOGICHIVE_HOME", str(Path.home() / ".logichive")))
 
-if IS_CLOUD:
-    # Use /tmp for ALL transient operations in the cloud
-    DATA_DIR = Path("/tmp/logic-hive")
-else:
-    # Use centralized data directory in home
-    DATA_DIR = LOGICHIVE_HOME / "data"
+def get_data_dir() -> Path:
+    if os.getenv("K_SERVICE") is not None or os.name != "nt":
+        return Path("/tmp/logic-hive")
+    return get_logic_hive_home() / "data"
 
-# Ensure transient directory exists
-try:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-except Exception as e:
-    print(f"[CRITICAL] Failed to create data directory {DATA_DIR}: {e}")
+def get_sqlite_db_path() -> str:
+    return os.getenv("SQLITE_DB_PATH", str(get_data_dir() / "logichive.db"))
 
-# SQLite Config
-SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", str(DATA_DIR / "logichive.db"))
+def get_faiss_index_path() -> str:
+    return os.getenv("FAISS_INDEX_PATH", str(get_data_dir() / "faiss_index.bin"))
+
+def get_faiss_mapping_path() -> str:
+    return os.getenv("FAISS_MAPPING_PATH", str(get_data_dir() / "faiss_mapping.json"))
+
+def get_pool_base_dir() -> Path:
+    return get_logic_hive_home() / "pools"
+
+# Legacy support for static imports (will be updated over time)
+LOGICHIVE_HOME = get_logic_hive_home()
+DATA_DIR = get_data_dir()
+SQLITE_DB_PATH = get_sqlite_db_path()
+FAISS_INDEX_PATH = get_faiss_index_path()
+FAISS_MAPPING_PATH = get_faiss_mapping_path()
+POOL_BASE_DIR = get_pool_base_dir()
 
 # LogicHive Quality Gate & Storage Thresholds
 QUALITY_GATE_THRESHOLD = int(os.getenv("QUALITY_GATE_THRESHOLD", 70))
@@ -226,19 +234,15 @@ DEFAULT_VERIFICATION_TIMEOUT = int(os.getenv("DEFAULT_VERIFICATION_TIMEOUT", 60)
 MAX_VERIFICATION_TIMEOUT = int(os.getenv("MAX_VERIFICATION_TIMEOUT", 120))
 
 # Backup Config (Opt-in)
-# デフォルトは False (ローカルのみ) です。GitHub同期を行う場合は .env で true に設定してください。
 ENABLE_AUTO_BACKUP = os.getenv("ENABLE_AUTO_BACKUP", "false").lower() == "true"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 DESCRIPTION_MIN_LENGTH = int(os.getenv("DESCRIPTION_MIN_LENGTH", 10))
 
 # Vector Search (FAISS) Config
 FAISS_GHOST_REBUILD_THRESHOLD = int(os.getenv("FAISS_GHOST_REBUILD_THRESHOLD", 10))
-FAISS_INDEX_PATH = os.getenv("FAISS_INDEX_PATH", str(DATA_DIR / "faiss_index.bin"))
-FAISS_MAPPING_PATH = os.getenv("FAISS_MAPPING_PATH", str(DATA_DIR / "faiss_mapping.json"))
 
 # 5. Virtual Environment Pooling (Pre-warming)
 ENABLE_ENV_POOLING = os.getenv("ENABLE_ENV_POOLING", "true").lower() == "true"
-POOL_BASE_DIR = LOGICHIVE_HOME / "pools"
 POOL_MAX_SIZE = int(os.getenv("POOL_MAX_SIZE", "1"))  # per spec
 
 # Default specs for pre-warming

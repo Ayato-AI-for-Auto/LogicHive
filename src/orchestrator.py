@@ -278,8 +278,12 @@ async def _run_async_verification_pipeline(
             reliability_score=final_score,
         )
 
-        # 5. Sync to Vector Store (if verified)
-        if status == "verified":
+        # 5. Sync to Database and Vector Store (if verified)
+        if status == "verified" and embedding:
+            # Update DB with embedding
+            await sqlite_storage.update_function_embedding(name, project, embedding)
+            
+            # Sync to FAISS
             await vector_manager.upsert_vector(
                 name,
                 embedding,

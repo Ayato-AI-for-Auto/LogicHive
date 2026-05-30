@@ -15,8 +15,8 @@ from mcp_server import (
 async def test_system_end_to_end_flow(test_db):
     """SYSTEM: End-to-end user flow across all MCP tools."""
     name = "system_e2e_func"
-    code = "def parse_data(data): return data.upper()"
-    test_code = "assert parse_data('hello') == 'HELLO'"
+    code = "def parse_data(data):\n    return data.upper()"
+    test_code = "res = parse_data('hello')\nassert res == 'HELLO'"
 
     # 1. Search (should be empty initially)
     search_res = await search_functions(query="parse_data")
@@ -31,10 +31,11 @@ async def test_system_end_to_end_flow(test_db):
         test_code=test_code,
         project="sys_test",
     )
-    assert "accepted and saved with status 'pending'" in save_msg
+    assert "accepted and saved" in save_msg
+    assert "Verification is running" in save_msg
 
     # 3. Wait for verification
-    await asyncio.sleep(0.8)
+    await asyncio.sleep(0.5)
 
     # 4. Check Status
     status_msg = await get_verification_status(name=name, project="sys_test")
@@ -49,7 +50,13 @@ async def test_system_end_to_end_flow(test_db):
     assert code in get_res
     assert "**Tags:** parser, string" in get_res
 
-    # 7. Delete
+    # 7. Check System Integrity Tool
+    from mcp_server import check_integrity
+    integrity_res = await check_integrity()
+    assert "LogicHive Integrity Report" in integrity_res
+    assert "✅ Connected" in integrity_res or "✅ Found on disk" in integrity_res
+
+    # 8. Delete
     del_res = await delete_function(name=name, project="sys_test")
     assert "Successfully deleted" in del_res
 

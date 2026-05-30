@@ -3,228 +3,151 @@ import hashlib
 import os
 import sqlite3
 import sys
+import uuid
+import importlib
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from loguru import logger
 
-from core.config import SQLITE_DB_PATH
+# --- CRITICAL: SET ENVIRONMENT BEFORE ANY IMPORTS ---
+TEST_ROOT = os.path.join(os.getcwd(), ".test_logichive")
+os.makedirs(TEST_ROOT, exist_ok=True)
 
-# Set environment variables for testing BEFORE any imports
-os.environ["SQLITE_DB_PATH"] = os.path.join("storage", "data", "test", "test_logichive.db")
-os.environ["FAISS_INDEX_PATH"] = os.path.join("storage", "data", "test", "test_faiss_index.bin")
-os.environ["FAISS_MAPPING_PATH"] = os.path.join(
-    "storage", "data", "test", "test_faiss_mapping.json"
-)
+# These will be the default, but individual tests will override SQLITE_DB_PATH
+os.environ["SQLITE_DB_PATH"] = os.path.join(TEST_ROOT, "data", "test_logichive.db")
+os.environ["FAISS_INDEX_PATH"] = os.path.join(TEST_ROOT, "data", "test_faiss_index.bin")
+os.environ["FAISS_MAPPING_PATH"] = os.path.join(TEST_ROOT, "data", "test_faiss_mapping.json")
+# os.environ["LOGICHIVE_OFFLINE"] = "true"  # Removed: prevents uv from working correctly
+
 
 # Add src to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
+# Now safe to import internal modules
+import core.config
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
 
-    # If test failed, dump DB metadata to logs
     if report.when == "call" and report.failed:
         logger.error(f"Test {item.name} failed. Dumping DB metadata...")
         try:
-            db_path = os.environ.get("SQLITE_DB_PATH", SQLITE_DB_PATH)
+            db_path = os.environ.get("SQLITE_DB_PATH")
             if os.path.exists(db_path):
                 conn = sqlite3.connect(db_path)
-                # Dump table list
-                tables = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
+                tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
                 logger.error(f"Current tables: {tables}")
-                # Dump migration versions
-                if "schema_migrations" in [t[0] for t in tables]:
-                    versions = conn.execute("SELECT * FROM schema_migrations").fetchall()
-                    logger.error(f"Applied migrations: {versions}")
                 conn.close()
         except Exception as e:
             logger.error(f"Failed to dump DB metadata: {e}")
 
-
 class FakeLogicIntelligence:
-    """
-    A deterministic fake for LogicIntelligence that avoids MagicMock.
-    Returns stable results for testing without external API calls.
-    """
-
     def __init__(self, api_key="fake_key"):
         self.api_key = api_key
-
     async def generate_embedding(self, text: str):
-        # Deterministic dummy embedding: repeating a simple hash of the text
         h = int(hashlib.md5(text.encode()).hexdigest(), 16)
         val = (h % 1000) / 1000.0
         return [val] * 768
-
     async def evaluate_quality(self, code: str, **kwargs):
-        # Basic heuristic for "good" vs "bad" code for testing
-        if len(code) < 10 or "error" in code.lower():
-            return {"score": 10, "reason": "Fake: Code too short or contains 'error'"}
+        if len(code) < 10 or "break_eval" in code.lower():
+            return {"score": 10, "reason": "Fake: Low quality"}
         return {"score": 90, "reason": "Fake: Looks good"}
-
     async def expand_query(self, query: str):
-        # Deterministic expansion that avoids triggering global drafts
         return f"TECHNICAL_QUERY: {query}"
-
     async def rerank_results(self, query: str, results: list, limit: int = 5):
         return results[:limit]
-
     def construct_search_document(self, name: str, description: str, tags: list, code: str = ""):
         return f"{name} {description} {' '.join(tags)}"
-
     async def optimize_metadata(self, code: str):
         return {"description": "Automated description", "tags": ["auto"]}
-
     async def _call_llm_async(self, prompt: str, use_json: bool = False):
-        """
-        Simulates internal LLM calls used by plugins/consolidation.
-        Uses keywords in prompt to trigger specific deterministic behaviors.
-        """
         p_lower = prompt.lower()
-
-        # Security/Vulnerability Triggers
         if "eval" in p_lower or "exec" in p_lower:
-            return {"score": 0, "reason": "Fake: AI Auditor detected code injection risk."}
-        if "secret_key" in p_lower or "api_key" in p_lower:
-            return {"score": 20, "reason": "Fake: AI Auditor detected hardcoded credentials."}
-
-        # Sophistry/Quality Theater Triggers
-        if "pass" in p_lower and len(p_lower) < 50:
-            return {
-                "score": 10,
-                "reason": "Fake: AI Auditor detected empty or stub implementation.",
-            }
-
-        # Error/Edge case triggers
-        if "break" in p_lower:
-            return None
-        if "fail" in p_lower:
-            return {}
-
-        # Success response (Default)
+            return {"score": 0, "reason": "Fake: AI Auditor detected risk."}
         if use_json:
             return {
                 "name": "fake_func",
-                "code": 'def fake_func():\n    """Docstring."""\n    return True',
-                "description": "A high-quality fake function generated for testing",
-                "tags": ["fake", "unit-test"],
+                "code": 'def fake_func(): return True',
+                "description": "Fake function",
+                "tags": ["fake"],
                 "dependencies": [],
                 "score": 98,
-                "reason": "Fake: Verified production-grade logic.",
+                "reason": "Fake: Verified.",
             }
         return "TECHNICAL_QUERY_EXPANSION"
 
-
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers",
-        "use_real_intelligence: marker to skip the automatic patching of LogicIntelligence with FakeLogicIntelligence",
-    )
-
-
 @pytest.fixture(autouse=True)
 def intelligence_isolation(request):
-    """
-    Autouse fixture that patches LogicIntelligence with its Fake implementation by default.
-    Specific unit tests can opt-out using @pytest.mark.use_real_intelligence.
-    """
     if "use_real_intelligence" in request.keywords:
         yield
         return
-
     patches = [
         patch("core.consolidation.LogicIntelligence", new=FakeLogicIntelligence),
         patch("orchestrator.LogicIntelligence", new=FakeLogicIntelligence),
         patch("core.plugins.draft_generator.LogicIntelligence", new=FakeLogicIntelligence),
         patch("core.evaluation.plugins.ai.LogicIntelligence", new=FakeLogicIntelligence),
     ]
-
-    for p in patches:
-        p.start()
-
+    for p in patches: p.start()
     yield
-
-    for p in patches:
-        p.stop()
-
-
-@pytest.fixture(scope="session", autouse=True)
-def global_test_config():
-    """Placeholder for session-scoped setup (logic moved to sessionstart)."""
-    yield
-
-
-@pytest.fixture
-def fake_intel():
-    """Provides a deterministic FakeLogicIntelligence instance."""
-    return FakeLogicIntelligence()
-
-
-@pytest.fixture
-def mock_intel():
-    """Alias for integration_mock_intel to support existing tests."""
-    mock = MagicMock()
-    mock.generate_embedding = AsyncMock(return_value=[0.1] * 768)
-    mock.evaluate_quality = AsyncMock(return_value={"score": 85, "reason": "Mocked pass"})
-    mock.optimize_metadata = AsyncMock(
-        return_value={"description": "Optimized description", "tags": ["ai-tag"]}
-    )
-    return mock
-
-
-@pytest.fixture
-async def test_db():
-    from core.db import close_db_connection
-    from storage.init_db import init_db
-
-    # Ensure any previous connection is closed/reset before initializing
-    await close_db_connection()
-    await init_db()
-    # Give a tiny buffer for SQLite/aiosqlite state settle
-    await asyncio.sleep(0.05)
-    yield
-    # CRITICAL: Close the singleton connection after each test to avoid thread reuse errors
-    await close_db_connection()
-
+    for p in patches: p.stop()
 
 @pytest.fixture(autouse=True)
-async def clear_cache():
-    """Resets the vector manager state between tests."""
-    import faiss
-
-    from storage.sqlite_api import vector_manager
-
-    vector_manager.id_to_name = {}
-    vector_manager.name_to_id = {}
-    vector_manager._current_id = 0
-    # Re-initialize to a fresh empty index
-    vector_manager.index = faiss.IndexFlatIP(768)
-    vector_manager._initialized = True
-
-    # Also remove physical index files if they exist to prevent cross-contamination
-    for f in [
-        os.environ.get("FAISS_INDEX_PATH"),
-        os.environ.get("FAISS_MAPPING_PATH"),
-        os.environ.get("SQLITE_DB_PATH"),
-    ]:
-        if f and os.path.exists(f):
+async def db_isolation(request):
+    """Ensures a fresh, unique environment for every single test."""
+    from core.db import close_db_connection
+    import importlib
+    import storage.sqlite_api
+    import orchestrator
+    
+    # 1. Setup unique paths
+    test_id = uuid.uuid4().hex[:8]
+    unique_home = os.path.join(TEST_ROOT, f"home_{test_id}")
+    unique_db = os.path.join(unique_home, "data", "test.db")
+    os.makedirs(os.path.dirname(unique_db), exist_ok=True)
+    
+    # 2. Force environment
+    os.environ["LOGICHIVE_HOME"] = unique_home
+    os.environ["SQLITE_DB_PATH"] = unique_db
+    
+    # 3. Reload config and reset singletons
+    importlib.reload(core.config)
+    await close_db_connection()
+    importlib.reload(storage.sqlite_api)
+    importlib.reload(orchestrator)
+    
+    yield
+    
+    # 4. Cleanup
+    await close_db_connection()
+    try:
+        import shutil
+        # Try cleanup but don't fail if Windows locks it
+        for _ in range(3):
             try:
-                # On Windows, we might need multiple attempts if the file is being closed
-                import time
+                shutil.rmtree(unique_home)
+                break
+            except: time.sleep(0.1)
+    except: pass
 
-                for _ in range(3):
-                    try:
-                        os.remove(f)
-                        break
-                    except PermissionError:
-                        time.sleep(0.1)
-            except Exception:
-                pass
+@pytest.fixture
+async def test_db(db_isolation):
+    from storage.init_db import init_db
+    await init_db()
+    yield
+
+@pytest.fixture(autouse=True)
+async def clear_vector_store():
+    try:
+        from storage.vector_store import vector_manager
+        import faiss
+        vector_manager.id_to_name = {}
+        vector_manager.name_to_id = {}
+        vector_manager._current_id = 0
+        vector_manager.index = faiss.IndexFlatIP(768)
+        vector_manager._initialized = True
+    except ImportError: pass
     yield
