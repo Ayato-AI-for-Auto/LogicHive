@@ -186,7 +186,7 @@ def main(page: ft.Page):
     )
 
     def copy_client_json(_):
-        page.set_clipboard(get_client_json())
+        page.clipboard.set(get_client_json())
         page.snack_bar = ft.SnackBar(ft.Text("Copied to clipboard!"))
         page.snack_bar.open = True
         page.update()
