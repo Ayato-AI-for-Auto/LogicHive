@@ -1,3 +1,10 @@
+# [0.10.0-dev.4](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.3...v0.10.0-dev.4) (2026-05-31)
+
+
+### Features
+
+* add CI/CD pipeline for automated testing, semantic versioning, and Windows executable builds ([eccb10e](https://github.com/ayato-labs/LogicHive/commit/eccb10e37a9a8a2d55ab1f05cff9c448bddb7b90))
+
 # [0.10.0-dev.3](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.2...v0.10.0-dev.3) (2026-05-31)
 
 
