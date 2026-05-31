@@ -1,3 +1,10 @@
+# [0.10.0-dev.6](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.5...v0.10.0-dev.6) (2026-05-31)
+
+
+### Bug Fixes
+
+* **ci:** ensure versioned pre-releases capture executables by fixing output logic ([ec1d8dd](https://github.com/ayato-labs/LogicHive/commit/ec1d8dda4fb71f4639f0ecdef84d7d919852bacc))
+
 # [0.10.0-dev.5](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.4...v0.10.0-dev.5) (2026-05-31)
 
 
