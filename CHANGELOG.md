@@ -1,3 +1,10 @@
+# [0.10.0-dev.8](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.7...v0.10.0-dev.8) (2026-05-31)
+
+
+### Features
+
+* implement automated CI/CD pipeline with PyInstaller build and release support ([357bf1f](https://github.com/ayato-labs/LogicHive/commit/357bf1fcf50d50e9aabc852c293d20253aa8bba2))
+
 # [0.10.0-dev.7](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.6...v0.10.0-dev.7) (2026-05-31)
 
 
