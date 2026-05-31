@@ -78,6 +78,19 @@ See [.env.example](.env.example) and [ADR-005](docs/adr/005-configuration-resolu
 
 ---
 
+### 🚀 自動起動の設定（タスクスケジューラー）
+
+LogicHive を常駐させたい場合は、以下のコマンドを管理者権限の PowerShell で実行することでタスクスケジューラーに登録できます。
+
+```powershell
+# 設定例（パスは適宜調整してください）
+$Action = New-ScheduledTaskAction -Execute "C:\Path\To\LogicHive-Hub.exe"
+$Trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -Action $Action -Trigger $Trigger -TaskName "LogicHiveAutoStart"
+```
+
+---
+
 ## 🚀 Quick Setup & 120-Second Cursor Integration
 
 To start using LogicHive immediately, follow these simple steps.
@@ -91,10 +104,10 @@ To start using LogicHive immediately, follow these simple steps.
 LogicHive offers two friction-free distribution methods:
 
 #### Option A: Windows Native EXE (Zero Friction & No Docker)
-1. Download `LogicHive-MCP.exe` from the [Latest Release](https://github.com/ayato-labs/LogicHive/releases).
-2. Run the `.exe` via double-click or Command Prompt:
+1. Download `LogicHive-Hub.exe` (Server) or `LogicHive-Settings.exe` (GUI) from the [Latest Release](https://github.com/ayato-labs/LogicHive/releases).
+2. Run the `LogicHive-Hub.exe` via double-click or Command Prompt:
    ```cmd
-   LogicHive-MCP.exe
+   LogicHive-Hub.exe
    ```
 3. The server runs natively on `http://localhost:10880/sse`.
 
@@ -195,6 +208,33 @@ To run the suite:
 ```powershell
 uv run pytest tests/unit tests/integration tests/system tests/chaos
 ```
+
+---
+
+## 🏢 Commercial & Enterprise Compliance
+
+LogicHive は、ビジネス環境での商用利用を前提として設計されています。
+コア技術および依存関係には、商用利用に非常に寛容な **MIT** や **Apache 2.0** ライセンスを採用しているライブラリのみを使用しており、安心して導入いただけます。
+
+### 依存ライブラリのライセンス状況
+
+LogicHive を構成する主要な依存ライブラリは以下の通りです。すべて商用利用可能なライセンスであることを確認済みです。
+
+| ライブラリ | ライセンス | 根拠 (LICENSE) |
+| :--- | :--- | :--- |
+| **Ollama Python** | MIT | [GitHub](https://github.com/ollama/ollama-python/blob/main/LICENSE) |
+| **FastMCP** | Apache 2.0 | [GitHub](https://github.com/PrefectHQ/fastmcp/blob/main/LICENSE) |
+| **Flet** | Apache 2.0 | [GitHub](https://github.com/flet-dev/flet/blob/main/LICENSE) |
+| **Google GenAI** | Apache 2.0 | [GitHub](https://github.com/google-gemini/generative-ai-python/blob/main/LICENSE) |
+| **FAISS** | MIT | [GitHub](https://github.com/facebookresearch/faiss/blob/main/LICENSE) |
+| **FastAPI** | MIT | [GitHub](https://github.com/tiangolo/fastapi/blob/master/LICENSE) |
+| **Ruff** | MIT | [GitHub](https://github.com/astral-sh/ruff/blob/main/LICENSE) |
+| **Loguru** | MIT | [GitHub](https://github.com/Delgan/loguru/blob/master/LICENSE) |
+| **HTTPX** | BSD 3-Clause | [GitHub](https://github.com/encode/httpx/blob/master/LICENSE.md) |
+| **Stripe** | MIT | [GitHub](https://github.com/stripe/stripe-python/blob/master/LICENSE) |
+
+> **セキュリティと機密性について**:
+> LogicHive のユーザーデータ（保存されたロジック資産）は、ローカル環境の SQLite/FAISS にのみ保持されます。AIプロバイダーへ送信されるのは、ユーザーが明示的にリクエストした範囲内のコンテキストのみであり、資産自体が外部へ漏洩する設計ではありません。
 
 ---
 

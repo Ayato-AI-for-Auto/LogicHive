@@ -132,14 +132,14 @@ jobs:
           
           # Rename based on branch
           if ("${{ github.ref_name }}" -eq "develop") {
-            if (Test-Path "dist/LogicHive-MCP.exe") {
-                Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+            if (Test-Path "dist/LogicHive-Settings.exe") {
+                Move-Item dist/LogicHive-Settings.exe dist/LogicHive-Settings-dev.exe
             } else {
-                Write-Error "Expected file dist/LogicHive-MCP.exe not found after build"
+                Write-Error "Expected file dist/LogicHive-Settings.exe not found after build"
                 exit 1
             }
-            if (Test-Path "dist/logichive-hub.exe") {
-                Move-Item dist/logichive-hub.exe dist/logichive-hub-dev.exe
+            if (Test-Path "dist/LogicHive-Hub.exe") {
+                Move-Item dist/LogicHive-Hub.exe dist/LogicHive-Hub-dev.exe
             }
           }
 
@@ -160,13 +160,13 @@ jobs:
           }
 
           if ($tag -ne "") {
-             $exe_file = if (Test-Path "dist/LogicHive-MCP-dev.exe") { "dist/LogicHive-MCP-dev.exe" } else { "dist/LogicHive-MCP.exe" }
-             $hub_file = if (Test-Path "dist/logichive-hub-dev.exe") { "dist/logichive-hub-dev.exe" } else { "dist/logichive-hub.exe" }
+             $settings_file = if (Test-Path "dist/LogicHive-Settings-dev.exe") { "dist/LogicHive-Settings-dev.exe" } else { "dist/LogicHive-Settings.exe" }
+             $hub_file = if (Test-Path "dist/LogicHive-Hub-dev.exe") { "dist/LogicHive-Hub-dev.exe" } else { "dist/LogicHive-Hub.exe" }
              
              Write-Host "Targeting Release: $tag"
-             Write-Host "Uploading Assets: $exe_file, $hub_file"
+             Write-Host "Uploading Assets: $settings_file, $hub_file"
              
-             gh release upload $tag $exe_file $hub_file --clobber
+             gh release upload $tag $settings_file $hub_file --clobber
           } else {
              Write-Error "No target tag identified for release upload."
              exit 1
