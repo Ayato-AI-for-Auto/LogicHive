@@ -24,9 +24,10 @@ def test_config_resolution_priority():
         home_env = logichive_home / ".env"
 
         # Mock Path.home and BASE_DIR
-        with patch("core.config.BASE_DIR", root_path), \
-             patch("pathlib.Path.home", return_value=home_path):
-
+        with (
+            patch("core.config.BASE_DIR", root_path),
+            patch("pathlib.Path.home", return_value=home_path),
+        ):
             # Re-initialize path constants in the module for this test
             importlib.reload(core.config)
 
@@ -43,14 +44,20 @@ def test_config_resolution_priority():
             assert str(HOME_ENV) == str(home_env)
 
             # 1. No files, No Env -> Should use defaults
-            with patch("core.config.load_dotenv") as mock_load, \
-                 patch("os.getenv", return_value=None):
+            with (
+                patch("core.config.load_dotenv") as mock_load,
+                patch("os.getenv", return_value=None),
+            ):
                 source = _load_config()
                 assert "None" in source
 
             # 2. No files, but Env exists
-            with patch("core.config.load_dotenv") as mock_load, \
-                 patch("os.getenv", side_effect=lambda k, d=None: "key" if k == "GEMINI_API_KEY" else d):
+            with (
+                patch("core.config.load_dotenv") as mock_load,
+                patch(
+                    "os.getenv", side_effect=lambda k, d=None: "key" if k == "GEMINI_API_KEY" else d
+                ),
+            ):
                 source = _load_config()
                 assert "System Environment Variables" in source
 
@@ -67,6 +74,7 @@ def test_config_resolution_priority():
                 source = _load_config()
                 assert "Local" in source
                 mock_load.assert_called_with(local_env)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

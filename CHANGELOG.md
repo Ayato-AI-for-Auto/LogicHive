@@ -1,3 +1,136 @@
+# [0.10.0-dev.7](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.6...v0.10.0-dev.7) (2026-05-31)
+
+
+### Bug Fixes
+
+* **ci:** add write permissions to CLA check workflow ([d1ba8eb](https://github.com/ayato-labs/LogicHive/commit/d1ba8eb3f4c0db50623e30d529e532f2fd589058))
+
+# [0.10.0-dev.6](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.5...v0.10.0-dev.6) (2026-05-31)
+
+
+### Bug Fixes
+
+* **ci:** ensure versioned pre-releases capture executables by fixing output logic ([ec1d8dd](https://github.com/ayato-labs/LogicHive/commit/ec1d8dda4fb71f4639f0ecdef84d7d919852bacc))
+
+# [0.10.0-dev.5](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.4...v0.10.0-dev.5) (2026-05-31)
+
+
+### Bug Fixes
+
+* **build:** resolve PyInstaller metadata discovery failure and align binary names ([507951f](https://github.com/ayato-labs/LogicHive/commit/507951f1956757ed9da3ba3ef4e526d246f1d52e))
+
+# [0.10.0-dev.4](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.3...v0.10.0-dev.4) (2026-05-31)
+
+
+### Features
+
+* add CI/CD pipeline for automated testing, semantic versioning, and Windows executable builds ([eccb10e](https://github.com/ayato-labs/LogicHive/commit/eccb10e37a9a8a2d55ab1f05cff9c448bddb7b90))
+
+# [0.10.0-dev.3](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.2...v0.10.0-dev.3) (2026-05-31)
+
+
+### Features
+
+* add centralized logging configuration and implement core MCP server infrastructure ([f270318](https://github.com/ayato-labs/LogicHive/commit/f270318fc6d08e8f5cc04b65bfc0c3bfdcfe3f96))
+* add diagnostic scripts to test Flet port configuration and module imports ([f7ccf43](https://github.com/ayato-labs/LogicHive/commit/f7ccf430b2371d721644413e63b949a38bc95afb))
+* add Flet-based GUI for system configuration and integrity diagnostics ([1dc8138](https://github.com/ayato-labs/LogicHive/commit/1dc81383b598d78bf7155ac8240f102ca38ba67e))
+* add Flet-based settings UI and generate PyInstaller build specifications for hub and settings binaries. ([fdc0458](https://github.com/ayato-labs/LogicHive/commit/fdc045801e54acc100d568ee2d3fdd97dfaaa6d4))
+* add PoolManager to pre-warm virtual environments and reduce cold start latency ([c0fd7f6](https://github.com/ayato-labs/LogicHive/commit/c0fd7f6955295e9981ae25931da82d31ee1fa8f4))
+* add PyInstaller spec file for building LogicHive hub and settings binaries ([2a43909](https://github.com/ayato-labs/LogicHive/commit/2a43909d2e155fd977ddb7e1008c3730242e7480))
+* add PyInstaller spec file to bundle hub and settings binaries ([db6adca](https://github.com/ayato-labs/LogicHive/commit/db6adca1c75f1efe94eb65f8140a1c51fd6c3cab))
+* implement asynchronous environment pool manager to eliminate cold start latency ([936fc56](https://github.com/ayato-labs/LogicHive/commit/936fc5625def407a73d8e9f09c51c3545054828c))
+* implement comprehensive unit, chaos, and integration test suite with supporting configuration fixtures ([692bd5e](https://github.com/ayato-labs/LogicHive/commit/692bd5ed20b2f3d70f25c5ef61c2ae11ebc799b5))
+* implement comprehensive unit, integration, and chaos test suites for code evaluation and system resilience ([5ab9697](https://github.com/ayato-labs/LogicHive/commit/5ab96978f73e285955200e8b749e7c3db978dcb4))
+* implement core infrastructure, database integration, and CI/CD pipelines for LogicHive. ([ba47d5b](https://github.com/ayato-labs/LogicHive/commit/ba47d5b3c0a4e2e3495ee8d8178477887054d07e))
+* implement core logic framework with multi-provider AI evaluation and orchestration services ([1b15602](https://github.com/ayato-labs/LogicHive/commit/1b15602f8cf003fdd715e0fe80de032d24df5e0b))
+* implement ephemeral python executor with uv integration and resource monitoring ([d4f15fb](https://github.com/ayato-labs/LogicHive/commit/d4f15fb161381c15431a3a426bb98d9ee67d0713))
+* implement EphemeralPythonExecutor using uv with resource monitoring and environment pooling ([cc5ed93](https://github.com/ayato-labs/LogicHive/commit/cc5ed9392ea88b4620c15f7b3d0d56a0c7bdfda8))
+* implement FastMCP server with tools for function search, retrieval, saving, and database debugging ([8a4ecdb](https://github.com/ayato-labs/LogicHive/commit/8a4ecdb0f1a86dbb861edd920945bb1c703efdb6))
+* implement Flet-based dashboard for settings management and system integrity diagnostics ([2a66e12](https://github.com/ayato-labs/LogicHive/commit/2a66e1205bacd9b8de9677c3cae38eeee8b8a5e8))
+* implement Flet-based settings and diagnostic dashboard for configuration and system integrity checks ([7f1a328](https://github.com/ayato-labs/LogicHive/commit/7f1a3282a43eb4eb958ae4ed52e10c5e19e9b91c))
+* implement MCP server and settings UI for LogicHive orchestration ([7eec011](https://github.com/ayato-labs/LogicHive/commit/7eec01161f15ac865f1a075dc76af9430aad535a))
+* implement MCP server with tool definitions for code search, retrieval, and validation ([1a6dacf](https://github.com/ayato-labs/LogicHive/commit/1a6dacfec2b5a7342cdeff6b5b5ad1acf8de20ce))
+* implement MCP server with tool definitions for code search, retrieval, validation, and database debugging ([2e6e2bf](https://github.com/ayato-labs/LogicHive/commit/2e6e2bf803706e12f93cdd1d9efb1be5207db9ba))
+* implement MCP server with tool definitions for LogicHive repository operations and initialize workspace infrastructure ([17e849e](https://github.com/ayato-labs/LogicHive/commit/17e849eebf87747183b2722e8422ca108b6b18c1))
+* implement MCP server with tool registration and introduce background pool management for execution environments ([9012bfe](https://github.com/ayato-labs/LogicHive/commit/9012bfe98604dae16e6639337d726292fb9b2e61))
+* implement modular configuration management and initialize FastMCP server structure ([f93e843](https://github.com/ayato-labs/LogicHive/commit/f93e8439bbd7d047df313f7f7935621dbe195010))
+* implement persistent FAISS vector index manager with incremental updates and automatic cleanup ([849cf5f](https://github.com/ayato-labs/LogicHive/commit/849cf5ffccc0e726bfac88d234e20fa125c4e36a))
+* implement persistent vector index management using FAISS with automatic rebuilding and disk synchronization. ([e276577](https://github.com/ayato-labs/LogicHive/commit/e27657787a324defe382f9a618926aa7b8461422))
+* implement secure local-only host binding and mDNS discovery for MCP server ([0c371f1](https://github.com/ayato-labs/LogicHive/commit/0c371f15d2fd599a33dfe96449580c7d21363c6f))
+* implement Streamable HTTP transport and initialize base MCP server structure ([ecdf216](https://github.com/ayato-labs/LogicHive/commit/ecdf21694c3eabab66dcd906f99e38d704429cc9))
+* implement structured JSON logging with loguru and add MCP server foundation ([13e3da5](https://github.com/ayato-labs/LogicHive/commit/13e3da55f698394f5bf581a6f52f58e9e0197b95))
+* implement structured logging with loguru and add initial MCP server architecture with port conflict documentation ([a1d4564](https://github.com/ayato-labs/LogicHive/commit/a1d45644fff99d875f80170c5b9541ba045aa05a))
+* implement tiered .env configuration loader and unified Loguru-based logging system ([4875765](https://github.com/ayato-labs/LogicHive/commit/48757656fcf07414e3f5cfe7a1002542df5bc271))
+* implement tiered configuration management with automatic .env generation and validation helpers ([6f12de3](https://github.com/ayato-labs/LogicHive/commit/6f12de3e010aac1a45cfb791b349d033e7bc8c13))
+* initialize application logging directory and structured event log file ([b2229a0](https://github.com/ayato-labs/LogicHive/commit/b2229a042ad6d1d84ec3bdd7b71cf5e6a41120ec))
+* initialize project structure with core configuration, MCP server scaffolding, and architectural documentation ([b1d4948](https://github.com/ayato-labs/LogicHive/commit/b1d49488549eaf01cd2cde8a776e9d86636b4fa1))
+* initialize system logging and database schema for LogicHive service ([a951451](https://github.com/ayato-labs/LogicHive/commit/a9514516b12739435da2771e0082c0219dae905e))
+* migrate MCP transport from Stdio to Streamable HTTP and implement FastAPI server support. ([c59d5c7](https://github.com/ayato-labs/LogicHive/commit/c59d5c733a17701cee9d9ff3ee0941063c14f086))
+* secure host by default and add setup wizard for network sharing configuration ([4ae1572](https://github.com/ayato-labs/LogicHive/commit/4ae1572744ebef5ef77c1590c648d6a4b7e50ec3))
+
+# [0.10.0-dev.2](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.1...v0.10.0-dev.2) (2026-05-26)
+
+
+### Features
+
+* implement configuration management system with automated template generation and initialize FastMCP server with lifespan management ([9e20a3e](https://github.com/ayato-labs/LogicHive/commit/9e20a3e4516380aa5d3be3ec4560407a1b23079c))
+* implement environment-based configuration loading and structured logging configuration ([b0053d2](https://github.com/ayato-labs/LogicHive/commit/b0053d251343e5353c1f028b308faee3146008e0))
+* implement tiered configuration loading system and initialize MCP server infrastructure ([e0e844d](https://github.com/ayato-labs/LogicHive/commit/e0e844d1e8606d281723a1b540cc74d69dcb4c32))
+* initialize FastMCP server with tools for searching, retrieving, and saving functions in LogicHive ([54af9de](https://github.com/ayato-labs/LogicHive/commit/54af9deb9693b784e473bdec963b6d5cec258f0c))
+
+# [0.10.0-dev.1](https://github.com/ayato-labs/LogicHive/compare/v0.9.8...v0.10.0-dev.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **ci:** bypass astral-sh/setup-uv action due to download failures ([e874b60](https://github.com/ayato-labs/LogicHive/commit/e874b606fb9461c45be7d5001e47b31118f61c40))
+* **ci:** set LOGICHIVE_TESTING=true to skip API key validation during tests ([e08bd6a](https://github.com/ayato-labs/LogicHive/commit/e08bd6aac06b738a52946b6db87c827a4e7926b8))
+* **config:** ensure LOGICHIVE_TESTING correctly bypasses GEMINI_API_KEY check ([c2c8de0](https://github.com/ayato-labs/LogicHive/commit/c2c8de004cbbdd7b48b5f9c8a265d0722577730e))
+* correct development branch name from 'dev' to 'develop' ([57d2e85](https://github.com/ayato-labs/LogicHive/commit/57d2e857b92bbbc089a3ca654ddcc766600d608d))
+
+
+### Features
+
+* add CI/CD pipeline for automated testing, semantic versioning, and Windows executable builds ([7d97c55](https://github.com/ayato-labs/LogicHive/commit/7d97c55a79b5f901407b969e6bc434f7c305a90c))
+* automate pre-releases for develop branch with specialized binary naming ([d063613](https://github.com/ayato-labs/LogicHive/commit/d06361314a3a1a7fc697c7f9ea35e48537f25db8))
+* enable continuous pre-release builds for develop branch and update config loader for executable compatibility ([596e99f](https://github.com/ayato-labs/LogicHive/commit/596e99f3711bf26578d72849f8756fc1d1998d3c))
+* implement centralized configuration management and structured logging system ([4cd0abe](https://github.com/ayato-labs/LogicHive/commit/4cd0abe24da4db4a4ca7546050c27bb394743782))
+* implement LogicIntelligence engine for AI-powered code quality evaluation and embedding generation ([92817ea](https://github.com/ayato-labs/LogicHive/commit/92817eaac98ddfd9cc7c2b2656b8ff1a1b545e72))
+* implement MCP server with tool definitions for code search, retrieval, validation, and database debugging ([78611be](https://github.com/ayato-labs/LogicHive/commit/78611be8080bba295a84598e888a2e4c0564265c))
+* implement modular configuration management and add automated CI/CD pipeline for binary builds ([9f048cf](https://github.com/ayato-labs/LogicHive/commit/9f048cf44f78e4caf7ee6080d4f01c5886107a69))
+* implement multi-provider embedding service, logging infrastructure, and MCP server boilerplate ([0ea6e63](https://github.com/ayato-labs/LogicHive/commit/0ea6e63b67df295b0cb7bc6593790503165a1fbd))
+* implement system fingerprinting and PyInstaller build configuration for executable packaging ([1081c66](https://github.com/ayato-labs/LogicHive/commit/1081c6612050bc615c01f865a1c39d8909162f3e))
+* implement system fingerprinting to detect and warn about environment drift in logic assets ([0764957](https://github.com/ayato-labs/LogicHive/commit/076495713a7b892cc748898d9e9dc858277fd547))
+* implement tiered .env resolution with automatic home dir creation ([940092e](https://github.com/ayato-labs/LogicHive/commit/940092eca019202ac3cece81c4ddfcd861c78682))
+* implement tiered configuration loading and add utility to list Gemini models ([d2673d7](https://github.com/ayato-labs/LogicHive/commit/d2673d70fb5b1e1f9028fa128d9420f0b6bbce6f))
+* initialize core configuration and project logging infrastructure ([e2066fb](https://github.com/ayato-labs/LogicHive/commit/e2066fb777faf7a6066946be542ae1a7e2bf2a26))
+* initialize system logging and SQLite database schema for LogicHive ([3187eec](https://github.com/ayato-labs/LogicHive/commit/3187eec655d719c227e2a2c9d9b3176a512b3e04))
+
+# [0.10.0.dev1](https://github.com/ayato-labs/LogicHive/compare/v0.9.8...v0.10.0.dev1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **ci:** bypass astral-sh/setup-uv action due to download failures ([e874b60](https://github.com/ayato-labs/LogicHive/commit/e874b606fb9461c45be7d5001e47b31118f61c40))
+* **ci:** set LOGICHIVE_TESTING=true to skip API key validation during tests ([e08bd6a](https://github.com/ayato-labs/LogicHive/commit/e08bd6aac06b738a52946b6db87c827a4e7926b8))
+* **config:** ensure LOGICHIVE_TESTING correctly bypasses GEMINI_API_KEY check ([c2c8de0](https://github.com/ayato-labs/LogicHive/commit/c2c8de004cbbdd7b48b5f9c8a265d0722577730e))
+* correct development branch name from 'dev' to 'develop' ([57d2e85](https://github.com/ayato-labs/LogicHive/commit/57d2e857b92bbbc089a3ca654ddcc766600d608d))
+
+
+### Features
+
+* add CI/CD pipeline for automated testing, semantic versioning, and Windows executable builds ([7d97c55](https://github.com/ayato-labs/LogicHive/commit/7d97c55a79b5f901407b969e6bc434f7c305a90c))
+* automate pre-releases for develop branch with specialized binary naming ([d063613](https://github.com/ayato-labs/LogicHive/commit/d06361314a3a1a7fc697c7f9ea35e48537f25db8))
+* enable continuous pre-release builds for develop branch and update config loader for executable compatibility ([596e99f](https://github.com/ayato-labs/LogicHive/commit/596e99f3711bf26578d72849f8756fc1d1998d3c))
+* implement centralized configuration management and structured logging system ([4cd0abe](https://github.com/ayato-labs/LogicHive/commit/4cd0abe24da4db4a4ca7546050c27bb394743782))
+* implement LogicIntelligence engine for AI-powered code quality evaluation and embedding generation ([92817ea](https://github.com/ayato-labs/LogicHive/commit/92817eaac98ddfd9cc7c2b2656b8ff1a1b545e72))
+* implement modular configuration management and add automated CI/CD pipeline for binary builds ([9f048cf](https://github.com/ayato-labs/LogicHive/commit/9f048cf44f78e4caf7ee6080d4f01c5886107a69))
+* implement multi-provider embedding service, logging infrastructure, and MCP server boilerplate ([0ea6e63](https://github.com/ayato-labs/LogicHive/commit/0ea6e63b67df295b0cb7bc6593790503165a1fbd))
+* implement tiered .env resolution with automatic home dir creation ([940092e](https://github.com/ayato-labs/LogicHive/commit/940092eca019202ac3cece81c4ddfcd861c78682))
+* implement tiered configuration loading and add utility to list Gemini models ([d2673d7](https://github.com/ayato-labs/LogicHive/commit/d2673d70fb5b1e1f9028fa128d9420f0b6bbce6f))
+* initialize core configuration and project logging infrastructure ([e2066fb](https://github.com/ayato-labs/LogicHive/commit/e2066fb777faf7a6066946be542ae1a7e2bf2a26))
+* initialize system logging and SQLite database schema for LogicHive ([3187eec](https://github.com/ayato-labs/LogicHive/commit/3187eec655d719c227e2a2c9d9b3176a512b3e04))
+
 ## [0.9.8](https://github.com/ayato-labs/LogicHive/compare/v0.9.7...v0.9.8) (2026-05-24)
 
 

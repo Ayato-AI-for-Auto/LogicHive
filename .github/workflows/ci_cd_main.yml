@@ -25,15 +25,15 @@ jobs:
       - run: echo "Workflow triggered successfully"
 
   test:
-    name: Test and Lint (Docker Target)
+    name: Test and Lint (Native Target)
     runs-on: ubuntu-latest
+    env:
+      LOGICHIVE_TESTING: true
     steps:
       - uses: actions/checkout@v4
       
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
+        run: pipx install uv
 
       - name: Set up Python 3.11
         run: uv python install 3.11
@@ -46,9 +46,12 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          # Run linting on the whole repository. 
-          # E,F,W,I are selected; E501 (line length) is ignored to keep noise low while respecting the 100-char limit.
-          uv run ruff check . --select E,F,W,I --ignore E501,F401,F841 --line-length 100
+          # 1. Strict check for Core Logic (src)
+          uv run ruff check src --select E,F,W,I,C90,T20 --line-length 100
+          
+          # 2. Relaxed check for non-core files (scripts, tests, tools)
+          # We ignore T20 (print), E501 (line length), and C901 (complexity) for these.
+          uv run ruff check tests tools --ignore T20,E501,C901 --line-length 120
 
       - name: Run tests
         run: |
@@ -77,46 +80,17 @@ jobs:
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          npx semantic-release
+          if [ -f .VERSION_PUBLISHED ]; then
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+            echo "new_release_version=$(cat .VERSION_PUBLISHED)" >> $GITHUB_OUTPUT
+          else
+            echo "new_release_published=false" >> $GITHUB_OUTPUT
+          fi
     outputs:
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-
-  docker:
-    name: Build and Push Docker Image
-    needs: release_version
-    if: needs.release_version.outputs.new_release_published == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ needs.release_version.outputs.new_release_version }}
-            type=raw,value=latest
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
 
   build_exe:
     name: Build and Upload Windows EXE
@@ -132,9 +106,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
+        run: pipx install uv
 
       - name: Set up Python 3.11
         run: uv python install 3.11
@@ -147,9 +119,28 @@ jobs:
         run: |
           $env:PYTHONPATH = "src"
           uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
+          
+          # Verify the build succeeded
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "PyInstaller build failed"
+              exit 1
+          }
+          
+          # Check what was actually created
+          Write-Host "Contents of dist directory:"
+          Get-ChildItem -Path dist -Recurse
+          
           # Rename based on branch
           if ("${{ github.ref_name }}" -eq "develop") {
-            Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+            if (Test-Path "dist/LogicHive-MCP.exe") {
+                Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+            } else {
+                Write-Error "Expected file dist/LogicHive-MCP.exe not found after build"
+                exit 1
+            }
+            if (Test-Path "dist/logichive-hub.exe") {
+                Move-Item dist/logichive-hub.exe dist/logichive-hub-dev.exe
+            }
           }
 
       - name: Upload to GitHub Release
@@ -157,14 +148,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ needs.release_version.outputs.new_release_version }}
+          IS_PUBLISHED: ${{ needs.release_version.outputs.new_release_published }}
         run: |
-          if ("${{ github.ref_name }}" -eq "develop") {
-             $exe_file = "dist/LogicHive-MCP-dev.exe"
+          $tag = ""
+          if ("$env:IS_PUBLISHED" -eq "true") {
+             $tag = "v$env:RELEASE_VERSION"
+          } elseif ("${{ github.ref_name }}" -eq "develop") {
              $tag = "v-develop"
              # Create pre-release if it does not exist
              gh release create $tag --prerelease --title "LogicHive Development Pre-release" --notes "Rolling pre-release build for the develop branch." --target "develop" 2>$null
-             gh release upload $tag $exe_file --clobber
+          }
+
+          if ($tag -ne "") {
+             $exe_file = if (Test-Path "dist/LogicHive-MCP-dev.exe") { "dist/LogicHive-MCP-dev.exe" } else { "dist/LogicHive-MCP.exe" }
+             $hub_file = if (Test-Path "dist/logichive-hub-dev.exe") { "dist/logichive-hub-dev.exe" } else { "dist/logichive-hub.exe" }
+             
+             Write-Host "Targeting Release: $tag"
+             Write-Host "Uploading Assets: $exe_file, $hub_file"
+             
+             gh release upload $tag $exe_file $hub_file --clobber
           } else {
-             $exe_file = "dist/LogicHive-MCP.exe"
-             gh release upload "v$env:RELEASE_VERSION" $exe_file --clobber
+             Write-Error "No target tag identified for release upload."
+             exit 1
           }

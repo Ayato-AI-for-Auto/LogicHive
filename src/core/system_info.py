@@ -1,6 +1,11 @@
 import platform
+import socket
 import sys
 from datetime import datetime
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SystemFingerprint:
@@ -8,6 +13,41 @@ class SystemFingerprint:
     Generates and manages a deterministic 'fingerprint' of the system environment.
     Used to detect environment drift (Bit Rot) in logic assets.
     """
+
+    @staticmethod
+    def get_local_ips() -> list[str]:
+        """
+        Retrieves all local IPv4 addresses of the current machine.
+        Useful for logging accessible endpoints when binding to 0.0.0.0.
+        """
+        ips = []
+        try:
+            # Try getting the 'main' IP first (standard trick)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                # doesn't even have to be reachable
+                s.connect(("8.8.8.8", 1))
+                main_ip = s.getsockname()[0]
+                ips.append(main_ip)
+            except Exception as e:
+                logger.debug(f"Fingerprint: Failed to get main IP: {e}")
+            finally:
+                s.close()
+
+            # Also try to get all IPs using socket.gethostbyname_ex
+            try:
+                hostname = socket.gethostname()
+                for ip in socket.gethostbyname_ex(hostname)[2]:
+                    if ip not in ips and not ip.startswith("127."):
+                        ips.append(ip)
+            except Exception as e:
+                logger.debug(f"Fingerprint: Failed to get interface IPs: {e}")
+
+        except Exception as e:
+            logger.debug(f"Fingerprint: Major failure in get_local_ips: {e}")
+
+        # Ensure localhost is included if empty, or just return what we found
+        return ips if ips else ["127.0.0.1"]
 
     @staticmethod
     def get_current() -> dict:
@@ -48,19 +88,22 @@ class SystemFingerprint:
         current_py = ".".join(current.get("python_version", "0.0.0").split(".")[:2])
         if stored_py != current_py:
             diffs.append(
-                f"Python Version Drift: Stored={stored.get('python_version')}, Current={current.get('python_version')}"
+                f"Python Version Drift: Stored={stored.get('python_version')}, "
+                f"Current={current.get('python_version')}"
             )
 
         # 3. High: CPU Arch change
         if stored.get("cpu_arch") != current.get("cpu_arch"):
             diffs.append(
-                f"Architecture Drift: Stored={stored.get('cpu_arch')}, Current={current.get('cpu_arch')}"
+                f"Architecture Drift: Stored={stored.get('cpu_arch')}, "
+                f"Current={current.get('cpu_arch')}"
             )
 
         # 4. Moderate: Execution Driver change (behavior may differ between venv and docker)
         if stored.get("execution_driver") != current.get("execution_driver"):
             diffs.append(
-                f"Execution Driver Change: Stored={stored.get('execution_driver')}, Current={current.get('execution_driver')}"
+                f"Execution Driver Change: Stored={stored.get('execution_driver')}, "
+                f"Current={current.get('execution_driver')}"
             )
 
         return diffs

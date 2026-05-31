@@ -3,17 +3,18 @@ import sqlite3
 
 import pytest
 
-from core.config import SQLITE_DB_PATH
-from storage.sqlite_api import sqlite_storage
+import core.config
+from storage import sqlite_api
 
 
 @pytest.mark.asyncio
 async def test_db_initialization(test_db):
     """UNIT: Verify that the DB is properly created with required tables."""
-    assert os.path.exists(SQLITE_DB_PATH)
+    db_path = core.config.SQLITE_DB_PATH
+    assert os.path.exists(db_path)
 
     # Actually query the physical DB to ensure table exists
-    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='logichive_functions'"
@@ -31,7 +32,7 @@ async def test_upsert_and_fetch_function(test_db):
     code = "def test(): return 1"
 
     # Insert
-    await sqlite_storage.upsert_function(
+    await sqlite_api.sqlite_storage.upsert_function(
         {
             "name": name,
             "code": code,
@@ -50,7 +51,7 @@ async def test_upsert_and_fetch_function(test_db):
     )
 
     # Retrieve
-    func = await sqlite_storage.get_function_by_name(name, project="default")
+    func = await sqlite_api.sqlite_storage.get_function_by_name(name, project="default")
 
     # Verify exact match
     assert func is not None
@@ -65,7 +66,7 @@ async def test_upsert_and_fetch_function(test_db):
 async def test_delete_function(test_db):
     """UNIT: Verify deleting a function actually removes it from DB."""
     name = "unit_delete_test"
-    await sqlite_storage.upsert_function(
+    await sqlite_api.sqlite_storage.upsert_function(
         {
             "name": name,
             "code": "pass",
@@ -83,11 +84,11 @@ async def test_delete_function(test_db):
     )
 
     # Confirm it exists
-    assert await sqlite_storage.get_function_by_name(name) is not None
+    assert await sqlite_api.sqlite_storage.get_function_by_name(name) is not None
 
     # Delete
-    success = await sqlite_storage.delete_function(name, "default")
+    success = await sqlite_api.sqlite_storage.delete_function(name, "default")
     assert success is True
 
     # Confirm it's gone
-    assert await sqlite_storage.get_function_by_name(name) is None
+    assert await sqlite_api.sqlite_storage.get_function_by_name(name) is None

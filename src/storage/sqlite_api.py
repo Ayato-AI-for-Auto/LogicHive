@@ -326,6 +326,24 @@ class SqliteStorage:
             logger.error(f"SQLite: Failed to update status for '{name}': {e}", exc_info=True)
             raise StorageError(f"Status update failed for '{name}': {e}") from e
 
+    async def update_function_embedding(
+        self,
+        name: str,
+        project: str,
+        embedding: list[float],
+    ):
+        """Updates the embedding for a function."""
+        try:
+            db = await get_db_connection()
+            sql = "UPDATE logichive_functions SET embedding = ?, updated_at = CURRENT_TIMESTAMP WHERE project = ? AND name = ?"
+            logger.debug(f"SQLite Embedding Update: '{name}' in '{project}'")
+            await db.execute(sql, [json.dumps(embedding), project, name])
+            await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"SQLite: Failed to update embedding for '{name}': {e}", exc_info=True)
+            raise StorageError(f"Embedding update failed for '{name}': {e}") from e
+
     async def get_function_by_name(
         self, name: str, project: str = "default"
     ) -> dict[str, Any] | None:

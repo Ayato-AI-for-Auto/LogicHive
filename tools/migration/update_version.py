@@ -2,6 +2,7 @@ import re
 import sys
 from pathlib import Path
 
+
 def update_version(version):
     # 1. Update pyproject.toml
     pyproject_path = Path("pyproject.toml")
@@ -15,7 +16,7 @@ def update_version(version):
     init_path = Path("src/core/__init__.py")
     if init_path.exists():
         content = init_path.read_text(encoding="utf-8")
-        if '__version__' in content:
+        if "__version__" in content:
             new_content = re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', content)
         else:
             new_content = content + f'\n__version__ = "{version}"\n'
@@ -25,6 +26,7 @@ def update_version(version):
         init_path.parent.mkdir(parents=True, exist_ok=True)
         init_path.write_text(f'__version__ = "{version}"\n', encoding="utf-8")
         print(f"Created src/core/__init__.py with version {version}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

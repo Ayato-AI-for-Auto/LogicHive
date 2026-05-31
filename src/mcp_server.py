@@ -9,6 +9,7 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 
+import fastmcp
 from fastmcp import FastMCP
 
 import orchestrator
@@ -70,12 +71,15 @@ async def search_functions(
     5. Project Filter: Restrict search to a specific project (e.g., "ayato-studio").
 
     Args:
-        query: Search term, exact name, or #tag.
-        limit: Max results. Default 5.
-        language: Optional language to filter by (e.g., 'python', 'javascript').
-        project: Optional project name to narrow the search.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+    query: Search term, exact name, or #tag.
+    limit: Max results. Default 5.
+    language: Optional language to filter by (e.g., 'python', 'javascript').
+    project: Optional project name to narrow the search.
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
+
     try:
         results = await orchestrator.do_search_async(query, limit, language, project=project)
         if not results:
@@ -122,7 +126,9 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
     Args:
         name: The precise, case-sensitive name of the function (e.g., "save_log").
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
+            Use true when this tool depends on the output of previous tools.
     """
     try:
         f_data = await orchestrator.do_get_async(name, project=project)
@@ -145,10 +151,63 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
             if warning:
                 drift_header = f"> [!WARNING]\n> {warning.replace(chr(10), chr(10) + '> ')}\n\n"
 
-        return f"**Function: {name}**\n\n{drift_header}{desc}\n\n**Tags:** {tags}\n**Dependencies:** {deps}\n\n```{lang}\n{code}\n```"
+        response = (
+            f"**Function: {name}**\n\n{drift_header}{desc}\n\n"
+            f"**Tags:** {tags}\n**Dependencies:** {deps}\n\n"
+            f"```{lang}\n{code}\n```"
+        )
+        return response
     except Exception as e:
-        logger.error(f"MCP Server: Error in get_function: {e}")
+        logger.error(f"MCP Server: Error in get_function: {name} - {e}")
         return f"LogicHive Error: Failed to retrieve function. Detail: {str(e)}"
+
+
+def _format_syntax_error(e: SyntaxValidationError) -> str:
+    """Format a syntax validation error into a user-friendly markdown report."""
+    details = e.details or {}
+    eval_details = details.get("eval_details", {}).get("static_analysis", {})
+    inner_details = eval_details.get("details", {})
+
+    line = inner_details.get("line", "?")
+    offset = inner_details.get("offset", "?")
+    text = inner_details.get("text", "N/A")
+
+    md = [
+        "### ❌ IMMEDIATE REJECTION: Syntax Error",
+        f"**Message**: {str(e)}",
+        f"- **Line**: {line}",
+        f"- **Offset**: {offset}",
+        f"\n**Context**:\n```python\n{text.strip()}\n```",
+        "\nPlease correct the syntax before attempting to save again.",
+    ]
+    return "\n".join(md)
+
+
+def _format_validation_error(e: ValidationError) -> str:
+    """Format a quality gate validation error into a user-friendly markdown report."""
+    details = e.details or {}
+    score = details.get("score", 0)
+    reason = details.get("reason", str(e))
+    eval_details = details.get("eval_details", {})
+
+    # Build a helpful report
+    report = [f"Quality Gate REJECTED: {reason}", f"Final Score: {score:.1f}/100"]
+
+    if eval_details:
+        report.append("\nBreakdown:")
+        for tool_name, res in eval_details.items():
+            tool_score = res.get("score", 0)
+            tool_reason = res.get("reason", "N/A")
+            report.append(f"- {tool_name}: {tool_score:.1f} ({tool_reason})")
+
+            # Show traceback or stderr if available (Crucial for debugging)
+            inner_details = res.get("details", {}) or {}
+            if inner_details.get("traceback"):
+                report.append(f"  [TRACEBACK]\n{inner_details['traceback']}")
+            elif inner_details.get("stderr"):
+                report.append(f"  [STDERR]\n{inner_details['stderr']}")
+
+    return "\n".join(report)
 
 
 @mcp.tool()
@@ -181,60 +240,21 @@ async def save_function(
             mock_imports=mock_imports,
             timeout=timeout,
         )
-        return (
-            (
-                f"Asset '{name}' (Project: {project}) has been accepted and saved with status 'pending'.\n"
-                "Verification is running in the background. Use 'get_verification_status' to check progress."
+        if success:
+            return (
+                f"Asset '{name}' (Project: {project}) has been accepted and saved.\n"
+                "Verification is running in the background. Use 'get_verification_status'."
             )
-            if success
-            else "Failed to initiate save (Unknown Error)"
-        )
+        return "Failed to initiate save (Unknown Error)"
     except SyntaxValidationError as e:
-        # User feedback Tip #3: Prominent Syntax Error Reporting
-        details = e.details or {}
-        eval_details = details.get("eval_details", {}).get("static_analysis", {})
-        inner_details = eval_details.get("details", {})
-
-        line = inner_details.get("line", "?")
-        offset = inner_details.get("offset", "?")
-        text = inner_details.get("text", "N/A")
-
-        md = [
-            "### ❌ IMMEDIATE REJECTION: Syntax Error",
-            f"**Message**: {str(e)}",
-            f"- **Line**: {line}",
-            f"- **Offset**: {offset}",
-            f"\n**Context**:\n```python\n{text.strip()}\n```",
-            "\nPlease correct the syntax before attempting to save again.",
-        ]
-        return "\n".join(md)
+        return _format_syntax_error(e)
     except ValidationError as e:
-        # Extract rich details for better transparency (User feedback Tip #1)
-        details = e.details or {}
-        score = details.get("score", 0)
-        reason = details.get("reason", str(e))
-        eval_details = details.get("eval_details", {})
-
-        # Build a helpful report
-        report = [f"Quality Gate REJECTED: {reason}", f"Final Score: {score:.1f}/100"]
-
-        if eval_details:
-            report.append("\nBreakdown:")
-            for tool_name, res in eval_details.items():
-                tool_score = res.get("score", 0)
-                tool_reason = res.get("reason", "N/A")
-                report.append(f"- {tool_name}: {tool_score:.1f} ({tool_reason})")
-
-                # Show traceback or stderr if available (Crucial for debugging)
-                inner_details = res.get("details", {}) or {}
-                if inner_details.get("traceback"):
-                    report.append(f"  [TRACEBACK]\n{inner_details['traceback']}")
-                elif inner_details.get("stderr"):
-                    report.append(f"  [STDERR]\n{inner_details['stderr']}")
-
-        return "\n".join(report)
+        return _format_validation_error(e)
     except LogicHiveError as e:
-        return f"LogicHive SYSTEM ERROR: {str(e)}\n\n(This is likely a transient infrastructure issue, not a problem with your code. Please try again in a few moments.)"
+        return (
+            f"LogicHive SYSTEM ERROR: {str(e)}\n\n(This is likely a transient infrastructure "
+            "issue, not a problem with your code. Please try again in a few moments.)"
+        )
     except Exception as e:
         return f"Unexpected Error: {str(e)}"
 
@@ -246,7 +266,9 @@ async def debug_db(wait_for_previous: bool = False) -> str:
     Debug tool to inspect LogicHive database configuration and table structure.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
+            Use true when this tool depends on the output of previous tools.
     """
 
     from core.config import SQLITE_DB_PATH
@@ -279,7 +301,9 @@ async def delete_function(
     Args:
         name: The case-sensitive name of the function to delete.
         project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
+            Use true when this tool depends on the output of previous tools.
     """
     success = await do_delete_async(name, project=project)
     if success:
@@ -301,7 +325,9 @@ async def list_functions(
         project: Optional project name to filter by.
         tags: Optional list of tags to filter by.
         limit: Max results. Default 50.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
+            Use true when this tool depends on the output of previous tools.
     """
     try:
         results = await orchestrator.do_list_async(project=project, tags=tags, limit=limit)
@@ -334,7 +360,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     including DB status, Vector store synchronization, and Environment pools.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.
+        wait_for_previous: Set to true to wait for all previously requested tools in this turn
+            to complete before starting. Set to false (or omit) to run in parallel.
+            Use true when this tool depends on the output of previous tools.
     """
 
     from storage.vector_store import vector_manager
@@ -345,16 +373,19 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
         # 1. DB Check
         db_exists = os.path.exists(SQLITE_DB_PATH)
         status.append(
-            f"### 1. Database\n- Path: `{SQLITE_DB_PATH}`\n- Status: {'✅ Connected' if db_exists else '❌ Missing'}"
+            f"### 1. Database\n- Path: `{SQLITE_DB_PATH}`\n- Status: "
+            f"{'✅ Connected' if db_exists else '❌ Missing'}"
         )
 
         if db_exists:
             count = await sqlite_storage.get_function_count()
             # New: Get count of assets that SHOULD be in FAISS (have embeddings)
             db = await get_db_connection()
-            async with db.execute(
-                "SELECT COUNT(*) FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
-            ) as cursor:
+            sql = (
+                "SELECT COUNT(*) FROM logichive_functions "
+                "WHERE embedding IS NOT NULL AND embedding != 'null'"
+            )
+            async with db.execute(sql) as cursor:
                 row = await cursor.fetchone()
                 expected_count = row[0] if row else 0
 
@@ -363,7 +394,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
         # 2. Vector Store Check
         faiss_exists = os.path.exists(FAISS_INDEX_PATH)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: {'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
+            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: "
+            f"{'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
         )
 
         if faiss_exists and db_exists:
@@ -374,7 +406,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
                 idx_size = vector_manager.index.ntotal if vector_manager.index else 0
                 if idx_size != expected_count:
                     status.append(
-                        f"- **Desync Detected**: DB({expected_count} verified) vs FAISS-Memory({idx_size}). Rebuild recommended."
+                        f"- **Desync Detected**: DB({expected_count} verified) vs "
+                        f"FAISS-Memory({idx_size}). Rebuild recommended."
                     )
                 else:
                     status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
@@ -384,7 +417,8 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
         pool = PoolManager.get_instance()
         status.append(
-            f"### 3. Environment Pool\n- Base Dir: `{pool.base_dir}`\n- GPU Available: {'✅' if pool.has_gpu else '❌'}"
+            f"### 3. Environment Pool\n- Base Dir: `{pool.base_dir}`\n- GPU Available: "
+            f"{'✅' if pool.has_gpu else '❌'}"
         )
 
         return "\n".join(status)
@@ -472,23 +506,169 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 if __name__ == "__main__":
+    import socket
     import sys
 
+    import psutil
+    import uvicorn
+
+    import core.config
     from core import __version__
-    from core.config import HOST, PORT
+    from core.config import validate_config_lazy
+    from core.system_info import SystemFingerprint
 
-    try:
-        logger.info(f"Starting LogicHive MCP Server (v{__version__}) on http://{HOST}:{PORT}/sse")
-        mcp.run(transport="sse", host=HOST, port=PORT)
-    except Exception as e:
-        import traceback
-        print(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-
-        # Prevent terminal window from closing immediately when running as compiled EXE
+    def wait_on_error():
+        """Prevents the terminal window from closing immediately in frozen mode."""
         if getattr(sys, "frozen", False):
-            print("\n" + "=" * 60)
-            print("The server encountered a fatal error and stopped.")
-            input("Press Enter to close this window...")
+            logger.info("=" * 60)
+            input("Press Enter to exit...")
+
+    def get_conflicting_process(port: int):
+        """Identifies the process currently using the specified port."""
+        try:
+            for conn in psutil.net_connections(kind="inet"):
+                if conn.laddr.port == port and conn.status == "LISTEN":
+                    return psutil.Process(conn.pid)
+        except Exception as e:
+            logger.debug(
+                f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
+            )
+        return None
+
+    def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
+        """Finds the first available port starting from start_port."""
+        port = start_port
+        while port < 65535:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind((host, port))
+                    return port
+                except OSError:
+                    port += 1
+        return start_port
+
+    # --- MONKEYPATCH UVICORN ---
+    # Uvicorn's Server.startup calls sys.exit(1) directly on socket errors.
+    # We override this to raise an exception instead, so we can handle it and wait_on_error.
+    original_startup = uvicorn.Server.startup
+
+    async def resilient_startup(self, sockets=None):
+        try:
+            await original_startup(self, sockets=sockets)
+        except SystemExit as e:
+            # If uvicorn tried to exit, it's likely a bind error (OSError)
+            # Re-raise as OSError so our outer block can catch it
+            if not self.started:
+                raise OSError(10048, "Port binding failed (detected via SystemExit)") from e
+            raise
+
+    uvicorn.Server.startup = resilient_startup
+    # ---------------------------
+
+    # Use a loop to allow retries or port changes without restarting the process
+    current_port = core.config.PORT
+    while True:
+        try:
+            if not os.environ.get("LOGICHIVE_TESTING"):
+                # Improved configuration validation (User Request)
+                is_valid, error_msg, config_path = validate_config_lazy()
+                if not is_valid:
+                    logger.error("\n" + "=" * 60)
+                    logger.error(f"LogicHive MCP (v{__version__}) - [ERROR]")
+                    logger.error("=" * 60)
+                    logger.error(f"\n[!] CONFIGURATION INCOMPLETE: {error_msg}")
+                    logger.error(
+                        "Please use the LogicHive Settings tool (logichive-settings.exe) "
+                        "to configure the system."
+                    )
+                    logger.error(f"Or edit your configuration file manually at:\n  {config_path}")
+                    logger.error("=" * 60)
+                    wait_on_error()
+                    sys.exit(1)
+
+            # Apply settings
+            host_val = core.config.HOST
+
+            # Start network listeners
+            logger.info("=" * 60)
+            logger.info(f"Starting LogicHive Hub (v{__version__})")
+            logger.info(f"AI Provider: {core.config.MODEL_TYPE.upper()}")
+            logger.info(f"Network: {host_val}:{current_port}")
+
+            if host_val == "0.0.0.0":
+                hostname = socket.gethostname()
+                logger.warning("=" * 60)
+                logger.warning(" LAN SHARING IS ENABLED (0.0.0.0)")
+                logger.warning(" This server is accessible from other computers on your network.")
+                logger.warning(" Do not use this on public networks.")
+                logger.warning("=" * 60)
+
+            # Create CORS middleware configuration
+            # In order to support webview-based clients (like Cline or VS Code extensions)
+            # that use browser `fetch`, we must:
+            # 1. Allow all origins/methods/headers.
+            # 2. EXPOSE all headers so the client can read the MCP session ID from the response.
+            from starlette.middleware import Middleware
+            from starlette.middleware.cors import CORSMiddleware
+
+            cors_middleware = Middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+                expose_headers=["*"],  # CRITICAL: Allows client to read session headers
+            )
+
+            # Create the app instance using Streamable HTTP with our middleware
+            # This ensures FastMCP integrates the middleware into its internal routing/lifespan.
+            app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
+
+            # Inform user about available endpoints
+            logger.info("Server is accessible at:")
+
+            # 1. Local URL (Always works)
+            logger.info(f"  > http://localhost:{current_port}/mcp (Local)")
+
+            # 2. Team URL via mDNS (Recommended for stability)
+            if host_val == "0.0.0.0":
+                hostname = socket.gethostname().lower()
+                logger.info(f"  > http://{hostname}.local:{current_port}/mcp (Team - Recommended)")
+
+                # 3. IP Fallback (If mDNS is disabled on network)
+                ips = SystemFingerprint.get_local_ips()
+                for ip in ips:
+                    logger.info(f"  > http://{ip}:{current_port}/mcp (IP Fallback)")
+
+            import uvicorn
+
+            log_level = fastmcp.settings.log_level.lower()
+
+            # Start the server
+            uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
+
+            break  # Success!
+
+        except OSError as e:
+            if e.errno == 10048 or "10048" in str(e):
+                logger.error(f"\n[!] NETWORK ERROR: Port {current_port} is already in use.")
+
+                # Diagnostics
+                proc = get_conflicting_process(current_port)
+                if proc:
+                    logger.error(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
+
+                logger.error("Please change the PORT in settings or kill the conflicting process.")
+                wait_on_error()
+                sys.exit(1)
+
+            logger.error(f"\n[FATAL OS ERROR]: {e}")
+            logger.exception("Traceback:")
+            wait_on_error()
             sys.exit(1)
-        raise
+
+        except Exception as e:
+            logger.error(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}")
+            logger.exception("Traceback:")
+            wait_on_error()
+            sys.exit(1)

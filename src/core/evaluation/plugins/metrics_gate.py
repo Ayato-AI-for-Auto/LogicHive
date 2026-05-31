@@ -20,7 +20,8 @@ class MetricsGateEvaluator(BaseEvaluator):
     async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
         if language.lower() != "python":
             return EvaluationResult(
-                score=100.0, reason="Metrics analysis skipped for non-python language."
+                score=100.0,
+                reason="Metrics analysis skipped for non-python language.",
             )
 
         try:
@@ -48,14 +49,16 @@ class MetricsGateEvaluator(BaseEvaluator):
                     severity = (m["complexity"] - 10) * 15  # Even stronger deduction
                     total_deduction += severity
                     warnings.append(
-                        f"Function '{m['name']}' (L{m['lineno']}) is too complex (CC={m['complexity']})."
+                        f"Function '{m['name']}' (L{m['lineno']}) is too "
+                        f"complex (CC={m['complexity']})."
                     )
 
                 # 2. Parameter count gate (Threshold: 6)
                 if m["parameters"] > 6:
                     total_deduction += 30  # Even stronger deduction
                     warnings.append(
-                        f"Function '{m['name']}' (L{m['lineno']}) has too many parameters ({m['parameters']})."
+                        f"Function '{m['name']}' (L{m['lineno']}) has too many "
+                        f"parameters ({m['parameters']})."
                     )
 
         score = max(0.0, 100.0 - total_deduction)

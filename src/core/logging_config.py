@@ -9,6 +9,7 @@ from loguru import logger
 # Context variable for tracing request/execution flows
 current_run_id: ContextVar[str] = ContextVar("run_id", default="system")
 
+
 class InterceptHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -21,67 +22,116 @@ class InterceptHandler(logging.Handler):
             depth += 1
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
+
 def json_serializer(record):
     exception = record["exception"]
+
     subset = {
         "timestamp": record["time"].isoformat(),
         "level": record["level"].name,
         "message": record["message"],
-        "name": record["extra"].get("name", "unknown"),
+        "name": record["extra"].get("name", record["name"]),
         "function": record["function"],
         "line": record["line"],
         "run_id": record["extra"].get("run_id", "system"),
     }
     if exception:
         subset["exception"] = {
-            "type": exception.type.__name__,
+            "type": str(exception.type.__name__),
             "value": str(exception.value),
-            "traceback": str(exception)
+            "traceback": str(exception.traceback),
         }
     return json.dumps(subset)
 
+
+def rotate_previous_execution_log(filepath):
+    """Keep only the last 2 executions by renaming the current file to _prev."""
+    if os.path.exists(filepath):
+        base, ext = os.path.splitext(filepath)
+        prev_path = f"{base}_prev{ext}"
+        if os.path.exists(prev_path):
+            try:
+                os.remove(prev_path)
+            except OSError:
+                pass
+        try:
+            os.rename(filepath, prev_path)
+        except OSError:
+            pass
+
+
 def setup_logging():
-    log_dir = "logs"
+    # Use user's home directory for logs to avoid permission issues in Program Files
+    # and to centralize logs for different execution methods.
+    log_dir = os.path.expanduser("~/.logichive/logs")
     os.makedirs(log_dir, exist_ok=True)
-
-    latest_log = os.path.join(log_dir, "logichive.jsonl")
-    previous_log = os.path.join(log_dir, "logichive_previous.jsonl")
-
-    # Strictly keep 2 generations
-    if os.path.exists(latest_log):
-        if os.path.exists(previous_log):
-            os.remove(previous_log)
-        os.rename(latest_log, previous_log)
 
     logger.remove()
 
+    # Determine process name to separate logs (settings_ui.py vs mcp_server.py)
+    # This prevents collisions between logichive-hub.exe and logichive-settings.exe.
+    main_script = os.path.basename(sys.argv[0]).lower()
+    if "settings" in main_script:
+        proc_name = "settings"
+    elif "hub" in main_script or "mcp_server" in main_script:
+        proc_name = "hub"
+    else:
+        # Fallback for generic execution
+        proc_name = "app"
+
     # 1. Console Sink (Human Readable)
+    if sys.stderr is not None:
+        log_format = (
+            "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+            "<cyan>{extra[name]}</cyan> - {message}"
+        )
+        logger.add(
+            sys.stderr,
+            format=log_format,
+            level="INFO",
+        )
+
+    # Manual rotation for keeping exact last 2 executions
+    main_log_path = os.path.join(log_dir, f"{proc_name}.jsonl")
+    error_log_path = os.path.join(log_dir, f"{proc_name}_error.log")
+
+    rotate_previous_execution_log(main_log_path)
+    rotate_previous_execution_log(error_log_path)
+
+    # 2. Main JSON Sink (All logs for traceability)
     logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[name]}:{function}:{line}</cyan> - [RunID: <yellow>{extra[run_id]}</yellow>] - <level>{message}</level>",
-        level="INFO",
+        main_log_path,
+        format="{extra[serialized]}",
+        level="DEBUG",
+        enqueue=True,
     )
 
-    # 2. Main JSON Sink
-    logger.add(latest_log, format="{extra[serialized]}", level="DEBUG", enqueue=True)
-
-    # 3. Isolated Error Sink
+    # 3. Isolated Error Sink (Only ERROR and CRITICAL)
     logger.add(
-        os.path.join(log_dir, "error.log"),
+        error_log_path,
         format="{extra[serialized]}",
         level="ERROR",
         enqueue=True,
     )
 
     def patcher(record):
-        record["extra"]["run_id"] = current_run_id.get()
         record["extra"]["name"] = record["extra"].get("name", record["name"])
+        record["extra"]["run_id"] = current_run_id.get()
         record["extra"]["serialized"] = json_serializer(record)
 
     logger.configure(patcher=patcher)
+
+    # Bridge standard logging to loguru
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+    # --- NOISE REDUCTION ---
+    for lib in ["faiss", "swig", "httpx", "uvicorn"]:
+        logging.getLogger(lib).setLevel(logging.WARNING)
+
 
 def get_logger(name: str):
     return logger.bind(name=name)
 
+
+# Initialize on import
 setup_logging()

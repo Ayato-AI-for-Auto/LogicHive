@@ -34,10 +34,10 @@ async def test_chaos_database_lock_simulation(test_db):
     """CHAOS: Simulate database lock to ensure retry logic handles it or fails gracefully."""
     import sqlite3
 
-    from core.config import SQLITE_DB_PATH
+    import core.config
 
     # Manually lock the DB
-    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
     conn.execute("BEGIN EXCLUSIVE TRANSACTION")
 
     try:
@@ -59,7 +59,10 @@ async def test_chaos_database_lock_simulation(test_db):
 
 @pytest.mark.asyncio
 async def test_chaos_heavy_import_blocking(test_db):
-    """CHAOS: Submit code with heavy imports without mocking, ensuring it gets blocked by static analyzer or times out."""
+    """
+    CHAOS: Submit code with heavy imports without mocking,
+    ensuring it gets blocked by static analyzer or times out.
+    """
     name = "chaos_heavy"
     code = "import torch\nimport tensorflow\n\ndef noop(): pass"
     test_code = "noop()"

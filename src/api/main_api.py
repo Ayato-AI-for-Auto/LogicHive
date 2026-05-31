@@ -137,5 +137,5 @@ async def search(query: SearchQuery):
 if __name__ == "__main__":
     import uvicorn
 
-    print("Starting LogicHive REST API on http://localhost:8000")
+    logger.info("Starting LogicHive REST API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

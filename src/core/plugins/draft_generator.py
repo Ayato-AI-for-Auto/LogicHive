@@ -40,15 +40,17 @@ class DraftGenerator:
             logger.debug(f"DraftGenerator: Using {len(context_results[:3])} patterns as context.")
 
         prompt = (
-            f"You are the LogicHive Draft Assistant. Your goal is to synthesize a high-quality, reusable code draft.\n"
+            "You are the LogicHive Draft Assistant. "
+            "Your goal is to synthesize a high-quality, reusable code draft.\n"
             f"User Query/Target: {query}\n"
             f"Language: {language}\n\n"
-            f"Below are some similar patterns from the existing LogicHive vault. \n"
-            f"Follow the coding style, naming conventions, and robustness patterns seen here:\n"
+            "Below are some similar patterns from the existing LogicHive vault. \n"
+            "Follow the coding style, naming conventions, and robustness patterns seen here:\n"
             f"{context_str}\n\n"
-            f"Task: Generate a draft implementation that solves the User Query.\n"
-            f"REQUIREMENTS:\n"
-            f"1. Respond ONLY with a JSON object containing keys: 'name', 'code', 'description', 'tags', 'dependencies'.\n"
+            "Task: Generate a draft implementation that solves the User Query.\n"
+            "REQUIREMENTS:\n"
+            "1. Respond ONLY with a JSON object containing keys: "
+            "'name', 'code', 'description', 'tags', 'dependencies'.\n"
             f"2. The code should be functional and follow the patterns provided.\n"
             f"3. Mark this clearly as a DRAFT in the description.\n"
             f"4. Focus on atomicity and reusability."

@@ -1,3 +1,4 @@
+class PromptGenerator:
     def get_verification_prompt(self, name: str, code: str, description: str) -> str:
         """Generates a prompt for AI-driven quality/security review."""
         return (

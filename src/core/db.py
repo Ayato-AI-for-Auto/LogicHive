@@ -3,7 +3,6 @@ from functools import wraps
 
 import aiosqlite
 
-from core.config import SQLITE_DB_PATH
 from core.logging_config import get_logger
 from core.migration import run_migrations
 
@@ -41,7 +40,8 @@ async def get_db_connection() -> aiosqlite.Connection:
             _global_db = None
 
         if _global_db is None:
-            _global_db = await aiosqlite.connect(SQLITE_DB_PATH)
+            from core.config import get_sqlite_db_path
+            _global_db = await aiosqlite.connect(get_sqlite_db_path())
             _global_db.row_factory = aiosqlite.Row
             _creator_loop = current_loop
 

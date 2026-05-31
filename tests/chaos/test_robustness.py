@@ -44,9 +44,8 @@ async def test_chaos_extreme_code_length(test_db):
     name = "huge_bloat"
     huge_code = "def large():\n" + "    pass\n" * 5000  # 5000 lines
 
-    # This might exceed the 800 line limit in Git rules, but here we test the system's runtime limit.
-    # LogicHive's EvaluationManager should handle this gracefully or time out.
-
+    # This might exceed the 800 line limit in Git rules, but here we test the system's runtime
+    # limit. LogicHive's EvaluationManager should handle this gracefully or time out.
     await do_save_async(name=name, code=huge_code, description="Testing bloat handling")
 
     for _ in range(10):

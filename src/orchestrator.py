@@ -251,7 +251,8 @@ async def _run_async_verification_pipeline(
         final_score = float(eval_res["score"])
         is_system_error = eval_res.get("is_system_error", False)
         logger.info(
-            f"[DEBUG] Orchestrator Verification: score={final_score}, is_system_error={is_system_error}"
+            f"[DEBUG] Orchestrator Verification: score={final_score}, "
+            f"is_system_error={is_system_error}"
         )
         status = "verified" if final_score >= QUALITY_GATE_THRESHOLD else "failed"
         if is_system_error:
@@ -277,8 +278,12 @@ async def _run_async_verification_pipeline(
             reliability_score=final_score,
         )
 
-        # 5. Sync to Vector Store (if verified)
-        if status == "verified":
+        # 5. Sync to Database and Vector Store (if verified)
+        if status == "verified" and embedding:
+            # Update DB with embedding
+            await sqlite_storage.update_function_embedding(name, project, embedding)
+
+            # Sync to FAISS
             await vector_manager.upsert_vector(
                 name,
                 embedding,
@@ -322,7 +327,8 @@ async def do_search_async(
                 query_emb = await intel.generate_embedding(expanded_query)
 
                 logger.info(
-                    f"Orchestrator: Performing hybrid search for '{query}' (Lang: {language}, Project: {project}, Attempt: {attempt + 1})"
+                    f"Orchestrator: Performing hybrid search for '{query}' "
+                    f"(Lang: {language}, Project: {project}, Attempt: {attempt + 1})"
                 )
 
                 # 1. Fetch more candidates than requested for re-ranking (limit * 3)
@@ -349,7 +355,8 @@ async def do_search_async(
 
                 if top_score < 0.45 and is_generation_request:
                     logger.info(
-                        f"Orchestrator: Weak results (Score: {top_score:.2f}) and Generation intent detected. Triggering..."
+                        f"Orchestrator: Weak results (Score: {top_score:.2f}) and "
+                        "Generation intent detected. Triggering..."
                     )
                     from core.plugins.draft_generator import DraftGenerator
 

@@ -1,3 +1,11 @@
+from typing import Any, Dict, List
+
+
+class ScoreChecker:
+    def __init__(self, processor, security_auditor):
+        self.processor = processor
+        self.security_auditor = security_auditor
+
     def check_score_only(
         self,
         name: str,

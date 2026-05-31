@@ -1,3 +1,18 @@
+import ast
+import logging
+from typing import List
+
+logger = logging.getLogger(__name__)
+
+class ValidationError(Exception):
+    """Custom validation error for LogicHive."""
+    pass
+
+class LogicHiveError(Exception):
+    """Base error for LogicHive."""
+    pass
+
+
 def extract_python_dependencies(code: str) -> List[str]:
     """
     Deterministically extracts top-level imports from Python code using AST.

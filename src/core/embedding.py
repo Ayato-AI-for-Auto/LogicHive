@@ -1,5 +1,4 @@
 import logging
-import sys
 
 from core.config import (
     EMBEDDING_MODEL_ID,
@@ -84,6 +83,7 @@ class OllamaEmbeddingService:
 
     def get_embedding(self, text: str, is_query: bool = False) -> list[float]:
         import httpx
+
         try:
             resp = httpx.post(
                 f"{self.url}/api/embeddings",
@@ -91,13 +91,14 @@ class OllamaEmbeddingService:
                     "model": self.model_name,
                     "prompt": text,
                 },
-                timeout=15.0
+                timeout=15.0,
             )
             if resp.status_code == 200:
                 vector = resp.json().get("embedding", [])
                 if len(vector) != VECTOR_DIMENSION:
                     logger.warning(
-                        f"OllamaEmbeddingService: Vector length ({len(vector)}) mismatch with expected {VECTOR_DIMENSION}. Adjusting."
+                        f"OllamaEmbeddingService: Vector length ({len(vector)}) "
+                        f"mismatch with expected {VECTOR_DIMENSION}. Adjusting."
                     )
                     if len(vector) < VECTOR_DIMENSION:
                         vector = vector + [0.0] * (VECTOR_DIMENSION - len(vector))
@@ -132,8 +133,11 @@ class FastEmbedEmbeddingService:
             return
         try:
             from fastembed import TextEmbedding
+
             self._model = TextEmbedding(model_name=self.model_name)
-            logger.info(f"FastEmbedEmbeddingService: Initialized successfully with {self.model_name}")
+            logger.info(
+                f"FastEmbedEmbeddingService: Initialized successfully with {self.model_name}"
+            )
         except ImportError:
             msg = (
                 "\n" + "=" * 80 + "\n"
@@ -142,7 +146,8 @@ class FastEmbedEmbeddingService:
                 "Or switch EMBEDDING_PROVIDER to 'gemini' or 'ollama' in your .env.\n"
                 "================================================================================\n"
             )
-            print(msg, file=sys.stderr)
+            import sys
+            sys.stderr.write(msg)
             logger.error("FastEmbedEmbeddingService: Missing fastembed library.")
             raise ImportError("Missing 'fastembed' package.")
         except Exception as e:

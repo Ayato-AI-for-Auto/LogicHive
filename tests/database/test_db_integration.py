@@ -21,13 +21,17 @@ async def test_db_connection_and_io():
 
     await close_db_connection()
 
+
 @pytest.mark.asyncio
 async def test_concurrent_db_access():
     """Integration: Tests concurrent access handling via pool/locks."""
+
     async def task(i):
         conn = await get_db_connection()
         # Use unique key per task
-        await conn.execute("INSERT INTO config (key, value) VALUES (?, ?)", (f"concurrent_{i}", "ok"))
+        await conn.execute(
+            "INSERT INTO config (key, value) VALUES (?, ?)", (f"concurrent_{i}", "ok")
+        )
         await conn.commit()
         return True
 

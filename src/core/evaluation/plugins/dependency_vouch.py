@@ -22,7 +22,10 @@ class DependencyVouchEvaluator(BaseEvaluator):
 
     async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
         if language.lower() != "python":
-            return EvaluationResult(score=100.0, reason="Dependency check skipped for non-python.")
+            return EvaluationResult(
+                score=100.0,
+                reason="Dependency check skipped for non-python.",
+            )
 
         try:
             tree = ast.parse(code)
@@ -149,7 +152,8 @@ class DependencyVouchEvaluator(BaseEvaluator):
                     line = line.strip()
                     if not line or line.startswith(("#", "-")):
                         continue
-                    # Extract package name: e.g. "flask==2.0.1" -> "flask", "pandas>=1.0" -> "pandas"
+                    # Extract package name: e.g. "flask==2.0.1" -> "flask"
+                    # or "pandas>=1.0" -> "pandas"
                     # Split on any character that isn't a letter, digit, underscore, or hyphen
                     name_match = re.match(r"^([a-zA-Z0-9_\-]+)", line)
                     if name_match:
