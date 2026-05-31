@@ -3,10 +3,9 @@ import asyncio
 import pytest
 
 from core.exceptions import SyntaxValidationError
-import pytest
-
 from orchestrator import do_get_verification_status, do_save_async
 from storage import sqlite_api
+
 
 @pytest.mark.asyncio
 async def test_integration_save_valid_function(test_db):
