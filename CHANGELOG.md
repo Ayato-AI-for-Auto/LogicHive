@@ -1,3 +1,10 @@
+# [0.10.0-dev.5](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.4...v0.10.0-dev.5) (2026-05-31)
+
+
+### Bug Fixes
+
+* **build:** resolve PyInstaller metadata discovery failure and align binary names ([507951f](https://github.com/ayato-labs/LogicHive/commit/507951f1956757ed9da3ba3ef4e526d246f1d52e))
+
 # [0.10.0-dev.4](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.3...v0.10.0-dev.4) (2026-05-31)
 
 
