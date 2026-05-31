@@ -201,12 +201,25 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 # --- Path Resolution Helpers ---
 
 def get_logic_hive_home() -> Path:
-    return Path(os.getenv("LOGICHIVE_HOME", str(Path.home() / ".logichive")))
+    # Ensure we return an absolute path to avoid ambiguity in tests
+    return Path(os.getenv("LOGICHIVE_HOME", str(Path.home() / ".logichive"))).resolve()
 
 def get_data_dir() -> Path:
-    if os.getenv("K_SERVICE") is not None or os.name != "nt":
+    # Only use /tmp/logic-hive for Knative services in production
+    if os.getenv("K_SERVICE") is not None:
         return Path("/tmp/logic-hive")
-    return get_logic_hive_home() / "data"
+    
+    # Respect the resolved home directory
+    data_dir = get_logic_hive_home() / "data"
+    
+    # Ensure it exists before returning (important for database initialization)
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        # Fallback to local ./data if home is unwritable, but log it
+        logger.error(f"Config: Failed to create data directory at {data_dir}: {e}")
+        
+    return data_dir
 
 def get_sqlite_db_path() -> str:
     return os.getenv("SQLITE_DB_PATH", str(get_data_dir() / "logichive.db"))
