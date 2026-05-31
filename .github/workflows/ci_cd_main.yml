@@ -112,9 +112,28 @@ jobs:
         run: |
           $env:PYTHONPATH = "src"
           uv run pyinstaller --noconfirm --clean tools/packaging/LogicHive.spec
+          
+          # Verify the build succeeded
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "PyInstaller build failed"
+              exit 1
+          }
+          
+          # Check what was actually created
+          Write-Host "Contents of dist directory:"
+          Get-ChildItem -Path dist -Recurse
+          
           # Rename based on branch
           if ("${{ github.ref_name }}" -eq "develop") {
-            Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+            if (Test-Path "dist/LogicHive-MCP.exe") {
+                Move-Item dist/LogicHive-MCP.exe dist/LogicHive-MCP-dev.exe
+            } else {
+                Write-Error "Expected file dist/LogicHive-MCP.exe not found after build"
+                exit 1
+            }
+            if (Test-Path "dist/logichive-hub.exe") {
+                Move-Item dist/logichive-hub.exe dist/logichive-hub-dev.exe
+            }
           }
 
       - name: Upload to GitHub Release
@@ -125,11 +144,13 @@ jobs:
         run: |
           if ("${{ github.ref_name }}" -eq "develop") {
              $exe_file = "dist/LogicHive-MCP-dev.exe"
+             $hub_file = "dist/logichive-hub-dev.exe"
              $tag = "v-develop"
              # Create pre-release if it does not exist
              gh release create $tag --prerelease --title "LogicHive Development Pre-release" --notes "Rolling pre-release build for the develop branch." --target "develop" 2>$null
-             gh release upload $tag $exe_file --clobber
+             gh release upload $tag $exe_file $hub_file --clobber
           } else {
              $exe_file = "dist/LogicHive-MCP.exe"
-             gh release upload "v$env:RELEASE_VERSION" $exe_file --clobber
+             $hub_file = "dist/logichive-hub.exe"
+             gh release upload "v$env:RELEASE_VERSION" $exe_file $hub_file --clobber
           }

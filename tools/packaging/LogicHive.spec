@@ -96,7 +96,7 @@ exe_settings = EXE(
     a_settings.zipfiles,
     a_settings.datas,
     [],
-    name='logichive-settings',
+    name='LogicHive-MCP',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
