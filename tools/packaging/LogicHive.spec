@@ -13,8 +13,16 @@ project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
-# Common data and metadata
-common_datas = copy_metadata('fastmcp') + copy_metadata('google-genai') + copy_metadata('mcp') + copy_metadata('flet') + copy_metadata('flet_desktop') + collect_data_files('flet')
+# Robust metadata collection
+metadata_packages = ['fastmcp', 'google-genai', 'mcp', 'flet', 'flet_desktop']
+common_datas = collect_data_files('flet')
+
+for pkg in metadata_packages:
+    try:
+        common_datas += copy_metadata(pkg)
+    except Exception:
+        print(f"Warning: Metadata for {pkg} not found, skipping...")
+
 common_hiddenimports = [
     'fastmcp',
     'google.genai',
@@ -28,7 +36,10 @@ common_hiddenimports = [
     'psutil',
     'flet',
     'flet_desktop',
-    'flet_runtime'
+    'flet_runtime',
+    'flet.canvas',
+    'flet.charts',
+    'flet.svg'
 ]
 
 # --- 1. Engine Binary (Hub) ---
@@ -77,7 +88,7 @@ a_settings = Analysis(
     pathex=[os.path.join(project_root, 'src')],
     binaries=[],
     datas=common_datas,
-    hiddenimports=common_hiddenimports + ['flet.canvas', 'flet.charts', 'flet.svg'],
+    hiddenimports=common_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
