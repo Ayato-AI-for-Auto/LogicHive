@@ -141,16 +141,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ needs.release_version.outputs.new_release_version }}
+          IS_PUBLISHED: ${{ needs.release_version.outputs.new_release_published }}
         run: |
-          if ("${{ github.ref_name }}" -eq "develop") {
-             $exe_file = "dist/LogicHive-MCP-dev.exe"
-             $hub_file = "dist/logichive-hub-dev.exe"
+          $tag = ""
+          if ("$env:IS_PUBLISHED" -eq "true") {
+             $tag = "v$env:RELEASE_VERSION"
+          } elseif ("${{ github.ref_name }}" -eq "develop") {
              $tag = "v-develop"
              # Create pre-release if it does not exist
              gh release create $tag --prerelease --title "LogicHive Development Pre-release" --notes "Rolling pre-release build for the develop branch." --target "develop" 2>$null
+          }
+
+          if ($tag -ne "") {
+             $exe_file = if (Test-Path "dist/LogicHive-MCP-dev.exe") { "dist/LogicHive-MCP-dev.exe" } else { "dist/LogicHive-MCP.exe" }
+             $hub_file = if (Test-Path "dist/logichive-hub-dev.exe") { "dist/logichive-hub-dev.exe" } else { "dist/logichive-hub.exe" }
+             
+             Write-Host "Targeting Release: $tag"
+             Write-Host "Uploading Assets: $exe_file, $hub_file"
+             
              gh release upload $tag $exe_file $hub_file --clobber
           } else {
-             $exe_file = "dist/LogicHive-MCP.exe"
-             $hub_file = "dist/logichive-hub.exe"
-             gh release upload "v$env:RELEASE_VERSION" $exe_file $hub_file --clobber
+             Write-Error "No target tag identified for release upload."
+             exit 1
           }
