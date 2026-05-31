@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from core.config import SQLITE_DB_PATH
+import core.config
 from core.migration import run_migrations
 
 
@@ -15,7 +15,7 @@ def clean_db():
     # Ensure connection is closed before test
     asyncio.run(close_db_connection())
 
-    db_path = Path(SQLITE_DB_PATH)
+    db_path = Path(core.config.SQLITE_DB_PATH)
     if db_path.exists():
         db_path.unlink()
     yield db_path

@@ -3,9 +3,10 @@ import asyncio
 import pytest
 
 from core.exceptions import SyntaxValidationError
-from orchestrator import do_get_verification_status, do_save_async
-from storage.sqlite_api import sqlite_storage
+import pytest
 
+from orchestrator import do_get_verification_status, do_save_async
+from storage import sqlite_api
 
 @pytest.mark.asyncio
 async def test_integration_save_valid_function(test_db):
@@ -87,6 +88,6 @@ async def test_integration_draft_mode(test_db):
     ]  # A draft without a valid test fails verification but remains in the vault
 
     # Let's check DB to ensure it was saved despite failing
-    f_data = await sqlite_storage.get_function_by_name(name, project="integ")
+    f_data = await sqlite_api.sqlite_storage.get_function_by_name(name, project="integ")
     assert f_data is not None
     assert f_data["verification_status"] in ["failed", "error"]

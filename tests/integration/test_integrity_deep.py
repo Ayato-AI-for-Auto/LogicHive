@@ -32,11 +32,11 @@ async def test_deep_data_integrity_handshake(test_db):
     verified = False
     status_found = "N/A"
 
-    from core.config import SQLITE_DB_PATH
+    import core.config
 
     for _ in range(max_retries):
         await asyncio.sleep(0.3)
-        conn = sqlite3.connect(SQLITE_DB_PATH)
+        conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
         cursor = conn.cursor()
         try:
             cursor.execute(
@@ -55,7 +55,7 @@ async def test_deep_data_integrity_handshake(test_db):
 
     if not verified:
         # Get full report for debugging
-        conn = sqlite3.connect(SQLITE_DB_PATH)
+        conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
         cursor = conn.cursor()
         try:
             cursor.execute(
@@ -74,7 +74,7 @@ async def test_deep_data_integrity_handshake(test_db):
     assert verified is True
 
     # 3. VERIFY SQLITE PHYSICALLY (Full check)
-    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
