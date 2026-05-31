@@ -208,17 +208,17 @@ def get_data_dir() -> Path:
     # Only use /tmp/logic-hive for Knative services in production
     if os.getenv("K_SERVICE") is not None:
         return Path("/tmp/logic-hive")
-    
+
     # Respect the resolved home directory
     data_dir = get_logic_hive_home() / "data"
-    
+
     # Ensure it exists before returning (important for database initialization)
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         # Fallback to local ./data if home is unwritable, but log it
         logger.error(f"Config: Failed to create data directory at {data_dir}: {e}")
-        
+
     return data_dir
 
 def get_sqlite_db_path() -> str:
