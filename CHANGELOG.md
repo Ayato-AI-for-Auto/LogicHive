@@ -1,3 +1,10 @@
+# [0.10.0-dev.7](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.6...v0.10.0-dev.7) (2026-05-31)
+
+
+### Bug Fixes
+
+* **ci:** add write permissions to CLA check workflow ([d1ba8eb](https://github.com/ayato-labs/LogicHive/commit/d1ba8eb3f4c0db50623e30d529e532f2fd589058))
+
 # [0.10.0-dev.6](https://github.com/ayato-labs/LogicHive/compare/v0.10.0-dev.5...v0.10.0-dev.6) (2026-05-31)
 
 
