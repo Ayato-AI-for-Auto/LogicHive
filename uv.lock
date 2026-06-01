@@ -769,6 +769,18 @@ wheels = [
 ]
 
 [[package]]
+name = "flet-desktop"
+version = "0.85.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flet" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/f5/833cdc298cc0f8f3fe2099ba62420afa7713a2774d1a6086e16e2f8857c2/flet_desktop-0.85.2.tar.gz", hash = "sha256:55dcb9afa90308b395dc488b3e59b89e6282eabe03fa5ceb294d62869826622b", size = 6089 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/40/79d22e254ba13423fce6f7e9c567e5c96f23748dfba04a418d284c3e2df2/flet_desktop-0.85.2-py3-none-any.whl", hash = "sha256:1f2aff2c66b4ed7360b3c4145aaaa9ce717ede29045159fcce66361909923fe8", size = 6178 },
+]
+
+[[package]]
 name = "frozenlist"
 version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1250,6 +1262,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "flet" },
+    { name = "flet-desktop" },
     { name = "google-genai" },
     { name = "httpx" },
     { name = "loguru" },
@@ -1281,6 +1294,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "flet" },
+    { name = "flet-desktop" },
     { name = "google-genai" },
     { name = "httpx" },
     { name = "loguru", specifier = ">=0.7.3" },

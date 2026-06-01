@@ -3,6 +3,12 @@ from pathlib import Path
 
 import flet as ft
 
+# Fallback for 'exit' name error in some environments (flet bug mitigation)
+if not hasattr(sys.modules["builtins"], "exit"):
+    import builtins
+
+    builtins.exit = sys.exit
+
 # Ensure src is in path for imports
 src_path = str(Path(__file__).parent.resolve())
 if src_path not in sys.path:
