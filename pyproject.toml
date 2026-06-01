@@ -18,6 +18,7 @@ dependencies = [
     "python-dateutil",
     "fastmcp",
     "faiss-cpu",
+    "fastembed",
     "radon",
     "ruff",
     "mypy",

@@ -130,18 +130,12 @@ class EphemeralPythonExecutor(BaseExecutor):
         return workspace
 
     def _build_command(self, pooled_env, harness_file, dependencies):
+        import sys
         if pooled_env:
             return [str(pooled_env.python_executable), str(harness_file)]
 
-        offline = os.getenv("LOGICHIVE_OFFLINE", "true").lower() in ("true", "1", "yes")
-        cmd = ["uv", "run", "--quiet"]
-        if offline:
-            cmd.append("--offline")
-        cmd.append("--no-project")
-        for dep in dependencies:
-            cmd.extend(["--with", dep])
-        cmd.extend(["python", str(harness_file)])
-        return cmd
+        # Use current running Python to ensure environment consistency
+        return [sys.executable, str(harness_file)]
 
     async def _run_subprocess(self, cmd, cwd, timeout, memory_limit, result_file):
         process_env = {
