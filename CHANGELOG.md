@@ -1,3 +1,10 @@
+# [0.12.0](https://github.com/ayato-labs/LogicHive/compare/v0.11.0...v0.12.0) (2026-06-01)
+
+
+### Features
+
+* implement Flet-based settings UI for system configuration and diagnostics ([9025f38](https://github.com/ayato-labs/LogicHive/commit/9025f38bab5dc5e530342a0c32e1c508017a5277))
+
 # [0.11.0](https://github.com/ayato-labs/LogicHive/compare/v0.10.0...v0.11.0) (2026-05-31)
 
 
