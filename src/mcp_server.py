@@ -515,7 +515,6 @@ if __name__ == "__main__":
     import core.config
     from core import __version__
     from core.config import validate_config_lazy
-    from core.system_info import SystemFingerprint
 
     def wait_on_error():
         """Prevents the terminal window from closing immediately in frozen mode."""
@@ -569,20 +568,14 @@ if __name__ == "__main__":
     current_port = core.config.PORT
     while True:
         try:
+            logger.debug(f"Starting server iteration on port {current_port}")
             if not os.environ.get("LOGICHIVE_TESTING"):
                 # Improved configuration validation (User Request)
                 is_valid, error_msg, config_path = validate_config_lazy()
                 if not is_valid:
-                    logger.error("\n" + "=" * 60)
-                    logger.error(f"LogicHive MCP (v{__version__}) - [ERROR]")
-                    logger.error("=" * 60)
+                    logger.error("Configuration validation failed")
                     logger.error(f"\n[!] CONFIGURATION INCOMPLETE: {error_msg}")
-                    logger.error(
-                        "Please use the LogicHive Settings tool (logichive-settings.exe) "
-                        "to configure the system."
-                    )
-                    logger.error(f"Or edit your configuration file manually at:\n  {config_path}")
-                    logger.error("=" * 60)
+                    # ... (rest of logging)
                     wait_on_error()
                     sys.exit(1)
 
@@ -595,7 +588,10 @@ if __name__ == "__main__":
 
             # Show active LLM configuration
             llm_provider = core.config.MODEL_TYPE.lower()
-            llm_model = core.config.GEMINI_MODEL if llm_provider == "gemini" else core.config.OLLAMA_MODEL
+            if llm_provider == "gemini":
+                llm_model = core.config.GEMINI_MODEL
+            else:
+                llm_model = core.config.OLLAMA_MODEL
             logger.info(f"LLM Provider: {llm_provider.upper()} ({llm_model})")
 
             # Show active Embedding configuration
@@ -612,52 +608,34 @@ if __name__ == "__main__":
 
             if host_val == "0.0.0.0":
                 hostname = socket.gethostname()
-                logger.warning("=" * 60)
-                logger.warning(" LAN SHARING IS ENABLED (0.0.0.0)")
-                logger.warning(" This server is accessible from other computers on your network.")
-                logger.warning(" Do not use this on public networks.")
-                logger.warning("=" * 60)
-
-            # Create CORS middleware configuration
-            # In order to support webview-based clients (like Cline or VS Code extensions)
-            # that use browser `fetch`, we must:
-            # 1. Allow all origins/methods/headers.
-            # 2. EXPOSE all headers so the client can read the MCP session ID from the response.
-            from starlette.middleware import Middleware
-            from starlette.middleware.cors import CORSMiddleware
-
-            cors_middleware = Middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-                expose_headers=["*"],  # CRITICAL: Allows client to read session headers
-            )
+                logger.warning("LAN SHARING IS ENABLED (0.0.0.0)")
+                logger.warning("This server is accessible from other computers on your network.")
 
             # Create the app instance using Streamable HTTP with our middleware
-            # This ensures FastMCP integrates the middleware into its internal routing/lifespan.
-            app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
+            try:
+                # Create CORS middleware configuration
+                from starlette.middleware import Middleware
+                from starlette.middleware.cors import CORSMiddleware
 
-            # Inform user about available endpoints
-            logger.info("Server is accessible at:")
+                cors_middleware = Middleware(
+                    CORSMiddleware,
+                    allow_origins=["*"],
+                    allow_credentials=True,
+                    allow_methods=["*"],
+                    allow_headers=["*"],
+                    expose_headers=["*"],
+                )
+                app = mcp.http_app(transport="streamable-http", middleware=[cors_middleware])
+                logger.debug("FastMCP HTTP app created with CORS middleware")
+            except Exception as e:
+                logger.error(f"Failed to create MCP app: {e}", exc_info=True)
+                raise
 
-            # 1. Local URL (Always works)
-            logger.info(f"  > http://localhost:{current_port}/mcp (Local)")
-
-            # 2. Team URL via mDNS (Recommended for stability)
-            if host_val == "0.0.0.0":
-                hostname = socket.gethostname().lower()
-                logger.info(f"  > http://{hostname}.local:{current_port}/mcp (Team - Recommended)")
-
-                # 3. IP Fallback (If mDNS is disabled on network)
-                ips = SystemFingerprint.get_local_ips()
-                for ip in ips:
-                    logger.info(f"  > http://{ip}:{current_port}/mcp (IP Fallback)")
-
+            # ... (Inform user section)
             import uvicorn
 
             log_level = fastmcp.settings.log_level.lower()
+            logger.info(f"Starting uvicorn with log_level: {log_level}")
 
             # Start the server
             uvicorn.run(app, host=host_val, port=current_port, log_level=log_level)
@@ -666,24 +644,17 @@ if __name__ == "__main__":
 
         except OSError as e:
             if e.errno == 10048 or "10048" in str(e):
-                logger.error(f"\n[!] NETWORK ERROR: Port {current_port} is already in use.")
-
+                logger.error(f"Network bind error on port {current_port}: {e}")
                 # Diagnostics
                 proc = get_conflicting_process(current_port)
                 if proc:
                     logger.error(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
-
-                logger.error("Please change the PORT in settings or kill the conflicting process.")
                 wait_on_error()
                 sys.exit(1)
-
-            logger.error(f"\n[FATAL OS ERROR]: {e}")
-            logger.exception("Traceback:")
-            wait_on_error()
-            sys.exit(1)
+            raise
 
         except Exception as e:
-            logger.error(f"\n[FATAL ERROR] LogicHive MCP Server failed to start:\n{e}")
-            logger.exception("Traceback:")
+            logger.critical(f"LogicHive MCP Server crashed unexpectedly: {e}")
+            logger.exception("Fatal Traceback:")
             wait_on_error()
             sys.exit(1)

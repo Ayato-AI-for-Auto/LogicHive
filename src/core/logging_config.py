@@ -45,17 +45,23 @@ def json_serializer(record):
 
 
 def rotate_previous_execution_log(filepath):
-    """Keep only the last 2 executions by renaming the current file to _prev."""
+    """
+    Retains exactly the last 2 execution logs.
+    Workflow:
+    1. If {name}.1.log exists, delete it.
+    2. If {name}.log exists, rename it to {name}.1.log.
+    3. New execution starts writing to {name}.log.
+    """
     if os.path.exists(filepath):
         base, ext = os.path.splitext(filepath)
-        prev_path = f"{base}_prev{ext}"
-        if os.path.exists(prev_path):
+        backup_path = f"{base}.1{ext}"
+        if os.path.exists(backup_path):
             try:
-                os.remove(prev_path)
+                os.remove(backup_path)
             except OSError:
                 pass
         try:
-            os.rename(filepath, prev_path)
+            os.rename(filepath, backup_path)
         except OSError:
             pass
 
@@ -69,14 +75,12 @@ def setup_logging():
     logger.remove()
 
     # Determine process name to separate logs (settings_ui.py vs mcp_server.py)
-    # This prevents collisions between logichive-hub.exe and logichive-settings.exe.
     main_script = os.path.basename(sys.argv[0]).lower()
     if "settings" in main_script:
         proc_name = "settings"
     elif "hub" in main_script or "mcp_server" in main_script:
         proc_name = "hub"
     else:
-        # Fallback for generic execution
         proc_name = "app"
 
     # 1. Console Sink (Human Readable)
@@ -91,11 +95,14 @@ def setup_logging():
             level="INFO",
         )
 
-    # Manual rotation for keeping exact last 2 executions
+    # File paths
     main_log_path = os.path.join(log_dir, f"{proc_name}.jsonl")
+    # Isolated Error Log (As requested: 'error.log' per process for safety)
     error_log_path = os.path.join(log_dir, f"{proc_name}_error.log")
 
+    # Rotate main log for this process
     rotate_previous_execution_log(main_log_path)
+    # Rotate error log for this process
     rotate_previous_execution_log(error_log_path)
 
     # 2. Main JSON Sink (All logs for traceability)
@@ -107,6 +114,7 @@ def setup_logging():
     )
 
     # 3. Isolated Error Sink (Only ERROR and CRITICAL)
+    # Always append to 'error.log' for this execution
     logger.add(
         error_log_path,
         format="{extra[serialized]}",

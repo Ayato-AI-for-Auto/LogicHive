@@ -54,7 +54,7 @@ exclude = [
     "dist",
     "build",
     "node_modules",
-    "exports",
+    "__pycache__",
 ]
 
 [tool.ruff.lint]
@@ -68,11 +68,13 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Relax rules for non-core scripts (exports, scratch, tools)
+# Realistic Compromise: Relax rules for non-core scripts and assets
+# T201: allow print, E501: allow long lines, C901: allow high complexity
 "scratch/**/*.py" = ["T201", "E501", "C901", "F401", "F841"]
 "tools/**/*.py" = ["T201", "E501", "C901"]
-"exports/**/*.py" = ["T201", "E501", "C901"]
-"tests/**/*.py" = ["T201"] # Tests can use print
+"exports/**/*.py" = ["T201", "E501", "C901", "F821", "I001"] # exports are snippets, ignore undefined names
+"tests/**/*.py" = ["T201", "E501"] # Tests can use print and long assertions
+"*.py" = ["T201", "E501"] # Root level scripts
 
 [tool.ruff.lint.isort]
 known-first-party = ["api", "core", "storage"]
