@@ -158,10 +158,10 @@ def validate_config_lazy():
 
 # 1. AI & Models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_TYPE = os.getenv("MODEL_TYPE", "gemini").lower()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
-EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "text-embedding-004")
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "gemini").lower()
+MODEL_TYPE = os.getenv("MODEL_TYPE", "ollama").lower()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemma-4-31b-it")
+EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "models/gemini-embedding-2")
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "fastembed").lower()
 OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
 FASTEMBED_MODEL = os.getenv("FASTEMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
 
