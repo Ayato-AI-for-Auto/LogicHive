@@ -296,7 +296,6 @@ async def delete_function(
 ) -> str:
     """
     Deletes a function from the LogicHive vault for a specific project.
-    The function is archived in the backup repository for safety.
 
     Args:
         name: The case-sensitive name of the function to delete.
@@ -307,7 +306,7 @@ async def delete_function(
     """
     success = await do_delete_async(name, project=project)
     if success:
-        return f"Successfully deleted and archived function '{name}' in project '{project}'."
+        return f"Successfully deleted function '{name}' in project '{project}'."
     else:
         return f"Failed to delete function '{name}' in project '{project}'."
 

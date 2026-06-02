@@ -13,9 +13,7 @@ from typing import Any
 
 from core.config import (
     DESCRIPTION_MIN_LENGTH,
-    ENABLE_AUTO_BACKUP,
     GEMINI_API_KEY,
-    GITHUB_TOKEN,
     QUALITY_GATE_THRESHOLD,
 )
 from core.consolidation import LogicIntelligence
@@ -202,12 +200,6 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
 
         # 2. Vector index deletion (background)
         asyncio.create_task(vector_manager.remove_vector(name, project=project))
-
-        # 3. Backup Archiving (background)
-        if ENABLE_AUTO_BACKUP and GITHUB_TOKEN:
-            from storage.auto_backup import backup_manager
-
-            asyncio.create_task(backup_manager.archive_asset(name, project=project))
 
         logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful.")
         return True
