@@ -16,9 +16,14 @@ if src_path not in sys.path:
 
 from core.config import (  # noqa: E402
     CONFIG_SOURCE,
+    EMBEDDING_MODEL_ID,
+    EMBEDDING_PROVIDER,
+    FASTEMBED_MODEL,
     GEMINI_API_KEY,
+    GEMINI_MODEL,
     HOST,
     MODEL_TYPE,
+    OLLAMA_MODEL,
     PORT,
     save_config,
 )
@@ -46,7 +51,12 @@ class LogicHiveUI:
 
         self.config_state = {
             "MODEL_TYPE": MODEL_TYPE,
+            "GEMINI_MODEL": GEMINI_MODEL,
             "GEMINI_API_KEY": GEMINI_API_KEY or "",
+            "EMBEDDING_PROVIDER": EMBEDDING_PROVIDER,
+            "EMBEDDING_MODEL_ID": EMBEDDING_MODEL_ID,
+            "OLLAMA_MODEL": OLLAMA_MODEL,
+            "FASTEMBED_MODEL": FASTEMBED_MODEL,
             "HOST": HOST,
             "PORT": str(PORT),
             "ENABLE_GPU": ENABLE_GPU,
@@ -143,15 +153,29 @@ class LogicHiveUI:
         self.page.update()
 
     def build_config_tab(self):
-        # AI Provider settings
-        provider_dropdown = ft.Dropdown(
-            label="AI Provider",
+        # --- 1. LLM Settings ---
+        llm_provider_dropdown = ft.Dropdown(
+            label="LLM Provider",
             value=self.config_state["MODEL_TYPE"],
             options=[
-                ft.dropdown.Option("gemini", "Google Gemini (Cloud)"),
-                ft.dropdown.Option("ollama", "Ollama (Local)"),
+                ft.dropdown.Option("ollama", "Ollama (Local-First)"),
+                ft.dropdown.Option("gemini", "Google Gemini (Cloud-Hybrid)"),
             ],
             on_select=lambda e: self.update_state("MODEL_TYPE", e.control.value),
+        )
+
+        gemini_model_input = ft.TextField(
+            label="Gemini LLM Model ID",
+            value=self.config_state["GEMINI_MODEL"],
+            on_change=lambda e: self.update_state("GEMINI_MODEL", e.control.value),
+            hint_text="e.g., models/gemma-4-31b-it",
+        )
+
+        ollama_model_input = ft.TextField(
+            label="Ollama LLM Model ID",
+            value=self.config_state["OLLAMA_MODEL"],
+            on_change=lambda e: self.update_state("OLLAMA_MODEL", e.control.value),
+            hint_text="e.g., mistral-large",
         )
 
         gemini_key_input = ft.TextField(
@@ -163,11 +187,38 @@ class LogicHiveUI:
             width=500,
         )
 
-        # Network Settings
+        # --- 2. Embedding Settings ---
+        emb_provider_dropdown = ft.Dropdown(
+            label="Embedding Provider",
+            value=self.config_state["EMBEDDING_PROVIDER"],
+            options=[
+                ft.dropdown.Option("fastembed", "FastEmbed (Local-Fast)"),
+                ft.dropdown.Option("gemini", "Google Gemini (Cloud-HighPrecision)"),
+                ft.dropdown.Option("ollama", "Ollama (Legacy)"),
+            ],
+            on_select=lambda e: self.update_state("EMBEDDING_PROVIDER", e.control.value),
+        )
+
+        gemini_emb_model_input = ft.TextField(
+            label="Gemini Embedding Model ID",
+            value=self.config_state["EMBEDDING_MODEL_ID"],
+            on_change=lambda e: self.update_state("EMBEDDING_MODEL_ID", e.control.value),
+            hint_text="e.g., models/gemini-embedding-2",
+        )
+
+        fastembed_model_input = ft.TextField(
+            label="FastEmbed Model ID",
+            value=self.config_state["FASTEMBED_MODEL"],
+            on_change=lambda e: self.update_state("FASTEMBED_MODEL", e.control.value),
+            hint_text="e.g., nomic-ai/nomic-embed-text-v1.5",
+        )
+
+        # --- 3. Network & System ---
         host_input = ft.TextField(
-            label="Host (127.0.0.1 for local, 0.0.0.0 for LAN)",
+            label="Host",
             value=self.config_state["HOST"],
             on_change=lambda e: self.update_state("HOST", e.control.value),
+            hint_text="127.0.0.1 (Local) or 0.0.0.0 (LAN)",
         )
 
         port_input = ft.TextField(
@@ -177,19 +228,19 @@ class LogicHiveUI:
         )
 
         gpu_toggle = ft.Switch(
-            label="Enable GPU Support (Requires ~5GB additional disk space)",
+            label="Enable GPU Support",
             value=self.config_state.get("ENABLE_GPU", False),
             on_change=lambda e: self.update_state("ENABLE_GPU", e.control.value),
         )
 
         save_button = ft.ElevatedButton(
-            "Save Configuration",
+            "Save All Settings",
             icon=ft.Icons.SAVE,
             on_click=self.save_settings,
             style=ft.ButtonStyle(color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE_700),
         )
 
-        # Client Setup Section
+        # --- 4. Client Setup Section ---
         self.client_json_field = ft.TextField(
             value=self.get_client_json(),
             read_only=True,
@@ -230,11 +281,16 @@ class LogicHiveUI:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("AI Provider & API Keys", size=20, weight=ft.FontWeight.BOLD),
-                    provider_dropdown,
+                    ft.Text("LLM (Inference & Quality Gate)", size=20, weight=ft.FontWeight.BOLD),
+                    llm_provider_dropdown,
+                    ft.Row([gemini_model_input, ollama_model_input]),
                     gemini_key_input,
                     ft.Divider(),
-                    ft.Text("Network Settings", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text("Vector Search (Embedding)", size=20, weight=ft.FontWeight.BOLD),
+                    emb_provider_dropdown,
+                    ft.Row([gemini_emb_model_input, fastembed_model_input]),
+                    ft.Divider(),
+                    ft.Text("Network & Performance", size=20, weight=ft.FontWeight.BOLD),
                     ft.Row([host_input, port_input]),
                     gpu_toggle,
                     save_button,
