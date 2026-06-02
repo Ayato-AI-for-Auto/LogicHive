@@ -592,8 +592,23 @@ if __name__ == "__main__":
             # Start network listeners
             logger.info("=" * 60)
             logger.info(f"Starting LogicHive Hub (v{__version__})")
-            logger.info(f"AI Provider: {core.config.MODEL_TYPE.upper()}")
-            logger.info(f"Network: {host_val}:{current_port}")
+
+            # Show active LLM configuration
+            llm_provider = core.config.MODEL_TYPE.lower()
+            llm_model = core.config.GEMINI_MODEL if llm_provider == "gemini" else core.config.OLLAMA_MODEL
+            logger.info(f"LLM Provider: {llm_provider.upper()} ({llm_model})")
+
+            # Show active Embedding configuration
+            emb_provider = core.config.EMBEDDING_PROVIDER.lower()
+            if emb_provider == "gemini":
+                emb_model = core.config.EMBEDDING_MODEL_ID
+            elif emb_provider == "fastembed":
+                emb_model = core.config.FASTEMBED_MODEL
+            else:
+                emb_model = core.config.OLLAMA_EMBEDDING_MODEL
+            logger.info(f"Embedding   : {emb_provider.upper()} ({emb_model})")
+
+            logger.info(f"Network     : {host_val}:{current_port}")
 
             if host_val == "0.0.0.0":
                 hostname = socket.gethostname()

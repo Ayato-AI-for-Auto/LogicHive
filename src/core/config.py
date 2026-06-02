@@ -31,12 +31,12 @@ def _load_config():
 
     # Priority 1: Local .env (next to EXE or project root)
     if LOCAL_ENV.exists():
-        load_dotenv(LOCAL_ENV)
+        load_dotenv(LOCAL_ENV, override=True)
         config_source = f"Local: {LOCAL_ENV}"
 
     # Priority 2: User Home fallback
     elif HOME_ENV.exists():
-        load_dotenv(HOME_ENV)
+        load_dotenv(HOME_ENV, override=True)
         config_source = f"Home: {HOME_ENV}"
 
     # Default: Standard CWD-based loading or Environment variables
