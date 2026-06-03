@@ -240,8 +240,8 @@ class PoolManager:
                 )
 
             try:
-                # 1. Create venv
-                vcmd = f'"{uv_path}" venv "{env_path}"'
+                # 1. Create venv (Lightweight via system-site-packages)
+                vcmd = f'"{uv_path}" venv --system-site-packages "{env_path}"'
                 res = await asyncio.to_thread(run_cmd, vcmd)
 
                 if res.returncode != 0:
