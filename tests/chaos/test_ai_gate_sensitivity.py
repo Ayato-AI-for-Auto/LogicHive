@@ -1,6 +1,9 @@
-import pytest
 import textwrap
+
+import pytest
+
 from core.evaluation.manager import EvaluationManager
+
 
 @pytest.mark.asyncio
 @pytest.mark.use_real_intelligence
@@ -10,7 +13,7 @@ async def test_ai_gate_theatrical_abstraction():
     Gemma 4 should identify this as 'Quality Theater' and reject/score it low.
     """
     manager = EvaluationManager()
-    
+
     code = textwrap.dedent("""
         class AbstractLogicProvider:
             def execute(self, *args, **kwargs): raise NotImplementedError()
@@ -31,24 +34,24 @@ async def test_ai_gate_theatrical_abstraction():
             factory = DistributedCalculationFactory(mode="high_precision")
             return factory.execute(a, b)
     """)
-    
+
     test_code = "assert theatrical_adder(10, 20) == 30"
-    
+
     # We use evaluate_all to trigger the AI Gate
     results = await manager.evaluate_all(
-        code=code, 
-        language="python", 
+        code=code,
+        language="python",
         test_code=test_code,
         description="High-precision distributed arithmetic provider with factory pattern."
     )
-    
+
     ai_res = results["details"].get("ai_gate")
     if ai_res:
-        print(f"\n[AI GATE REPORT - THEATER]")
+        print("\n[AI GATE REPORT - THEATER]")
         print(f"Score: {ai_res['score']}")
         print(f"Reason: {ai_res['reason']}")
         # Expectation: AI should notice the over-engineering
-        # assert ai_res["score"] < 70 
+        # assert ai_res["score"] < 70
 
 @pytest.mark.asyncio
 @pytest.mark.use_real_intelligence
@@ -57,7 +60,7 @@ async def test_ai_gate_math_smoke_screen():
     Sensitivity: Provide code with complex-looking math that simplifies to a constant.
     """
     manager = EvaluationManager()
-    
+
     code = textwrap.dedent("""
         import math
         def high_entropy_constant_generator(input_val):
@@ -65,25 +68,25 @@ async def test_ai_gate_math_smoke_screen():
             s = sum([math.sin(i) for i in range(100)])
             c = math.cos(math.pi * 2)
             log_val = math.log(abs(s) + 1)
-            
+
             # The result is effectively independent of the 'logic' above
             if input_val > 0:
                 return 1.0 * c
             else:
                 return 0.0
     """)
-    
+
     test_code = "assert high_entropy_constant_generator(5) == 1.0"
-    
+
     results = await manager.evaluate_all(
-        code=code, 
-        language="python", 
+        code=code,
+        language="python",
         test_code=test_code,
         description="Sophisticated high-entropy signal generator for stochastic modeling."
     )
-    
+
     ai_res = results["details"].get("ai_gate")
     if ai_res:
-        print(f"\n[AI GATE REPORT - MATH SMOKE]")
+        print("\n[AI GATE REPORT - MATH SMOKE]")
         print(f"Score: {ai_res['score']}")
         print(f"Reason: {ai_res['reason']}")

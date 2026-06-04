@@ -46,14 +46,7 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          # 1. Strict check for Core Logic (src)
-          # Ensuring structural integrity and best practices in the engine.
-          uv run ruff check src --select E,F,W,I,C90,T20 --line-length 100
-          
-          # 2. Realistic Compromise for other files (scripts, tests, tools, exports)
-          # We check for basic errors (E,F,W,I) but ignore print statements (T20), 
-          # line length (E501), and complexity (C901) to prioritize development speed.
-          uv run ruff check . --ignore T20,E501,C901 --exclude src
+          uv run ruff check src tests
 
       - name: Run tests
         run: |

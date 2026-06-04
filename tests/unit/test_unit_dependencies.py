@@ -1,6 +1,7 @@
-import pytest
 import textwrap
+
 from orchestrator import extract_dependencies
+
 
 def test_extract_dependencies_python_simple():
     code = "import os\nimport requests\nfrom datetime import datetime"

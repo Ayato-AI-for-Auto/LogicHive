@@ -27,7 +27,7 @@ def calculate_code_hash_v5(code: str) -> str:
     \"\"\"
     # Normalize: strip leading/trailing whitespace and ensure consistent line endings
     normalized_code = code.strip().replace("\\r\\n", "\\n")
-    
+
     # Generate SHA-256 hash
     return hashlib.sha256(normalized_code.encode("utf-8")).hexdigest()
 """
