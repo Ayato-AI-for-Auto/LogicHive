@@ -62,18 +62,18 @@ def test_config_resolution_priority():
                 assert "System Environment Variables" in source
 
             # 3. Home file exists
-            home_env.write_text("GEMINI_API_KEY=home_key")
-            with patch("core.config.load_dotenv") as mock_load:
+            home_env.write_text("GEMINI_API_KEY=home_key")      
+            with patch("core.config.load_dotenv") as mock_load: 
                 source = _load_config()
                 assert "Home" in source
-                mock_load.assert_called_with(home_env)
+                mock_load.assert_called_with(home_env, override=True)
 
             # 4. Local file exists (Should override Home)
             local_env.write_text("GEMINI_API_KEY=local_key")
             with patch("core.config.load_dotenv") as mock_load:
                 source = _load_config()
                 assert "Local" in source
-                mock_load.assert_called_with(local_env)
+                mock_load.assert_called_with(local_env, override=True)
 
 
 if __name__ == "__main__":

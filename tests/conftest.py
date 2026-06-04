@@ -147,9 +147,8 @@ async def db_isolation(request):
 
 @pytest.fixture
 async def test_db(db_isolation):
-    from storage.init_db import init_db
-
-    await init_db()
+    from core.db import get_db_connection
+    await get_db_connection()
     yield
 
 

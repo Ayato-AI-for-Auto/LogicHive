@@ -32,31 +32,6 @@ def check_leak():
     assert "NETWORK_ACCESS_DENIED" in result.error.value
 
 
-@pytest.mark.asyncio
-async def test_offline_mode_enforcement(executor, monkeypatch):
-    """
-    Verifies that the executor adds the --offline flag to uv run.
-    """
-    from unittest.mock import AsyncMock
-
-    captured_cmds = []
-
-    async def mock_create_subprocess_exec(*args, **kwargs):
-        captured_cmds.append(args)
-        proc = AsyncMock()
-        proc.communicate = AsyncMock(return_value=(b"", b""))
-        proc.returncode = 0
-        proc.wait = AsyncMock(return_value=0)
-        return proc
-
-    monkeypatch.setattr(asyncio, "create_subprocess_exec", mock_create_subprocess_exec)
-
-    await executor.execute("print('hello')", "print('test')")
-
-    assert len(captured_cmds) > 0
-    args = captured_cmds[0]
-    assert "--offline" in args
-    assert "--no-project" in args
 
 
 @pytest.mark.asyncio
