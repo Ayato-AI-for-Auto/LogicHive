@@ -13,7 +13,7 @@ import fastmcp
 from fastmcp import FastMCP
 
 import orchestrator
-from core.config import FAISS_INDEX_PATH, SQLITE_DB_PATH
+from core.config import get_faiss_index_path, get_sqlite_db_path
 from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
 from core.logging_config import get_logger
@@ -271,15 +271,15 @@ async def debug_db(wait_for_previous: bool = False) -> str:
             Use true when this tool depends on the output of previous tools.
     """
 
-    from core.config import SQLITE_DB_PATH
+    db_path = get_sqlite_db_path()
+    status = [f"SQLITE_DB_PATH: {db_path}"]
+    status.append(f"Exists: {os.path.exists(db_path)}")      
 
-    status = [f"SQLITE_DB_PATH: {SQLITE_DB_PATH}"]
-    status.append(f"Exists: {os.path.exists(SQLITE_DB_PATH)}")
-
-    if os.path.exists(SQLITE_DB_PATH):
+    if os.path.exists(db_path):
         try:
-            status.append(f"Size: {os.path.getsize(SQLITE_DB_PATH)} bytes")
-            conn = sqlite3.connect(SQLITE_DB_PATH)
+            status.append(f"Size: {os.path.getsize(db_path)} bytes")
+            conn = sqlite3.connect(db_path)
+
             tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             status.append(f"Tables: {tables}")
             conn.close()
@@ -367,12 +367,14 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     from storage.vector_store import vector_manager
 
     status = ["## LogicHive Integrity Report\n"]
+    db_path = get_sqlite_db_path()
+    faiss_path = get_faiss_index_path()
 
     try:
         # 1. DB Check
-        db_exists = os.path.exists(SQLITE_DB_PATH)
+        db_exists = os.path.exists(db_path)
         status.append(
-            f"### 1. Database\n- Path: `{SQLITE_DB_PATH}`\n- Status: "
+            f"### 1. Database\n- Path: `{db_path}`\n- Status: "
             f"{'✅ Connected' if db_exists else '❌ Missing'}"
         )
 
@@ -391,9 +393,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
             status.append(f"- Record Count: {count} ({expected_count} with embeddings)")
 
         # 2. Vector Store Check
-        faiss_exists = os.path.exists(FAISS_INDEX_PATH)
+        faiss_exists = os.path.exists(faiss_path)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{FAISS_INDEX_PATH}`\n- Status: "
+            f"### 2. Vector Store (FAISS)\n- Path: `{faiss_path}`\n- Status: "
             f"{'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
         )
 

@@ -34,12 +34,18 @@ async def test_system_end_to_end_flow(test_db):
     assert "accepted and saved" in save_msg
     assert "Verification is running" in save_msg
 
-    # 3. Wait for verification
-    await asyncio.sleep(0.5)
-
-    # 4. Check Status
-    status_msg = await get_verification_status(name=name, project="sys_test")
-    assert "VERIFIED" in status_msg
+    # 3. Wait for verification (Polling)
+    max_retries = 10
+    verified = False
+    status_msg = ""
+    for _ in range(max_retries):
+        status_msg = await get_verification_status(name=name, project="sys_test")
+        if "VERIFIED" in status_msg:
+            verified = True
+            break
+        await asyncio.sleep(1.0)
+    
+    assert verified is True, f"Verification timed out or failed. Last status: {status_msg}"
 
     # 5. Search again (should find it)
     search_res2 = await search_functions(query="parse", project="sys_test")
@@ -51,6 +57,8 @@ async def test_system_end_to_end_flow(test_db):
     assert "**Tags:** parser, string" in get_res
 
     # 7. Check System Integrity Tool
+    # Add a small delay to ensure all DB operations (including vector sync) are fully committed
+    await asyncio.sleep(0.5)
     from mcp_server import check_integrity
     integrity_res = await check_integrity()
     assert "LogicHive Integrity Report" in integrity_res
