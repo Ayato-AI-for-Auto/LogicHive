@@ -28,7 +28,7 @@ class LogicHiveBootstrapper:
             self.root_dir = self.persistent_engine_dir
         else:
             self.bundled_root = None
-            self.root_dir = Path(__file__).parent.parent.parent.resolve()
+            self.root_dir = Path(__file__).parent.parent.parent.parent.resolve()
 
         self.pyproject_path = self.root_dir / "pyproject.toml"
 
