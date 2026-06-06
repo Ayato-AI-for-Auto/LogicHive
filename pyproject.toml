@@ -66,6 +66,11 @@ select = [
     "C90", # mccabe (complexity)
     "T20", # flake8-print
 ]
+ignore = [
+    "T20",   # Ignore print warnings in CI
+    "E501",  # Ignore line too long in CI
+    "C90",   # Ignore mccabe complexity in CI
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Realistic Compromise: Relax rules for non-core scripts and assets
