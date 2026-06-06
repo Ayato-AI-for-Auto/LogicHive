@@ -5,7 +5,7 @@ This directory contains records of significant architectural decisions made duri
 ## Records
 
 - [ADR-001: Migration from Stdio to Streamable HTTP (SSE)](001-migration-to-sse.md)
-- [ADR-002: Dual Distribution Strategy (OCI Container & Windows EXE)](002-dual-distribution.md)
+- [ADR-002: Dual Distribution Strategy (OCI Container & Windows EXE) (Superseded)](002-dual-distribution.md)
 - [ADR-003: Rejection of Docker-in-Docker for Internal Execution](003-reject-dind.md)
 - [ADR-004: Rigorous Multi-layered Testing with Deep Fact Verification](004-rigorous-testing.md)
 - [ADR-005: Configuration Resolution Strategy](005-configuration-resolution-strategy.md)
@@ -15,3 +15,10 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-009: Port Conflict Resolution Strategy](009-port-conflict-resolution.md)
 - [ADR-010: WiFi Sharing & Host Configuration](ADR-0010-wifi-sharing-host-configuration.md)
 - [ADR-011: Separation of Engine (MCP) and Control (Settings GUI)](ADR-0011-dual-binary-separation-of-control-and-engine.md)
+- [ADR-012: Centralized User Data Storage](ADR-0012-centralized-user-data-storage.md)
+- [ADR-013: Manual Task Scheduler Configuration (Superseded)](ADR-0013-manual-task-scheduler-configuration.md)
+- [ADR-014: Standardized Hybrid Configuration Strategy](ADR-0014-standardized-hybrid-configuration-strategy.md)
+- [ADR-015: Lightweight Ephemeral Environments](ADR-0015-lightweight-ephemeral-environments.md)
+- [ADR-016: OS Integration and Clean Uninstall Strategy](ADR-0016-os-integration-and-clean-uninstall-strategy.md)
+- [ADR-017: Embedding Model Isolation and Rebuild Strategy (Superseded)](ADR-0017-embedding-model-isolation-and-rebuild-strategy.md)
+- [ADR-018: Thin Settings Client and Dynamic Hub Engine Venv](ADR-0018-thin-client-dynamic-venv.md)

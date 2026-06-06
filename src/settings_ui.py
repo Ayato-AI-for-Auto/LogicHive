@@ -28,6 +28,17 @@ from core.config import (  # noqa: E402
     save_config,
 )
 from core.logging_config import get_logger  # noqa: E402
+from core.system.uninstall import (  # noqa: E402
+    execute_kamikaze_script,
+    kill_logichive_processes,
+    remove_data_directory,
+)
+from core.system.windows_tasks import (  # noqa: E402
+    install_scheduled_tasks,
+    is_admin,
+    remove_scheduled_tasks,
+    run_as_admin,
+)
 from orchestrator import check_integrity  # noqa: E402
 
 logger = get_logger("settings_ui")
@@ -327,6 +338,159 @@ class LogicHiveUI:
             padding=20,
         )
 
+    def build_system_tab(self):  # noqa: C901
+        # 1. Auto Start (Task Scheduler)
+        admin_status_text = ft.Text(
+            f"Admin Privileges: {'YES' if is_admin() else 'NO'}",
+            color=ft.Colors.GREEN if is_admin() else ft.Colors.RED,
+        )
+
+        def on_install_tasks(e):
+            if not is_admin():
+                self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
+                self.page.snack_bar.open = True
+                self.page.update()
+                if run_as_admin():
+                    self.page.window_close()
+                return
+
+            hub_path = Path(sys.executable).parent / "LogicHive-Hub.exe"
+            if not getattr(sys, "frozen", False):
+                hub_path = Path(sys.executable)
+
+            success = install_scheduled_tasks(hub_path)
+            self.page.snack_bar = ft.SnackBar(
+                ft.Text(f"Task installation: {'SUCCESS' if success else 'FAILED'}")
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+
+        def on_remove_tasks(e):
+            if not is_admin():
+                self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
+                self.page.snack_bar.open = True
+                self.page.update()
+                if run_as_admin():
+                    self.page.window_close()
+                return
+
+            success = remove_scheduled_tasks()
+            self.page.snack_bar = ft.SnackBar(
+                ft.Text(f"Task removal: {'SUCCESS' if success else 'FAILED'}")
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+
+        install_btn = ft.ElevatedButton(
+            "Install Auto-Start Tasks", icon=ft.Icons.SCHEDULE, on_click=on_install_tasks
+        )
+        remove_btn = ft.ElevatedButton(
+            "Remove Auto-Start Tasks", icon=ft.Icons.DELETE_OUTLINE, on_click=on_remove_tasks
+        )
+
+        tasks_card = ft.Card(
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("Task Scheduler Integration", size=18, weight=ft.FontWeight.BOLD),
+                        ft.Text(
+                            "Register LogicHive to start automatically on logon and watch for crashes."
+                        ),
+                        admin_status_text,
+                        ft.Row([install_btn, remove_btn]),
+                    ]
+                ),
+                padding=20,
+            )
+        )
+
+        # 2. Uninstall Wizard
+        remove_data_checkbox = ft.Checkbox(label="Remove User Data (~/.logichive)", value=True)
+
+        def confirm_uninstall(e):
+            self.page.dialog.open = False
+            self.page.update()
+
+            # タスク削除は管理者権限がある場合のみ試みる
+            if is_admin():
+                remove_scheduled_tasks()
+
+            if remove_data_checkbox.value:
+                remove_data_directory()
+
+            kill_logichive_processes()
+
+            execs_to_delete = [Path(sys.executable)]
+            if getattr(sys, "frozen", False):
+                hub_path = Path(sys.executable).parent / "LogicHive-Hub.exe"
+                if hub_path.exists():
+                    execs_to_delete.append(hub_path)
+
+            execute_kamikaze_script(execs_to_delete)
+            self.page.window_close()
+
+        def cancel_uninstall(e):
+            self.page.dialog.open = False
+            self.page.update()
+
+        uninstall_dlg = ft.AlertDialog(
+            title=ft.Text("Confirm Uninstall"),
+            content=ft.Column(
+                [
+                    ft.Text("This will permanently remove LogicHive and its configurations."),
+                    remove_data_checkbox,
+                    ft.Text(
+                        "The application will close immediately after starting the uninstallation.",
+                        color=ft.Colors.RED,
+                    ),
+                ],
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel_uninstall),
+                ft.TextButton(
+                    "Uninstall",
+                    on_click=confirm_uninstall,
+                    style=ft.ButtonStyle(color=ft.Colors.RED),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        def open_uninstall_dlg(e):
+            self.page.dialog = uninstall_dlg
+            uninstall_dlg.open = True
+            self.page.update()
+
+        uninstall_btn = ft.ElevatedButton(
+            "Completely Uninstall LogicHive",
+            icon=ft.Icons.DELETE_FOREVER,
+            color=ft.Colors.RED,
+            on_click=open_uninstall_dlg,
+        )
+
+        uninstall_card = ft.Card(
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text(
+                            "Danger Zone",
+                            size=18,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.RED,
+                        ),
+                        ft.Text("Completely remove LogicHive from this system."),
+                        uninstall_btn,
+                    ]
+                ),
+                padding=20,
+            )
+        )
+
+        return ft.Container(
+            content=ft.Column([tasks_card, uninstall_card], spacing=20), padding=20
+        )
+
     def build(self):
         self.initialize_state()
 
@@ -343,7 +507,7 @@ class LogicHiveUI:
         )
 
         tabs = ft.Tabs(
-            length=2,
+            length=3,
             expand=True,
             content=ft.Column(
                 expand=True,
@@ -352,6 +516,7 @@ class LogicHiveUI:
                         tabs=[
                             ft.Tab(label="Configuration", icon=ft.Icons.SETTINGS),
                             ft.Tab(label="System Health", icon=ft.Icons.DASHBOARD),
+                            ft.Tab(label="System Integration", icon=ft.Icons.POWER),
                         ]
                     ),
                     ft.TabBarView(
@@ -359,6 +524,7 @@ class LogicHiveUI:
                         controls=[
                             self.build_config_tab(),
                             self.build_health_tab(),
+                            self.build_system_tab(),
                         ],
                     ),
                 ],

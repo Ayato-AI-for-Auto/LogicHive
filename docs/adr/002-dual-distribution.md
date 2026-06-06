@@ -1,7 +1,7 @@
 # ADR-002: Dual Distribution Strategy (OCI Container & Windows EXE)
 
 ## Status
-Accepted
+Superseded by [ADR-0018](./ADR-0018-thin-client-dynamic-venv.md)
 
 ## Context
 Commercializing LogicHive in enterprise environments faces friction from Docker Desktop licensing (paid for large businesses) and the technical complexity of container runtimes on Windows.

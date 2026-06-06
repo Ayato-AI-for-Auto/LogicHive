@@ -22,6 +22,11 @@ We chose a weighted scoring system (4:3:2:1) because AI-only evaluation is subje
 - **Deterministic Veto (AST)**: We use Python's `ast` module to count assertions and detect "hollow logic" before the AI even sees the code. If the "Fact" layer fails, the asset is rejected instantly.
 - **Isolated Runtimes**: We use ephemeral virtual environments (Environment Pooling) to verify execution without polluting the host system.
 
+### Thin Client + Dynamic Engine (ADR-0018)
+LogicHive is distributed using a hybrid approach to maximize portability while evading "dependency hell":
+- **Thin Settings Client**: A lightweight, standalone `.exe` built with Flet for zero-friction user control (Task Scheduler, Uninstallation, Config).
+- **Dynamic Venv Engine**: The core Hub and MCP Server are executed within a dynamic virtual environment (`~/.logichive/.venv`), built on the fly using `uv`. This frees the system to utilize heavy, native dependencies like ChromaDB without bloating the initial download or causing PyInstaller crashes.
+
 ### Why MCP (Model Context Protocol)?
 To make LogicHive a "first-class citizen" in the agentic ecosystem. By using MCP, any AI agent (Antigravity, Cursor, etc.) can discover and store logic without custom integration code.
 
@@ -48,7 +53,7 @@ graph TD
     
     subgraph Persistence ["Persistent Vault"]
         Sqlite[(SQLite: Metadata)]
-        Faiss[(FAISS: Vector Index)]
+        VectorDB[(Vector DB: ChromaDB)]
         GitHub[(GitHub: Remote Sync)]
     end
 

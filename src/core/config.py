@@ -224,11 +224,27 @@ def get_data_dir() -> Path:
 def get_sqlite_db_path() -> str:
     return os.getenv("SQLITE_DB_PATH", str(get_data_dir() / "logichive.db"))
 
+def _get_active_embedding_model_name() -> str:
+    """現在の設定に基づいて有効なEmbeddingモデル名を返す"""
+    provider = os.getenv("EMBEDDING_PROVIDER", EMBEDDING_PROVIDER).lower()
+    if provider == "ollama":
+        return os.getenv("OLLAMA_EMBEDDING_MODEL", OLLAMA_EMBEDDING_MODEL)
+    elif provider == "fastembed":
+        return os.getenv("FASTEMBED_MODEL", FASTEMBED_MODEL)
+    else:
+        return os.getenv("EMBEDDING_MODEL_ID", EMBEDDING_MODEL_ID)
+
 def get_faiss_index_path() -> str:
-    return os.getenv("FAISS_INDEX_PATH", str(get_data_dir() / "faiss_index.bin"))
+    model_name = _get_active_embedding_model_name()
+    safe_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_")
+    default_path = str(get_data_dir() / f"faiss_{safe_name}.bin")
+    return os.getenv("FAISS_INDEX_PATH", default_path)
 
 def get_faiss_mapping_path() -> str:
-    return os.getenv("FAISS_MAPPING_PATH", str(get_data_dir() / "faiss_mapping.json"))
+    model_name = _get_active_embedding_model_name()
+    safe_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_")
+    default_path = str(get_data_dir() / f"faiss_mapping_{safe_name}.json")
+    return os.getenv("FAISS_MAPPING_PATH", default_path)
 
 def get_pool_base_dir() -> Path:
     return get_logic_hive_home() / "pools"

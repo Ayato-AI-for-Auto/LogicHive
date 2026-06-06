@@ -1,7 +1,7 @@
 # ADR-0013: 手動タスクスケジューラー設定の採用
 
 - **Date**: 2026-05-31
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0016](./ADR-0016-os-integration-and-clean-uninstall-strategy.md)
 - **Deciders**: ユーザー, Gemini CLI
 
 ## Context
