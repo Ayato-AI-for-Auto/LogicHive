@@ -3,11 +3,7 @@ Windows OS との統合ユーティリティ (Phase 2) のテスト。
 CTypes や subprocess をモックして検証します。
 """
 
-import subprocess
-from pathlib import Path
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import patch
 
 from src.core.system.windows_tasks import (
     LOGON_TASK_NAME,
