@@ -1,16 +1,18 @@
+"""
+LogicHive Vector Store: ChromaDB による永続化とセマンティック検索を提供します。
+ADR-0018 に基づき、Faiss からの移行版。
+"""
+
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
-import faiss
-import numpy as np
+import chromadb
 
 from core.config import (
-    FAISS_GHOST_REBUILD_THRESHOLD,
-    FAISS_INDEX_PATH,
-    FAISS_MAPPING_PATH,
+    CHROMA_DB_DIR,
     VECTOR_DIMENSION,
+    get_active_embedding_model_name,
 )
 from core.db import get_db_connection
 from core.exceptions import StorageError
@@ -20,42 +22,30 @@ logger = get_logger(__name__)
 
 
 class VectorIndexManager:
-    """Manages persistent FAISS index with incremental updates."""
+    """ChromaDB を使用してベクトルインデックスとメタデータを管理します。"""
 
-    def __init__(self, dimension: int = VECTOR_DIMENSION):
-        self.dimension = dimension
-        self.index = faiss.IndexFlatIP(dimension)
-        self.id_to_name = {}
-        self.name_to_id = {}
-        self._current_id = 0
+    def __init__(self):
+        self.client: Any = None
+        self.collection: Any = None
         self._lock = asyncio.Lock()
         self._initialized = False
-        self.__index_path_override = None
-        self.__mapping_path_override = None
 
-    @property
-    def _index_path(self) -> str:
-        if self.__index_path_override:
-            return self.__index_path_override
-        from core.config import get_faiss_index_path
-        return get_faiss_index_path()
-
-    @_index_path.setter
-    def _index_path(self, value: str) -> None:
-        self.__index_path_override = value
-
-    @property
-    def _mapping_path(self) -> str:
-        if self.__mapping_path_override:
-            return self.__mapping_path_override
-        from core.config import get_faiss_mapping_path
-        return get_faiss_mapping_path()
-
-    @_mapping_path.setter
-    def _mapping_path(self, value: str) -> None:
-        self.__mapping_path_override = value
+    def _get_collection_name(self) -> str:
+        """現在のEmbeddingモデル名から安全なコレクション名を生成します。"""
+        model_name = get_active_embedding_model_name()
+        # ChromaDB の制限: 3-63文字, 英数字/_- のみ, 開始終了は英数字
+        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in model_name)
+        # 先頭が記号の場合はプレフィックスを付ける
+        if not safe_name[0].isalnum():
+            safe_name = f"lh_{safe_name}"
+        # 長さ制限
+        safe_name = safe_name[:63].strip("_")
+        if len(safe_name) < 3:
+            safe_name = f"logichive_{safe_name}"
+        return safe_name
 
     async def ensure_initialized(self, db_rows: list[dict[str, Any]]):
+        """クライアントとコレクションを初期化し、必要であればDBと同期します。"""
         if self._initialized:
             return
 
@@ -63,265 +53,191 @@ class VectorIndexManager:
             if self._initialized:
                 return
 
-            # Load from disk if exists
-            if Path(self._index_path).exists() and Path(self._mapping_path).exists():
-                try:
-                    self.index = faiss.read_index(self._index_path)
-                    with open(self._mapping_path) as f:
-                        mapping = json.load(f)
-                        self.id_to_name = {int(k): v for k, v in mapping["id_to_name"].items()}
-                        self.name_to_id = mapping["name_to_id"]
-                        self._current_id = mapping["current_id"]
-                    self._initialized = True
-                    logger.info("FAISS: Loaded index from disk successfully.")
-                    return
-                except Exception as e:
-                    logger.warning(f"FAISS: Load from disk failed, rebuilding from DB: {e}")
+            try:
+                CHROMA_DB_DIR.mkdir(parents=True, exist_ok=True)
+                # SQLite へのコネクション確立前に ChromaDB が立ち上がるようにする
+                self.client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
 
-            # Rebuild from DB rows
-            logger.info("FAISS: Initializing/Rebuilding index from database rows...")
-            embeddings = []
-            names = []
-            skipped_dim = 0
-            for row in db_rows:
-                if "embedding" in row and row["embedding"]:
-                    try:
-                        # Handle both string (JSON) and already parsed list
-                        vec = row["embedding"]
-                        if isinstance(vec, str):
-                            vec = json.loads(vec)
+                collection_name = self._get_collection_name()
+                # Cosine 距離を使用するように設定
+                self.collection = self.client.get_or_create_collection(
+                    name=collection_name,
+                    metadata={"hnsw:space": "cosine"}
+                )
 
-                        project = row["project"] if "project" in row else "default"
-                        name = row["name"]
-                        full_key = f"{project}:{name}"
+                # 同期チェック (簡易的に件数で比較)
+                current_count = self.collection.count()
+                db_valid_rows = [r for r in db_rows if r.get("embedding")]
+                expected_count = len(db_valid_rows)
 
-                        if vec and len(vec) == self.dimension:
-                            embeddings.append(vec)
-                            names.append(full_key)
-                        else:
-                            skipped_dim += 1
-                            logger.debug(
-                                f"FAISS: Skipping '{full_key}' due to dimension mismatch or empty vec."
-                            )
-                    except (json.JSONDecodeError, TypeError, KeyError) as e:
-                        logger.warning(f"FAISS: Skipping row due to invalid embedding format: {e}")
-                        continue
+                if current_count < expected_count:
+                    logger.info(f"ChromaDB: Syncing {expected_count - current_count} missing vectors...")
+                    ids, embeddings, metadatas = [], [], []
 
-            if embeddings:
-                embeddings_np = np.array(embeddings).astype("float32")
-                faiss.normalize_L2(embeddings_np)
-                self.index.add(embeddings_np)
-                for i, full_key in enumerate(names):
-                    self.id_to_name[i] = full_key
-                    self.name_to_id[full_key] = i
-                self._current_id = len(names)
-                logger.debug(f"FAISS: Added {len(names)} vectors to new index.")
+                    for row in db_valid_rows:
+                        emb = row["embedding"]
+                        if isinstance(emb, str):
+                            try:
+                                emb = json.loads(emb)
+                            except json.JSONDecodeError:
+                                continue
 
-            self._initialized = True
-            await self.save_to_disk()
-            logger.info(f"FAISS: Initialization complete. Total: {len(names)}, Skipped: {skipped_dim}")
+                        if emb and len(emb) == VECTOR_DIMENSION:
+                            p, n = row.get("project", "default"), row["name"]
+                            full_key = f"{p}:{n}"
+                            ids.append(full_key)
+                            embeddings.append(emb)
+                            metadatas.append({"project": p, "name": n})
+
+                    if ids:
+                        # 大量データの場合はバッチ分割が必要だが、MVPでは一括
+                        self.collection.upsert(
+                            ids=ids,
+                            embeddings=embeddings,
+                            metadatas=metadatas
+                        )
+
+                self._initialized = True
+                logger.info(f"ChromaDB: Initialized collection '{collection_name}' (Count: {self.collection.count()})")
+            except Exception as e:
+                logger.error(f"ChromaDB: Initialization failed: {e}", exc_info=True)
+                raise StorageError(f"Vector Store Initialization failed: {e}") from e
 
     async def upsert_vector(
-        self, name: str, embedding: list[float], metadata: dict[str, Any] = None, project: str = "default"      
+        self, name: str, embedding: list[float], metadata: dict[str, Any] = None, project: str = "default"
     ):
-        async with self._lock:
-            full_key = f"{project}:{name}"
-            logger.debug(f"FAISS: upsert_vector for '{full_key}'")
-            # 1. Basic validation
-            if len(embedding) != self.dimension:
-                logger.warning(
-                    f"FAISS: Dimension mismatch for '{full_key}'. Expected {self.dimension}, got {len(embedding)}"
-                )
+        """単一のベクトルを更新または追加します。"""
+        if not self._initialized:
+            # 最小限の初期化を試みる
+            try:
+                await self.ensure_initialized([])
+            except Exception:
                 return
 
-            needs_rebuild = False
-            if full_key in self.name_to_id:
-                # Mark as stale (ghost vector)
-                old_id = self.name_to_id[full_key]
-                if old_id in self.id_to_name:
-                    del self.id_to_name[old_id]
-                    logger.trace(f"FAISS: Mark old vector ID {old_id} as ghost for '{full_key}'")
-
-                ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
-                    needs_rebuild = True
-
-            vec = np.array([embedding]).astype("float32")
-            faiss.normalize_L2(vec)
-
-            self.index.add(vec)
-            new_id = self._current_id
-            self.id_to_name[new_id] = full_key
-            self.name_to_id[full_key] = new_id
-            self._current_id += 1
-            await self.save_to_disk()
-
-            if needs_rebuild:
-                logger.info(
-                    f"FAISS: Ghost vectors ({ghost_count}) exceeded threshold, triggering rebuild."
-                )
-                await self._rebuild_internal()
-
-    async def remove_vector(self, name: str, project: str = "default"):
-        """Removes a vector's mapping. Does not directly delete from FAISS (bloat mitigated by rebuild)."""     
         async with self._lock:
             full_key = f"{project}:{name}"
-            logger.info(f"FAISS: Removing vector mapping for '{full_key}'")
-            if full_key in self.name_to_id:
-                old_id = self.name_to_id[full_key]
-                if old_id in self.id_to_name:
-                    del self.id_to_name[old_id]
-                del self.name_to_id[full_key]
+            if len(embedding) != VECTOR_DIMENSION:
+                logger.warning(f"ChromaDB: Dimension mismatch for '{full_key}'.")
+                return
 
-                await self.save_to_disk()
+            try:
+                meta = metadata or {}
+                meta.update({"project": project, "name": name})
+                self.collection.upsert(
+                    ids=[full_key],
+                    embeddings=[embedding],
+                    metadatas=[meta]
+                )
+                logger.debug(f"ChromaDB: Upserted '{full_key}'")
+            except Exception as e:
+                logger.error(f"ChromaDB: Upsert failed: {e}")
 
-                ghost_count = self.index.ntotal - len(self.id_to_name)
-                if ghost_count > FAISS_GHOST_REBUILD_THRESHOLD:
-                    logger.info(
-                        f"FAISS: Ghost vectors ({ghost_count}) exceeded threshold during removal, rebuilding."  
-                    )
-                    await self._rebuild_internal()
+    async def remove_vector(self, name: str, project: str = "default"):
+        """ベクトルを削除します。"""
+        if not self._initialized:
+            return
+        async with self._lock:
+            full_key = f"{project}:{name}"
+            try:
+                self.collection.delete(ids=[full_key])
+                logger.info(f"ChromaDB: Deleted '{full_key}'")
+            except Exception as e:
+                logger.error(f"ChromaDB: Delete failed: {e}")
 
     async def rebuild_index(self):
-        """Public method to force rebuild index from DB."""
+        """現在のコレクションをリセットし、SQLite から全件再構築します。"""
         async with self._lock:
-            await self._rebuild_internal()
+            try:
+                collection_name = self._get_collection_name()
+                logger.info(f"ChromaDB: Rebuilding collection '{collection_name}'...")
 
-    async def _rebuild_internal(self):
-        """Internal rebuild logic (assumes lock is held)."""
-        logger.info("FAISS: Rebuilding index to clear bloat...")
-        try:
-            db = await get_db_connection()
-            async with db.execute(
-                "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
-            ) as cursor:
-                rows = await cursor.fetchall()
+                if not self.client:
+                    self.client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
 
-            self.index = faiss.IndexFlatIP(self.dimension)
-            self.id_to_name = {}
-            self.name_to_id = {}
-            self._current_id = 0
-
-            embeddings = []
-            names = []
-            skipped_dim = 0
-            for row in rows:
                 try:
-                    vec = row["embedding"]
-                    if isinstance(vec, str):
-                        vec = json.loads(vec)
+                    self.client.delete_collection(name=collection_name)
+                except Exception:
+                    pass
 
-                    project = row["project"] if "project" in row else "default"
-                    name = row["name"]
-                    full_key = f"{project}:{name}"
-
-                    if vec and len(vec) == self.dimension:
-                        embeddings.append(vec)
-                        names.append(full_key)
-                    else:
-                        skipped_dim += 1
-                except (json.JSONDecodeError, TypeError, KeyError) as e:
-                    logger.warning(f"FAISS: Rebuild skipping row due to invalid embedding: {e}")
-                    continue
-
-            if embeddings:
-                embeddings_np = np.array(embeddings).astype("float32")
-                faiss.normalize_L2(embeddings_np)
-                self.index.add(embeddings_np)
-                for i, full_key in enumerate(names):
-                    self.id_to_name[i] = full_key
-                    self.name_to_id[full_key] = i
-                self._current_id = len(names)
-
-            await self.save_to_disk()
-            logger.info(f"FAISS: Rebuild complete. Active vectors: {self.index.ntotal}, Skipped: {skipped_dim}")
-        except Exception as e:
-            logger.error(f"FAISS: Rebuild failed: {e}", exc_info=True)
-            raise StorageError(f"Vector Index Rebuild failed: {e}") from e
-
-    async def save_to_disk(self):
-        try:
-            Path(self._index_path).parent.mkdir(parents=True, exist_ok=True)
-            faiss.write_index(self.index, self._index_path)
-            with open(self._mapping_path, "w") as f:
-                json.dump(
-                    {
-                        "id_to_name": {str(k): v for k, v in self.id_to_name.items()},
-                        "name_to_id": self.name_to_id,
-                        "current_id": self._current_id,
-                    },
-                    f,
+                self.collection = self.client.create_collection(
+                    name=collection_name,
+                    metadata={"hnsw:space": "cosine"}
                 )
-            logger.debug(f"FAISS: Saved index and mapping to disk.")
-        except Exception as e:
-            logger.error(f"FAISS: Failed to save index to {self._index_path}: {e}", exc_info=True)
-            # We don't raise here to avoid crashing the whole operation if just saving fails,
-            # but it is logged as ERROR for isolation.
+
+                db = await get_db_connection()
+                async with db.execute(
+                    "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
+                ) as cursor:
+                    rows = await cursor.fetchall()
+
+                ids, embeddings, metadatas = [], [], []
+                for row in rows:
+                    try:
+                        emb = json.loads(row["embedding"]) if isinstance(row["embedding"], str) else row["embedding"]
+                        if emb and len(emb) == VECTOR_DIMENSION:
+                            p, n = row["project"], row["name"]
+                            ids.append(f"{p}:{n}")
+                            embeddings.append(emb)
+                            metadatas.append({"project": p, "name": n})
+                    except Exception:
+                        continue
+
+                if ids:
+                    self.collection.add(ids=ids, embeddings=embeddings, metadatas=metadatas)
+
+                self._initialized = True
+                logger.info(f"ChromaDB: Rebuild complete. (Count: {self.collection.count()})")
+            except Exception as e:
+                logger.error(f"ChromaDB: Rebuild failed: {e}")
+                raise StorageError(f"Vector Store Rebuild failed: {e}") from e
 
     async def search(
         self, query_emb: list[float], limit: int = 5, project: str | None = None
     ) -> list[dict[str, Any]]:
+        """類似ベクトルを検索します。"""
         if not self._initialized:
-            logger.warning("FAISS: Search attempted before initialization.")
             return []
 
         try:
-            search_project = project or "default"
-            query_vec = np.array([query_emb]).astype("float32")
-            faiss.normalize_L2(query_vec)
+            where = {"project": project} if project else None
 
-            # Use a larger k for post-filtering to ensure we hit the limit after filtering
-            k = min(limit * 10, self.index.ntotal)
-            if k <= 0:
-                return []
+            results = self.collection.query(
+                query_embeddings=[query_emb],
+                n_results=limit,
+                where=where
+            )
 
-            similarities, indices = self.index.search(query_vec, k)
-
-            results = []
-            project_prefix = f"{search_project}:"
-
-            for i, idx in enumerate(indices[0]):
-                if idx == -1:
-                    continue
-
-                full_key = self.id_to_name.get(int(idx))
-                if full_key and full_key.startswith(project_prefix):
-                    name_part = full_key.split(":", 1)[1]
-                    results.append(
-                        {
-                            "name": name_part,
-                            "project": search_project,
-                            "similarity": float(similarities[0][i]),
-                        }
-                    )
-
-                if len(results) >= limit:
-                    break
-
-            logger.debug(f"FAISS: Search found {len(results)} matches for project '{search_project}'")
-            return results
+            output = []
+            if results["ids"] and results["ids"][0]:
+                for i, full_key in enumerate(results["ids"][0]):
+                    # ChromaDB の distance (cosine distance = 1 - cosine similarity) を
+                    # 以前のコードと互換性のある similarity に変換
+                    dist = results["distances"][0][i] if results["distances"] else 0.5
+                    output.append({
+                        "name": results["metadatas"][0][i]["name"],
+                        "project": results["metadatas"][0][i]["project"],
+                        "similarity": 1.0 - dist
+                    })
+            return output
         except Exception as e:
-            logger.error(f"FAISS: Search failed: {e}", exc_info=True)
+            logger.error(f"ChromaDB: Search failed: {e}")
             return []
 
     async def check_health(self) -> dict[str, Any]:
-        """Checks if the FAISS index is loaded and has entries."""
+        """コンポーネントの状態を確認します。"""
         try:
             if not self._initialized:
-                return {"status": "Warning", "message": "Vector store not yet initialized."}
+                return {"status": "Warning", "message": "Vector store not initialized."}
 
-            count = self.index.ntotal
-            mapped = len(self.id_to_name)
+            count = self.collection.count()
             return {
-                "status": "Healthy" if count >= 0 else "Error",
-                "message": f"Index has {count} total entries ({mapped} mapped active).",
-                "details": {"total": count, "active": mapped},
+                "status": "Healthy",
+                "message": f"ChromaDB OK. Collection '{self._get_collection_name()}' count: {count}",
+                "details": {"total": count}
             }
         except Exception as e:
-            logger.error(f"FAISS: Health check failed: {e}", exc_info=True)
             return {"status": "Error", "message": str(e)}
 
 
-# Singleton instance
+# Singleton
 vector_manager = VectorIndexManager()
-

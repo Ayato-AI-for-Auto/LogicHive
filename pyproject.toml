@@ -17,7 +17,7 @@ dependencies = [
     "pytest-mock",
     "python-dateutil",
     "fastmcp",
-    "faiss-cpu",
+    "chromadb",
     "fastembed",
     "radon",
     "ruff",

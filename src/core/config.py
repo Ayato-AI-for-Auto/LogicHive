@@ -224,7 +224,7 @@ def get_data_dir() -> Path:
 def get_sqlite_db_path() -> str:
     return os.getenv("SQLITE_DB_PATH", str(get_data_dir() / "logichive.db"))
 
-def _get_active_embedding_model_name() -> str:
+def get_active_embedding_model_name() -> str:
     """現在の設定に基づいて有効なEmbeddingモデル名を返す"""
     provider = os.getenv("EMBEDDING_PROVIDER", EMBEDDING_PROVIDER).lower()
     if provider == "ollama":
@@ -234,17 +234,8 @@ def _get_active_embedding_model_name() -> str:
     else:
         return os.getenv("EMBEDDING_MODEL_ID", EMBEDDING_MODEL_ID)
 
-def get_faiss_index_path() -> str:
-    model_name = _get_active_embedding_model_name()
-    safe_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_")
-    default_path = str(get_data_dir() / f"faiss_{safe_name}.bin")
-    return os.getenv("FAISS_INDEX_PATH", default_path)
-
-def get_faiss_mapping_path() -> str:
-    model_name = _get_active_embedding_model_name()
-    safe_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_")
-    default_path = str(get_data_dir() / f"faiss_mapping_{safe_name}.json")
-    return os.getenv("FAISS_MAPPING_PATH", default_path)
+def get_chroma_db_dir() -> Path:
+    return get_data_dir() / "chroma"
 
 def get_pool_base_dir() -> Path:
     return get_logic_hive_home() / "pools"
@@ -253,8 +244,7 @@ def get_pool_base_dir() -> Path:
 LOGICHIVE_HOME = get_logic_hive_home()
 DATA_DIR = get_data_dir()
 SQLITE_DB_PATH = get_sqlite_db_path()
-FAISS_INDEX_PATH = get_faiss_index_path()
-FAISS_MAPPING_PATH = get_faiss_mapping_path()
+CHROMA_DB_DIR = get_chroma_db_dir()
 POOL_BASE_DIR = get_pool_base_dir()
 
 # LogicHive Quality Gate & Storage Thresholds
@@ -264,8 +254,8 @@ MAX_VERIFICATION_TIMEOUT = int(os.getenv("MAX_VERIFICATION_TIMEOUT", 120))
 
 DESCRIPTION_MIN_LENGTH = int(os.getenv("DESCRIPTION_MIN_LENGTH", 10))
 
-# Vector Search (FAISS) Config
-FAISS_GHOST_REBUILD_THRESHOLD = int(os.getenv("FAISS_GHOST_REBUILD_THRESHOLD", 10))
+# Vector Search (ChromaDB) Config
+# No ghost thresholds needed as ChromaDB handles updates internally.
 
 # 5. Virtual Environment Pooling (Pre-warming)
 ENABLE_ENV_POOLING = os.getenv("ENABLE_ENV_POOLING", "true").lower() == "true"

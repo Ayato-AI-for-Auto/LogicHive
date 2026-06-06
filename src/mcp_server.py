@@ -13,7 +13,7 @@ import fastmcp
 from fastmcp import FastMCP
 
 import orchestrator
-from core.config import get_faiss_index_path, get_sqlite_db_path
+from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
 from core.logging_config import get_logger
@@ -368,7 +368,6 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
     status = ["## LogicHive Integrity Report\n"]
     db_path = get_sqlite_db_path()
-    faiss_path = get_faiss_index_path()
 
     try:
         # 1. DB Check
@@ -380,7 +379,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
         if db_exists:
             count = await sqlite_storage.get_function_count()
-            # New: Get count of assets that SHOULD be in FAISS (have embeddings)
+            # New: Get count of assets that SHOULD be in Vector Store (have embeddings)
             db = await get_db_connection()
             sql = (
                 "SELECT COUNT(*) FROM logichive_functions "
@@ -392,26 +391,27 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
 
             status.append(f"- Record Count: {count} ({expected_count} with embeddings)")
 
-        # 2. Vector Store Check
-        faiss_exists = os.path.exists(faiss_path)
+        # 2. Vector Store Check (ChromaDB)
         status.append(
-            f"### 2. Vector Store (FAISS)\n- Path: `{faiss_path}`\n- Status: "
-            f"{'✅ Found on disk' if faiss_exists else '⚠️ Missing'}"
+            f"### 2. Vector Store (ChromaDB)\n- Path: `{CHROMA_DB_DIR}`"
         )
 
-        if faiss_exists and db_exists:
-            # Check for memory sync (Silent check for initialization)
-            if not vector_manager._initialized:
-                status.append("- **Memory State**: 💤 Uninitialized (Will load on first search)")
-            else:
-                idx_size = vector_manager.index.ntotal if vector_manager.index else 0
+        # Check for memory sync (Silent check for initialization)
+        if not vector_manager._initialized:
+            status.append("- **Status**: 💤 Uninitialized (Will load on first search)")
+        else:
+            health = await vector_manager.check_health()
+            if health["status"] == "Healthy":
+                idx_size = health["details"]["total"]
                 if idx_size != expected_count:
                     status.append(
                         f"- **Desync Detected**: DB({expected_count} verified) vs "
-                        f"FAISS-Memory({idx_size}). Rebuild recommended."
+                        f"ChromaDB({idx_size}). Rebuild recommended."
                     )
                 else:
-                    status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in memory)")
+                    status.append(f"- Sync Status: ✅ Optimal ({idx_size} vectors in collection)")
+            else:
+                status.append(f"- **Status**: ❌ Error: {health['message']}")
 
         # 3. Environment Pool Check
         from core.execution.pool import PoolManager

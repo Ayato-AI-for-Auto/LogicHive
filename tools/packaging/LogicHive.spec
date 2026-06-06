@@ -14,7 +14,7 @@ sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
 # Robust metadata collection
-metadata_packages = ['fastmcp', 'google-genai', 'mcp', 'flet', 'flet_desktop']
+metadata_packages = ['fastmcp', 'google-genai', 'mcp', 'flet', 'flet_desktop', 'chromadb']
 common_datas = collect_data_files('flet')
 
 for pkg in metadata_packages:
@@ -30,7 +30,8 @@ common_hiddenimports = [
     'google',
     'aiosqlite',
     'numpy',
-    'faiss',
+    'chromadb',
+    'fastembed',
     'radon',
     'sqlite3',
     'psutil',

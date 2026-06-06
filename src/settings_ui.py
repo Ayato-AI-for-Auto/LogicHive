@@ -28,6 +28,7 @@ from core.config import (  # noqa: E402
     save_config,
 )
 from core.logging_config import get_logger  # noqa: E402
+from core.system.bootstrapper import LogicHiveBootstrapper  # noqa: E402
 from core.system.uninstall import (  # noqa: E402
     execute_kamikaze_script,
     kill_logichive_processes,
@@ -72,6 +73,70 @@ class LogicHiveUI:
             "PORT": str(PORT),
             "ENABLE_GPU": ENABLE_GPU,
         }
+
+    async def bootstrap_if_needed(self) -> bool:
+        """
+        Hub エンジンの実行環境 (venv) をチェックし、必要であれば構築します。
+        構築中はプログレス画面を表示します。
+        """
+        bootstrapper = LogicHiveBootstrapper()
+        if bootstrapper.is_venv_ready():
+            # 既に準備ができていれば、Hub をバックグラウンドで起動して終了
+            bootstrapper.run_hub_background()
+            return True
+
+        # 環境構築画面の表示
+        progress_text = ft.Text("Initializing LogicHive Hub Engine...", size=20, weight=ft.FontWeight.BOLD)
+        progress_bar = ft.ProgressBar(width=400, color=ft.Colors.BLUE_400)
+        status_msg = ft.Text("Starting environment setup...", size=14, color=ft.Colors.GREY_400)
+
+        self.page.clean()
+        self.page.vertical_alignment = ft.MainAxisAlignment.CENTER
+        self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+        self.page.add(
+            ft.Column(
+                [
+                    ft.Icon(ft.Icons.ROCKET_LAUNCH, size=60, color=ft.Colors.BLUE_400),
+                    progress_text,
+                    progress_bar,
+                    status_msg,
+                    ft.Text(
+                        "This will set up a local virtual environment in ~/.logichive/.venv\n"
+                        "and install required libraries (ChromaDB, etc.).\n"
+                        "This only happens on the first run or after a cleanup.",
+                        text_align=ft.TextAlign.CENTER,
+                        size=12,
+                        color=ft.Colors.GREY_500,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20,
+            )
+        )
+        self.page.update()
+
+        def update_status(msg: str):
+            status_msg.value = msg
+            self.page.update()
+
+        # 構築実行
+        success = await bootstrapper.setup_environment(progress_callback=update_status)
+
+        if success:
+            update_status("Starting Hub Engine...")
+            bootstrapper.run_hub_background()
+            # 少し待ってからメイン画面へ
+            import asyncio
+            await asyncio.sleep(1)
+            return True
+        else:
+            # 失敗時はエラー表示をして止める
+            progress_bar.color = ft.Colors.RED
+            progress_bar.value = 1.0
+            status_msg.value = "Bootstrap Failed. Please check the logs in ~/.logichive/logs/hub.log"
+            status_msg.color = ft.Colors.RED
+            self.page.update()
+            return False
 
     def get_client_json(self):
         import json
@@ -539,15 +604,18 @@ class LogicHiveUI:
         )
 
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     app = LogicHiveUI(page)
-    app.build()
+    # 1. 環境構築 (ADR-0018)
+    if await app.bootstrap_if_needed():
+        # 2. メイン画面の構築
+        app.build()
 
 
 if __name__ == "__main__":
     logger.info("Starting LogicHive Settings UI")
     try:
-        ft.run(main)
+        ft.app(target=main)
     except Exception:
         logger.exception("Fatal error occurred in Settings UI")
         sys.exit(1)
