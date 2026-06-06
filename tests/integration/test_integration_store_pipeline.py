@@ -1,9 +1,11 @@
 import asyncio
 import os
 import sqlite3
+
 import pytest
+
 from core.exceptions import ValidationError
-from orchestrator import do_save_async, do_get_verification_status
+from orchestrator import do_get_verification_status, do_save_async
 from storage.sqlite_api import sqlite_storage
 
 
@@ -51,7 +53,7 @@ async def test_pipeline_versioning_and_history_archival(test_db):
 
     cursor.execute("SELECT * FROM logichive_function_history WHERE name = ? AND project = ?", (name, project))
     history_records = cursor.fetchall()
-    
+
     # We should have exactly 1 archived version (the original V1)
     assert len(history_records) == 1
     archive = history_records[0]

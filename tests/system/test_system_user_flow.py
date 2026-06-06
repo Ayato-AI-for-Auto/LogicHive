@@ -1,14 +1,15 @@
 import asyncio
 import os
 import sqlite3
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from core.system.bootstrapper import LogicHiveBootstrapper
-from core.exceptions import StorageError
-from orchestrator import do_save_async, do_get_verification_status, do_search_async
-from storage.sqlite_api import sqlite_storage
+import pytest
+
 from core.db import get_db_connection
+from core.exceptions import StorageError
+from core.system.bootstrapper import LogicHiveBootstrapper
+from orchestrator import do_get_verification_status, do_save_async, do_search_async
+from storage.sqlite_api import sqlite_storage
 
 
 @pytest.mark.asyncio
@@ -22,14 +23,14 @@ async def test_system_bootstrap_and_user_flow(test_db):
     # 1. Bootstrapper Setup Environment Simulation
     # ==========================================
     bootstrapper = LogicHiveBootstrapper()
-    
+
     # Assert initially not ready in this clean test_db / home sandbox
     assert bootstrapper.is_venv_ready() is False
 
     with patch("core.system.bootstrapper.shutil.which", return_value="mock_uv"), \
          patch("core.system.bootstrapper.subprocess.run") as mock_sub_run, \
          patch.object(LogicHiveBootstrapper, "get_venv_python") as mock_get_python:
-        
+
         # Mock python_exe path existence check
         mock_python = MagicMock()
         mock_python.exists.return_value = True
@@ -63,7 +64,7 @@ async def test_system_bootstrap_and_user_flow(test_db):
         if status_data["status"] != "pending":
             break
         await asyncio.sleep(0.1)
-    
+
     assert status_data["status"] == "verified"
 
     # Verify database state directly (情報の裏取り)

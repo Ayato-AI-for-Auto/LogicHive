@@ -1,7 +1,9 @@
 import os
 import sqlite3
-import pytest
+
 import aiosqlite
+import pytest
+
 from core.db import get_db_connection, retry_on_db_lock
 from storage.sqlite_api import SqliteStorage, _safe_json_loads
 
@@ -86,7 +88,7 @@ async def test_sqlite_storage_direct_verification(db_isolation):
     assert row["description"] == func_data["description"]
     assert row["reliability_score"] == 95.5
     assert row["verification_status"] == "verified"
-    
+
     # JSON strings must be decoded and matched
     import json
     assert json.loads(row["tags"]) == ["math", "utility"]
@@ -111,7 +113,7 @@ async def test_retry_on_db_lock_decorator_failure(db_isolation):
 
     with pytest.raises(aiosqlite.OperationalError) as exc_info:
         await mock_fail_db_op()
-    
+
     assert "database is locked" in str(exc_info.value)
     # 1 initial call + 2 retries = 3 calls
     assert call_count == 3
