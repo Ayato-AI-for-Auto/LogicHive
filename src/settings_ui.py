@@ -410,13 +410,13 @@ class LogicHiveUI:
             color=ft.Colors.GREEN if is_admin() else ft.Colors.RED,
         )
 
-        def on_install_tasks(e):
+        async def on_install_tasks(e):
             if not is_admin():
                 self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
                 self.page.snack_bar.open = True
                 self.page.update()
                 if run_as_admin():
-                    self.page.window_close()
+                    await self.page.window.destroy()
                 return
 
             hub_path = Path(sys.executable).parent / "LogicHive-Hub.exe"
@@ -430,13 +430,13 @@ class LogicHiveUI:
             self.page.snack_bar.open = True
             self.page.update()
 
-        def on_remove_tasks(e):
+        async def on_remove_tasks(e):
             if not is_admin():
                 self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
                 self.page.snack_bar.open = True
                 self.page.update()
                 if run_as_admin():
-                    self.page.window_close()
+                    await self.page.window.destroy()
                 return
 
             success = remove_scheduled_tasks()
@@ -472,7 +472,7 @@ class LogicHiveUI:
         # 2. Uninstall Wizard
         remove_data_checkbox = ft.Checkbox(label="Remove User Data (~/.logichive)", value=True)
 
-        def confirm_uninstall(e):
+        async def confirm_uninstall(e):
             self.page.dialog.open = False
             self.page.update()
 
@@ -492,7 +492,7 @@ class LogicHiveUI:
                     execs_to_delete.append(hub_path)
 
             execute_kamikaze_script(execs_to_delete)
-            self.page.window_close()
+            await self.page.window.destroy()
 
         def cancel_uninstall(e):
             self.page.dialog.open = False
