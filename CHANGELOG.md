@@ -1,3 +1,27 @@
+# [0.13.0](https://github.com/ayato-labs/LogicHive/compare/v0.12.0...v0.13.0) (2026-06-06)
+
+
+### Features
+
+* add sqlite debugging script and update environment configuration template to prioritize local-first models ([48f6267](https://github.com/ayato-labs/LogicHive/commit/48f6267ff1f55708473a2ddfd9124755bc5124ef))
+* bump project version to 0.12.0 and add evaluation runner script for code hashing tests ([59e90b8](https://github.com/ayato-labs/LogicHive/commit/59e90b8126f928da7f07364e8f504c65bb450db0))
+* implement automated entropy-based secret scanning tools for dogfooding and final audits ([659b57e](https://github.com/ayato-labs/LogicHive/commit/659b57e2ad442f3844387b95561b196bcca2e5a3))
+* implement comprehensive testing suite and CI/CD pipeline for LogicHive ([a667801](https://github.com/ayato-labs/LogicHive/commit/a6678010955996f5e445cc6cb0dfbd5095f16cd8))
+* implement concurrent file scanning with performance optimizations and expanded secret filtering ([40fa80c](https://github.com/ayato-labs/LogicHive/commit/40fa80c3bf28e11e2c1bb9e7973efbcc251e1abb))
+* implement EphemeralPythonExecutor for secure, resource-monitored code execution with environment pooling support ([fdbe48e](https://github.com/ayato-labs/LogicHive/commit/fdbe48e683b59731ddf5ad7896055269a847f6f8))
+* implement FastMCP server with search, retrieval, and validation tools alongside system integration tests ([5c03ab6](https://github.com/ayato-labs/LogicHive/commit/5c03ab67987b2f3bdf5f5879318defe049f284b7))
+* implement Flet-based GUI for managing application configuration and system integrity checks ([dda1a60](https://github.com/ayato-labs/LogicHive/commit/dda1a60d6b7a4408e3eb9c03c4590d447003633b))
+* implement MCP server with tool registration for searching, retrieving, saving, and debugging functions ([e5dad25](https://github.com/ayato-labs/LogicHive/commit/e5dad2552fb3ea0067dad751021818cbcc1a56f1))
+* implement mcp_server with core function management tools and add system flow test suite ([7fbd20c](https://github.com/ayato-labs/LogicHive/commit/7fbd20cc2339c3316a369bb7af975cd4929c121f))
+* implement PoolManager with background environment warming and non-blocking cleanup strategy ([4f1b4cc](https://github.com/ayato-labs/LogicHive/commit/4f1b4cc259bb63b21c16b2e666d9ef6cd89847dd))
+* implement security scanner, add debug utilities, and update environment configuration. ([1378e3f](https://github.com/ayato-labs/LogicHive/commit/1378e3f616faee556c09a523e80af74b000c132c))
+* implement SQLite database management and add system tests for configuration resolution and execution harness logic ([959b4a8](https://github.com/ayato-labs/LogicHive/commit/959b4a80646b0ff0d03f45d29dd879d63df3d6df))
+* implement structured JSON logging and initialize MCP server infrastructure ([4845bfe](https://github.com/ayato-labs/LogicHive/commit/4845bfe804509ed5aa5fad3126615b5136cf091b))
+* implement thread-safe SQLite database connector with loop-affinity handling and add comprehensive test infrastructure ([2efd2dc](https://github.com/ayato-labs/LogicHive/commit/2efd2dc00909ac691cf9e4ab50c2a1e8f659f96c))
+* implement tiered .env configuration strategy and document hybrid deployment standard ([f6b02f6](https://github.com/ayato-labs/LogicHive/commit/f6b02f628ee156f7c623b6acb034a8d343b53329))
+* implement tiered hybrid configuration strategy and standardize environment loading ([b11101e](https://github.com/ayato-labs/LogicHive/commit/b11101e44e84c14cd25fdb65c6e64c46986a57a0))
+* introduce orchestrator module for async asset management and verification pipeline ([3469fd3](https://github.com/ayato-labs/LogicHive/commit/3469fd3a50fa361985d614b9f377b960be6960d0))
+
 # [0.12.0](https://github.com/ayato-labs/LogicHive/compare/v0.11.0...v0.12.0) (2026-06-01)
 
 
