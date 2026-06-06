@@ -44,7 +44,7 @@ async def test_system_end_to_end_flow(test_db):
             verified = True
             break
         await asyncio.sleep(1.0)
-    
+
     assert verified is True, f"Verification timed out or failed. Last status: {status_msg}"
 
     # 5. Search again (should find it)

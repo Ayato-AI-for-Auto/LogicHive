@@ -273,7 +273,7 @@ async def debug_db(wait_for_previous: bool = False) -> str:
 
     db_path = get_sqlite_db_path()
     status = [f"SQLITE_DB_PATH: {db_path}"]
-    status.append(f"Exists: {os.path.exists(db_path)}")      
+    status.append(f"Exists: {os.path.exists(db_path)}")
 
     if os.path.exists(db_path):
         try:
