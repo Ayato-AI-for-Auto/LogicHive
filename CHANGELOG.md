@@ -1,3 +1,16 @@
+# [0.14.0](https://github.com/ayato-labs/LogicHive/compare/v0.13.0...v0.14.0) (2026-06-06)
+
+
+### Features
+
+* add system integration tests for Windows task management ([08bce84](https://github.com/ayato-labs/LogicHive/commit/08bce84f6c776ac4dca513dd625b134ad1dc1604))
+* add Windows system tests and implement CI/CD pipeline for automated testing and release builds ([658dff2](https://github.com/ayato-labs/LogicHive/commit/658dff228e939365b6288cc157a71c66c0b2a7cc))
+* implement automated CI/CD pipeline and add settings UI for system configuration ([77f513a](https://github.com/ayato-labs/LogicHive/commit/77f513a81dcbf7a6ef37c0bb18c3f9f806b354a7))
+* implement bootstrapper to initialize core system services ([246c06c](https://github.com/ayato-labs/LogicHive/commit/246c06ce32f297ef50a8cc616b7dcd883970ea33))
+* implement core MCP server infrastructure with dynamic configuration and modular project structure ([21daa6d](https://github.com/ayato-labs/LogicHive/commit/21daa6db1d9b3360b9cf423a3bce30e118f3964f))
+* implement system bootstrapper and add PyInstaller build configuration for hub and settings binaries ([73aebbd](https://github.com/ayato-labs/LogicHive/commit/73aebbd7f416ce5ea08335821dae50bdb41d9213))
+* implement thin settings client with dynamic virtual environment orchestration and system-wide OS integration ([6d332dd](https://github.com/ayato-labs/LogicHive/commit/6d332dd440dd2e1b4aa01d7d0d2063b66ad46731))
+
 # [0.13.0](https://github.com/ayato-labs/LogicHive/compare/v0.12.0...v0.13.0) (2026-06-06)
 
 
