@@ -1,3 +1,10 @@
+# [0.15.0](https://github.com/ayato-labs/LogicHive/compare/v0.14.0...v0.15.0) (2026-06-06)
+
+
+### Features
+
+* initialize MCP server and implement basic tools for function management and verification ([3d977ba](https://github.com/ayato-labs/LogicHive/commit/3d977bad721f8914c95fbb416d86ded8e9e7a825))
+
 # [0.14.0](https://github.com/ayato-labs/LogicHive/compare/v0.13.0...v0.14.0) (2026-06-06)
 
 
