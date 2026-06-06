@@ -62,8 +62,8 @@ def test_config_resolution_priority():
                 assert "System Environment Variables" in source
 
             # 3. Home file exists
-            home_env.write_text("GEMINI_API_KEY=home_key")      
-            with patch("core.config.load_dotenv") as mock_load: 
+            home_env.write_text("GEMINI_API_KEY=home_key")
+            with patch("core.config.load_dotenv") as mock_load:
                 source = _load_config()
                 assert "Home" in source
                 mock_load.assert_called_with(home_env, override=True)

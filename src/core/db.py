@@ -21,7 +21,7 @@ async def get_db_connection() -> aiosqlite.Connection:
     import time
 
     start_time = time.perf_counter()
-    logger.info("[TRACE] SQLite: Requesting DB connection...")      
+    logger.info("[TRACE] SQLite: Requesting DB connection...")
     global _global_db, _creator_loop
     current_loop = asyncio.get_running_loop()
 
@@ -31,7 +31,7 @@ async def get_db_connection() -> aiosqlite.Connection:
         if _global_db is not None and _creator_loop is not current_loop:
             logger.warning("Loop affinity change detected. Re-initializing DB.")
             # We don't await close on the old connection because it might be tied
-            # to a dead loop, which causes a hang. We orphan it.    
+            # to a dead loop, which causes a hang. We orphan it.
             _global_db = None
 
         if _global_db is None:
@@ -40,9 +40,9 @@ async def get_db_connection() -> aiosqlite.Connection:
             _global_db.row_factory = aiosqlite.Row
             _creator_loop = current_loop
 
-            await _global_db.execute("PRAGMA journal_mode=WAL;")    
-            await _global_db.execute("PRAGMA synchronous=NORMAL;")  
-            await _global_db.execute("PRAGMA busy_timeout=5000;")   
+            await _global_db.execute("PRAGMA journal_mode=WAL;")
+            await _global_db.execute("PRAGMA synchronous=NORMAL;")
+            await _global_db.execute("PRAGMA busy_timeout=5000;")
 
             # --- Initialize Database Schema ---
             await _global_db.execute("""
