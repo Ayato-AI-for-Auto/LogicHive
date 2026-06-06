@@ -3,7 +3,10 @@ Windows OS との統合ユーティリティ (Phase 2) のテスト。
 CTypes や subprocess をモックして検証します。
 """
 
+import sys
 from unittest.mock import patch
+
+import pytest
 
 from src.core.system.windows_tasks import (
     LOGON_TASK_NAME,
@@ -15,6 +18,7 @@ from src.core.system.windows_tasks import (
 )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 @patch("src.core.system.windows_tasks.ctypes.windll.shell32.IsUserAnAdmin")
 def test_is_admin_true(mock_is_admin):
     """管理者権限がある場合のテスト"""
@@ -22,6 +26,7 @@ def test_is_admin_true(mock_is_admin):
     assert is_admin() is True
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 @patch("src.core.system.windows_tasks.ctypes.windll.shell32.IsUserAnAdmin")
 def test_is_admin_false(mock_is_admin):
     """管理者権限がない場合のテスト"""
@@ -29,6 +34,7 @@ def test_is_admin_false(mock_is_admin):
     assert is_admin() is False
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 @patch("src.core.system.windows_tasks.ctypes.windll.shell32.ShellExecuteW")
 def test_run_as_admin_success(mock_shell_execute):
     """UAC昇格リクエストが成功した場合のテスト"""
@@ -38,6 +44,7 @@ def test_run_as_admin_success(mock_shell_execute):
     mock_shell_execute.assert_called_once_with(None, "runas", "test.exe", "--foo", None, 1)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 @patch("src.core.system.windows_tasks.ctypes.windll.shell32.ShellExecuteW")
 def test_run_as_admin_failure(mock_shell_execute):
     """UAC昇格リクエストが失敗した場合のテスト"""
