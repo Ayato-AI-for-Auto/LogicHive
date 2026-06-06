@@ -558,6 +558,9 @@ class LogicHiveUI:
 
     def build(self):
         self.initialize_state()
+        self.page.clean()
+        self.page.vertical_alignment = ft.MainAxisAlignment.START
+        self.page.horizontal_alignment = ft.CrossAxisAlignment.START
 
         header = ft.Row(
             [
