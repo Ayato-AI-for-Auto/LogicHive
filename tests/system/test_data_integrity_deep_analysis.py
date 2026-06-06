@@ -5,7 +5,6 @@ import pytest
 
 import core.config
 from orchestrator import do_get_verification_status, do_save_async
-from storage.vector_store import vector_manager
 
 
 @pytest.mark.asyncio
@@ -66,6 +65,8 @@ async def test_zombie_detection(test_db):
     """
     SYSTEM: Check for synchronization between DB and FAISS.
     """
+    from storage.vector_store import vector_manager
+    await vector_manager.ensure_initialized([])
     # Force a desync by inserting directly via SQL (bypassing the logic that updates FAISS)
     conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
     conn.execute(
@@ -85,19 +86,19 @@ async def test_zombie_detection(test_db):
     db_count = cursor.fetchone()[0]
     conn.close()
 
-    # Count in FAISS
-    faiss_count = len(vector_manager.id_to_name)
+    # Count in ChromaDB
+    chroma_count = vector_manager.collection.count()
 
     print("\n--- Sync Analysis ---")
     print(f"DB Assets with Embeddings: {db_count}")
-    print(f"FAISS Memory Assets: {faiss_count}")
+    print(f"ChromaDB Memory Assets: {chroma_count}")
 
     # In a healthy system they should match (if initialized)
     # But here we expect a mismatch because we bypassed the orchestrator
     assert db_count == 1
-    assert faiss_count == 0
+    assert chroma_count == 0
 
     # Trigger self-healing (rebuild)
     await vector_manager.rebuild_index()
-    assert len(vector_manager.id_to_name) == 1
+    assert vector_manager.collection.count() == 1
     print("Self-healing (Rebuild) successful.")

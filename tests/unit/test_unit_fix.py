@@ -55,26 +55,24 @@ async def test_python_static_evaluator_pure():
 @pytest.mark.asyncio
 async def test_vector_store_initialization_filtering(tmp_path):
     """Verifies that VectorIndexManager correctly filters dimensions and 'null' strings."""
-    # We use a custom dimension for testing
-    manager = VectorIndexManager(dimension=3)
-    manager._index_path = str(tmp_path / "test_faiss.bin")
-    manager._mapping_path = str(tmp_path / "test_faiss.json")
+    from unittest.mock import patch
+    with patch("storage.vector_store.VECTOR_DIMENSION", 3), \
+         patch("storage.vector_store.CHROMA_DB_DIR", tmp_path / "chroma"):
+        manager = VectorIndexManager()
 
-    dummy_rows = [
-        {"name": "valid", "embedding": "[0.1, 0.2, 0.3]", "project": "test"},
-        {"name": "wrong_dim", "embedding": "[0.1, 0.2]", "project": "test"},
-        {"name": "null_string", "embedding": "null", "project": "test"},
-        {"name": "none_val", "embedding": None, "project": "test"},
-    ]
+        dummy_rows = [
+            {"name": "valid", "embedding": "[0.1, 0.2, 0.3]", "project": "test"},
+            {"name": "wrong_dim", "embedding": "[0.1, 0.2]", "project": "test"},
+            {"name": "null_string", "embedding": "null", "project": "test"},
+            {"name": "none_val", "embedding": None, "project": "test"},
+        ]
 
-    # We don't want it to hit disk, but ensure_initialized handles its own state
-    # We pass the rows directly
-    await manager.ensure_initialized(dummy_rows)
+        await manager.ensure_initialized(dummy_rows)
 
-    # Only 1 should be loaded
-    assert manager.index.ntotal == 1
-    assert "test:valid" in manager.name_to_id
-    assert "test:wrong_dim" not in manager.name_to_id
+        # Only 1 should be loaded
+        assert manager.collection.count() == 1
+        assert len(manager.collection.get(ids=["test:valid"])["ids"]) == 1
+        assert len(manager.collection.get(ids=["test:wrong_dim"])["ids"]) == 0
 
 
 @pytest.mark.asyncio

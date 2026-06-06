@@ -5,12 +5,12 @@ import sqlite3
 import pytest
 
 from orchestrator import do_save_async, do_search_async
-from storage.vector_store import vector_manager
 
 
 @pytest.mark.asyncio
 async def test_deep_data_integrity_handshake(test_db):
     """INTEGRATION: Deep dive into DB and FAISS to ensure physical data integrity."""
+    from storage.vector_store import vector_manager
     name = "integrity_test"
     code = "def add_logic(a, b):\n    return a + b"
     project = "integrity_deep"
@@ -91,11 +91,10 @@ async def test_deep_data_integrity_handshake(test_db):
     tags = json.loads(row["tags"])
     assert "integrity" in tags
 
-    # 4. VERIFY FAISS SYNC
-    # The vector manager uses 'project:name' as the key
+    # 4. VERIFY CHROMADB SYNC
     full_key = f"{project}:{name}"
-    assert full_key in vector_manager.name_to_id
-    vector_manager.name_to_id[full_key]
+    res = vector_manager.collection.get(ids=[full_key])
+    assert len(res["ids"]) > 0
 
     # Search should find it
     search_results = await do_search_async("nested logic", limit=1, project=project)

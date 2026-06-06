@@ -127,6 +127,8 @@ async def db_isolation(request):
     # 3. Reload config and reset singletons
     importlib.reload(core.config)
     await close_db_connection()
+    import storage.vector_store
+    importlib.reload(storage.vector_store)
     importlib.reload(storage.sqlite_api)
     importlib.reload(orchestrator)
 
