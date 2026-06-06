@@ -22,3 +22,4 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-016: OS Integration and Clean Uninstall Strategy](ADR-0016-os-integration-and-clean-uninstall-strategy.md)
 - [ADR-017: Embedding Model Isolation and Rebuild Strategy (Superseded)](ADR-0017-embedding-model-isolation-and-rebuild-strategy.md)
 - [ADR-018: Thin Settings Client and Dynamic Hub Engine Venv](ADR-0018-thin-client-dynamic-venv.md)
+- [ADR-019: Windows Unified CI Test Environment](ADR-0019-windows-unified-ci-test-environment.md)
