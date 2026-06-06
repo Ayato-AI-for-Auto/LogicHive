@@ -19,17 +19,55 @@ class LogicHiveBootstrapper:
     def __init__(self):
         self.home_dir = get_logic_hive_home()
         self.venv_dir = self.home_dir / ".venv"
+        self.persistent_engine_dir = self.home_dir / "engine"
+
         # 開発環境か EXE 環境かによって pyproject.toml の場所を特定
         if getattr(sys, "frozen", False):
-            self.root_dir = Path(sys.executable).parent
+            # PyInstaller の一時展開先 (sys._MEIPASS)
+            self.bundled_root = Path(sys._MEIPASS)
+            self.root_dir = self.persistent_engine_dir
         else:
+            self.bundled_root = None
             self.root_dir = Path(__file__).parent.parent.parent.resolve()
 
         self.pyproject_path = self.root_dir / "pyproject.toml"
 
+    def _ensure_engine_source(self):
+        """EXE 同梱のソースを永続ディレクトリに展開・更新します (frozen 時のみ)"""
+        if not getattr(sys, "frozen", False) or not self.bundled_root:
+            return
+
+        logger.info(f"Checking engine source in {self.persistent_engine_dir}")
+        bundled_engine = self.bundled_root / "engine"
+        bundled_pyproject = self.bundled_root / "pyproject.toml"
+
+        if not bundled_engine.exists():
+            logger.error("Critical: Bundled engine source not found inside EXE.")
+            return
+
+        # 同期または上書きコピー
+        try:
+            self.persistent_engine_dir.mkdir(parents=True, exist_ok=True)
+
+            # src ディレクトリのコピー (engine/src -> ~/.logichive/engine/src)
+            target_src = self.persistent_engine_dir / "src"
+            if target_src.exists():
+                shutil.rmtree(target_src)
+            shutil.copytree(bundled_engine / "src", target_src)
+
+            # pyproject.toml のコピー (pyproject.toml -> ~/.logichive/engine/pyproject.toml)
+            shutil.copy2(bundled_pyproject, self.persistent_engine_dir / "pyproject.toml")
+
+            logger.info("Engine source updated successfully from bundle.")
+        except Exception as e:
+            logger.error(f"Failed to extract engine source: {e}")
+
     def is_venv_ready(self) -> bool:
         """仮想環境が構築済みで、python.exe が存在するかチェック"""
         python_exe = self.get_venv_python()
+        # 開発環境でない場合は、ソース自体の存在もチェック
+        if getattr(sys, "frozen", False) and not self.pyproject_path.exists():
+            return False
         return python_exe.exists()
 
     def get_venv_python(self) -> Path:
@@ -56,6 +94,11 @@ class LogicHiveBootstrapper:
         uv = self._find_uv()
 
         try:
+            # 0. ソースの展開 (frozen の場合のみ)
+            if progress_callback:
+                progress_callback("Extracting engine source...")
+            self._ensure_engine_source()
+
             if progress_callback:
                 progress_callback("Creating virtual environment in ~/.logichive/.venv...")
 

@@ -17,6 +17,12 @@ sys.path.append(os.path.join(project_root, 'src'))
 metadata_packages = ['fastmcp', 'google-genai', 'mcp', 'flet', 'flet_desktop', 'chromadb']
 common_datas = collect_data_files('flet')
 
+# Include engine source and config for bootstrapping
+common_datas += [
+    (os.path.join(project_root, 'pyproject.toml'), '.'),
+    (os.path.join(project_root, 'src'), 'engine/src'),
+]
+
 for pkg in metadata_packages:
     try:
         common_datas += copy_metadata(pkg)
