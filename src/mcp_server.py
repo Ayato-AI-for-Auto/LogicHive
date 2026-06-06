@@ -6,10 +6,13 @@
 # (at your option) any later version.
 
 import os
+import socket
 import sqlite3
+import sys
 from contextlib import asynccontextmanager
 
 import fastmcp
+import psutil
 from fastmcp import FastMCP
 
 import orchestrator
@@ -506,46 +509,46 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
         return f"LogicHive Error: Failed to rebuild index. Detail: {str(e)}"
 
 
-if __name__ == "__main__":
-    import socket
-    import sys
 
-    import psutil
+def wait_on_error():
+    """Prevents the terminal window from closing immediately in frozen mode."""
+    if getattr(sys, "frozen", False):
+        logger.info("=" * 60)
+        input("Press Enter to exit...")
+
+
+def get_conflicting_process(port: int):
+    """Identifies the process currently using the specified port."""
+    try:
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.laddr.port == port and conn.status == "LISTEN":
+                return psutil.Process(conn.pid)
+    except Exception as e:
+        logger.debug(
+            f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
+        )
+    return None
+
+
+def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
+    """Finds the first available port starting from start_port."""
+    port = start_port
+    while port < 65535:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, port))
+                return port
+            except OSError:
+                port += 1
+    return start_port
+
+
+def run_server():
     import uvicorn
 
     import core.config
     from core import __version__
     from core.config import validate_config_lazy
-
-    def wait_on_error():
-        """Prevents the terminal window from closing immediately in frozen mode."""
-        if getattr(sys, "frozen", False):
-            logger.info("=" * 60)
-            input("Press Enter to exit...")
-
-    def get_conflicting_process(port: int):
-        """Identifies the process currently using the specified port."""
-        try:
-            for conn in psutil.net_connections(kind="inet"):
-                if conn.laddr.port == port and conn.status == "LISTEN":
-                    return psutil.Process(conn.pid)
-        except Exception as e:
-            logger.debug(
-                f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
-            )
-        return None
-
-    def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
-        """Finds the first available port starting from start_port."""
-        port = start_port
-        while port < 65535:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                try:
-                    s.bind((host, port))
-                    return port
-                except OSError:
-                    port += 1
-        return start_port
 
     # --- MONKEYPATCH UVICORN ---
     # Uvicorn's Server.startup calls sys.exit(1) directly on socket errors.
@@ -608,7 +611,6 @@ if __name__ == "__main__":
             logger.info(f"Network     : {host_val}:{current_port}")
 
             if host_val == "0.0.0.0":
-                hostname = socket.gethostname()
                 logger.warning("LAN SHARING IS ENABLED (0.0.0.0)")
                 logger.warning("This server is accessible from other computers on your network.")
 
@@ -648,10 +650,91 @@ if __name__ == "__main__":
                 logger.error(f"Network bind error on port {current_port}: {e}")
                 # Diagnostics
                 proc = get_conflicting_process(current_port)
+                proc_info = ""
                 if proc:
-                    logger.error(f"Conflicting process found: {proc.name()} (PID: {proc.pid})")
-                wait_on_error()
-                sys.exit(1)
+                    try:
+                        proc_info = f"Conflicting process found: {proc.name()} (PID: {proc.pid})"
+                        logger.error(proc_info)
+                    except Exception:
+                        proc_info = "Conflicting process detected, but failed to retrieve details."
+                        logger.error(proc_info)
+
+                if sys.stdin.isatty():
+                    print("\n" + "=" * 60)
+                    print(f"PORT CONFLICT: Port {current_port} is already in use.")
+                    if proc_info:
+                        print(proc_info)
+                    else:
+                        print("No conflicting process could be identified.")
+                    print("=" * 60)
+                    print("Please choose a recovery option:")
+                    print("1. [Retry] Re-attempt binding (manually free the port first)")
+                    print("2. [Kill] Terminate the conflicting process")
+                    print("3. [Auto-find] Automatically search for the next available port")
+                    print("4. [Exit] Exit the application")
+                    print("=" * 60)
+
+                    try:
+                        choice = input("Enter choice (1-4): ").strip()
+                    except (KeyboardInterrupt, EOFError):
+                        logger.info("Cancelled by user. Exiting.")
+                        wait_on_error()
+                        sys.exit(1)
+
+                    if choice == "1":
+                        logger.info("Retrying port binding...")
+                        continue
+                    elif choice == "2":
+                        if proc:
+                            try:
+                                logger.info(f"Attempting to terminate process {proc.name()} (PID: {proc.pid})...")
+                                proc.terminate()
+                                try:
+                                    proc.wait(timeout=3)
+                                    logger.info("Process terminated successfully. Retrying port binding...")
+                                except psutil.TimeoutExpired:
+                                    logger.warning("Process did not terminate in time. Forcing kill...")
+                                    proc.kill()
+                                    proc.wait(timeout=2)
+                                    logger.info("Process killed successfully. Retrying port binding...")
+                            except Exception as kill_err:
+                                logger.error(f"Failed to resolve conflicting process: {kill_err}")
+                        else:
+                            logger.warning("No conflicting process identified to terminate. Retrying anyway...")
+                        continue
+                    elif choice == "3":
+                        new_port = find_available_port(current_port + 1, host_val)
+                        if new_port == current_port:
+                            logger.error("No available ports could be found.")
+                            wait_on_error()
+                            sys.exit(1)
+                        logger.info(f"Auto-found available port: {new_port}")
+                        try:
+                            save_choice = input("Would you like to save this port as the default in your config? (y/N): ").strip().lower()
+                        except (KeyboardInterrupt, EOFError):
+                            save_choice = "n"
+                        if save_choice in ("y", "yes"):
+                            from core.config import save_config
+                            if save_config({"PORT": new_port}):
+                                logger.info(f"Port {new_port} successfully saved to config.")
+                            else:
+                                logger.error("Failed to save configuration.")
+                        current_port = new_port
+                        continue
+                    else:
+                        logger.info("Exiting application...")
+                        wait_on_error()
+                        sys.exit(1)
+                else:
+                    logger.warning("Non-interactive run detected. Port binding failed.")
+                    new_port = find_available_port(current_port + 1, host_val)
+                    if new_port == current_port:
+                        logger.error("No available ports could be found.")
+                        wait_on_error()
+                        sys.exit(1)
+                    logger.info(f"Auto-finding port in non-interactive mode. Selected: {new_port}")
+                    current_port = new_port
+                    continue
             raise
 
         except Exception as e:
@@ -659,3 +742,7 @@ if __name__ == "__main__":
             logger.exception("Fatal Traceback:")
             wait_on_error()
             sys.exit(1)
+
+
+if __name__ == "__main__":
+    run_server()
