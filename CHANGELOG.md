@@ -1,3 +1,11 @@
+# [0.18.0](https://github.com/ayato-labs/LogicHive/compare/v0.17.0...v0.18.0) (2026-06-07)
+
+
+### Features
+
+* implement periodic vulnerability scanning via OSV API with multiplicative RAG prioritization and supporting documentation ([c16afe5](https://github.com/ayato-labs/LogicHive/commit/c16afe5493a4f5abc6f922011faf5a56ee558f64))
+* implement Windows-native sandbox using Job Objects for secure, multi-language process execution ([638307d](https://github.com/ayato-labs/LogicHive/commit/638307dca839d4ab609a3dc29e86f835002f29c1))
+
 # [0.17.0](https://github.com/ayato-labs/LogicHive/compare/v0.16.0...v0.17.0) (2026-06-07)
 
 
