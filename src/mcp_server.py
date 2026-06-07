@@ -31,22 +31,138 @@ from storage.vector_store import vector_manager
 
 logger = get_logger(__name__)
 
+async def _periodic_vulnerability_scan_loop():
+    """Background task that runs a dependency vulnerability scan every 24 hours."""
+    import asyncio
+    import re
+
+    from core.evaluation.plugins.dependency_vouch import DependencyVouchEvaluator
+
+    evaluator = DependencyVouchEvaluator()
+    # Wait a short duration after startup to not contend with initial server load
+    await asyncio.sleep(5)
+
+    while True:
+        try:
+            logger.info("Starting background vulnerability scan...")
+            functions = await sqlite_storage.get_all_functions()
+            if not functions:
+                logger.debug("No functions stored in database to scan.")
+            else:
+                unique_deps = set()
+                for f in functions:
+                    # Stored dependencies is a JSON list (already deserialized by sqlite_storage)
+                    f_deps = f.get("dependencies") or []
+                    for dep in f_deps:
+                        unique_deps.add(dep)
+
+                if unique_deps:
+                    logger.info(f"Scanning {len(unique_deps)} unique dependencies via OSV API...")
+                    vulns = evaluator._check_osv_vulnerabilities(list(unique_deps))
+
+                    # Group vulns by package-version for easy lookup
+                    vuln_map = {}
+                    for v in vulns:
+                        key = f"{v['package']}=={v['version']}"
+                        if key not in vuln_map:
+                            vuln_map[key] = []
+                        vuln_map[key].append(v)
+
+                    # Update matching functions
+                    for f in functions:
+                        name = f["name"]
+                        project = f.get("project", "default")
+                        f_deps = f.get("dependencies") or []
+
+                        f_vulns = []
+                        for dep in f_deps:
+                            dep_key = dep.strip()
+                            if dep_key in vuln_map:
+                                f_vulns.extend(vuln_map[dep_key])
+                            else:
+                                match = re.match(r"^([a-zA-Z0-9_\-]+)", dep_key)
+                                if match:
+                                    pkg = match.group(1)
+                                    for k, vs in vuln_map.items():
+                                        if k.startswith(f"{pkg}=="):
+                                            f_vulns.extend(vs)
+
+                        current_report = f.get("verification_report") or {}
+                        current_vulns = current_report.get("details", {}).get("dependency_vouch", {}).get("details", {}).get("vulnerabilities", [])
+
+                        if len(f_vulns) != len(current_vulns):
+                            logger.info(f"Vulnerability change detected for '{name}' [{project}]. Updating database.")
+                            new_score = max(0.0, 100.0 - len(f_vulns) * 40.0)
+
+                            new_report = current_report.copy() if isinstance(current_report, dict) else {}
+                            if "details" not in new_report:
+                                new_report["details"] = {}
+                            if "dependency_vouch" not in new_report["details"]:
+                                new_report["details"]["dependency_vouch"] = {}
+                            if "details" not in new_report["details"]["dependency_vouch"]:
+                                new_report["details"]["dependency_vouch"]["details"] = {}
+                            new_report["details"]["dependency_vouch"]["details"]["vulnerabilities"] = f_vulns
+
+                            new_status = "failed" if f_vulns else f.get("verification_status", "verified")
+
+                            await sqlite_storage.update_verification_status(
+                                name,
+                                project,
+                                status=new_status,
+                                report=new_report,
+                                reliability_score=new_score
+                            )
+            logger.info("Background vulnerability scan completed successfully.")
+        except Exception as e:
+            logger.error(f"Error during background vulnerability scan: {e}")
+
+        await asyncio.sleep(24 * 3600)
+
 
 @asynccontextmanager
 async def lifespan(server: FastMCP):
-    """Initializes and cleans up the background worker for environment pooling."""
+    """Initializes and cleans up background workers for environment pooling and vulnerability scanning."""
+    import asyncio
+
     from core.execution.pool import PoolManager
 
     manager = PoolManager.get_instance()
     await manager.initialize()
+
+    scan_task = asyncio.create_task(_periodic_vulnerability_scan_loop())
     try:
         yield
     finally:
+        scan_task.cancel()
         await manager.shutdown()
 
 
 # Initialize FastMCP server with lifespan management
 mcp = FastMCP("LogicHive", lifespan=lifespan)
+
+
+def _get_vulnerability_warning_msg(f_data: dict) -> str:
+    """Extracts vulnerability warning message from the verification report if present."""
+    report = f_data.get("verification_report")
+    if not report or not isinstance(report, dict):
+        return ""
+
+    details = report.get("details", {})
+    dep_vouch = details.get("dependency_vouch", {})
+    dep_details = dep_vouch.get("details", {}) if isinstance(dep_vouch, dict) else {}
+    vulns = dep_details.get("vulnerabilities", []) if isinstance(dep_details, dict) else []
+
+    if vulns and isinstance(vulns, list):
+        summary_list = []
+        for v in vulns:
+            pkg = v.get("package", "unknown")
+            ver = v.get("version", "unknown")
+            vid = v.get("id", "unknown")
+            summary_list.append(f"{pkg}=={ver} ({vid})")
+
+        pkgs_str = ", ".join(summary_list)
+        return f"[SECURITY WARNING] Known vulnerabilities detected in dependencies: {pkgs_str}."
+    return ""
 
 
 @mcp.tool()
@@ -99,7 +215,7 @@ async def search_functions(
             desc = res.get("description", "No description")
             tags = ", ".join(res.get("tags", []))
 
-            # Check for Environment Drift
+            # Check for Environment Drift & Vulnerabilities
             drift_warning = ""
             stored_env = res.get("env_fingerprint")
             if stored_env:
@@ -108,9 +224,15 @@ async def search_functions(
                 if SystemFingerprint.compare(stored_env, SystemFingerprint.get_current()):
                     drift_warning = " [DRIFT]"
 
+            vuln_warn = _get_vulnerability_warning_msg(res)
+            if vuln_warn:
+                drift_warning += " [VULNERABLE]"
+
             md += f"- **{name}{drift_warning}** (Match: {sim:.2f}, Reliability: {rel:.1f}%)\n"
             if is_draft:
                 md += "  - *NOTE: This is a generated draft. Refine and Save to verify.*\n"
+            if vuln_warn:
+                md += f"  - *⚠️ {vuln_warn}*\n"
             md += f"  - *{desc}*\n"
             md += f"  - Tags: {tags}\n"
         return md
@@ -144,15 +266,24 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
         tags = ", ".join(f_data.get("tags", []))
         deps = ", ".join(f_data.get("dependencies", []))
 
-        # Environment Drift Check
+        # Environment Drift & Vulnerability Checks
         drift_header = ""
+        warnings_list = []
+
         stored_env = f_data.get("env_fingerprint")
         if stored_env:
             from core.system_info import SystemFingerprint
-
             warning = SystemFingerprint.generate_warning_msg(stored_env)
             if warning:
-                drift_header = f"> [!WARNING]\n> {warning.replace(chr(10), chr(10) + '> ')}\n\n"
+                warnings_list.append(warning)
+
+        vuln_warn = _get_vulnerability_warning_msg(f_data)
+        if vuln_warn:
+            warnings_list.append(vuln_warn)
+
+        if warnings_list:
+            warning_txt = "\n\n".join(warnings_list)
+            drift_header = f"> [!WARNING]\n> {warning_txt.replace(chr(10), chr(10) + '> ')}\n\n"
 
         response = (
             f"**Function: {name}**\n\n{drift_header}{desc}\n\n"

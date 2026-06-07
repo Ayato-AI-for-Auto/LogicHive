@@ -25,4 +25,10 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-019: Windows Unified CI Test Environment](ADR-0019-windows-unified-ci-test-environment.md)
 - [ADR-020: Remove Task Scheduler Auto-Start Integration](ADR-0020-remove-task-scheduler-autostart-integration.md)
 - [ADR-021: Score-Scaled Multiplicative RAG Prioritization](ADR-0021-score-scaled-multiplicative-rag-prioritization.md)
+- [ADR-022: External Vulnerability Database (OSV API) Integration](ADR-0022-external-vulnerability-database-osv-api-integration.md)
+- [ADR-023: Handling Vulnerable Assets (Demotion & Warning)](ADR-0023-handling-vulnerable-assets-demotion-and-warning.md)
+- [ADR-024: In-Memory Periodic Vulnerability Scanning](ADR-0024-in-memory-periodic-vulnerability-scanning.md)
+
+
+
 

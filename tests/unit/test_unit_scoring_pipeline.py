@@ -61,3 +61,69 @@ async def test_evaluation_manager_veto_logic():
     )
     assert res["score"] == 0.0
     assert "SECURITY" in res["reason"] or "Veto" in res["reason"] or "Ruff" in res["reason"] or "Syntax Error" in res["reason"]
+
+
+@pytest.mark.asyncio
+async def test_dependency_vouch_vulnerabilities():
+    """UNIT: Verify that DependencyVouchEvaluator flags known vulnerable packages."""
+    from core.evaluation.plugins.dependency_vouch import DependencyVouchEvaluator
+
+    evaluator = DependencyVouchEvaluator()
+    code = "import urllib3\ndef get(): pass"
+
+    # We pass a known vulnerable version "urllib3==1.26.15" via dependencies
+    res = await evaluator.evaluate(code, language="python", dependencies=["urllib3==1.26.15"])
+
+    assert res.score < 100.0
+    assert "Security vulnerabilities detected" in res.reason
+    assert len(res.details.get("vulnerabilities", [])) > 0
+
+
+@pytest.mark.asyncio
+async def test_periodic_vulnerability_scan_loop(test_db):
+    """UNIT: Verify that the background periodic scan loop updates function scores in DB."""
+    import asyncio
+    from unittest.mock import patch
+
+    from mcp_server import _periodic_vulnerability_scan_loop
+    from storage.sqlite_api import sqlite_storage
+
+    # Insert a function with vulnerable dependency "urllib3==1.26.15"
+    await sqlite_storage.upsert_function({
+        "name": "func_to_scan",
+        "code": "import urllib3",
+        "description": "test",
+        "tags": [],
+        "language": "python",
+        "reliability_score": 100.0,
+        "embedding": [0.1] * 768,
+        "project": "default",
+        "verification_status": "verified",
+        "dependencies": ["urllib3==1.26.15"],
+    })
+
+    # We mock asyncio.sleep so that the first call allows execution but then cancels/raises to break the loop
+    sleep_count = 0
+    original_sleep = asyncio.sleep
+
+    async def mock_sleep(delay, result=None):
+        nonlocal sleep_count
+        sleep_count += 1
+        if sleep_count > 1:  # Break the loop on the 24 hour sleep
+            raise asyncio.CancelledError()
+        await original_sleep(0.01)
+
+    with patch("asyncio.sleep", side_effect=mock_sleep):
+        try:
+            await _periodic_vulnerability_scan_loop()
+        except asyncio.CancelledError:
+            pass
+
+    # Verify that the function in the DB has its score reduced and status updated to 'failed'
+    updated = await sqlite_storage.get_function_by_name("func_to_scan")
+    assert updated is not None
+    assert updated["verification_status"] == "failed"
+    assert updated["reliability_score"] < 100.0
+    report = updated.get("verification_report") or {}
+    vulns = report.get("details", {}).get("dependency_vouch", {}).get("details", {}).get("vulnerabilities", [])
+    assert len(vulns) > 0

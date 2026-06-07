@@ -39,15 +39,88 @@ class DependencyVouchEvaluator(BaseEvaluator):
         declared = self._get_declared_dependencies()
         hallucinated = self._find_hallucinated_imports(imports, declared)
 
-        if not hallucinated:
-            return EvaluationResult(score=100.0, reason="All dependencies are verified.")
+        # Check vulnerabilities
+        dep_list = kwargs.get("dependencies", [])
+        vulnerabilities = []
+        if dep_list:
+            vulnerabilities = self._check_osv_vulnerabilities(dep_list)
 
-        score = max(0.0, 100.0 - (len(hallucinated) * 30))
+        score = 100.0
+        reasons = []
+
+        if hallucinated:
+            score -= len(hallucinated) * 30
+            reasons.append(f"Hallucinated imports: {', '.join(hallucinated)}")
+
+        if vulnerabilities:
+            score -= len(vulnerabilities) * 40
+            vuln_desc = ", ".join(f"{v['id']} in {v['package']}=={v['version']}" for v in vulnerabilities)
+            reasons.append(f"Security vulnerabilities detected: {vuln_desc}")
+
+        score = max(0.0, score)
+        reason_str = " | ".join(reasons) if reasons else "All dependencies are verified."
+
         return EvaluationResult(
             score=score,
-            reason=f"Hallucinated imports: {', '.join(hallucinated)}",
-            details={"missing": hallucinated},
+            reason=reason_str,
+            details={
+                "missing": hallucinated,
+                "vulnerabilities": vulnerabilities
+            },
         )
+
+    def _check_osv_vulnerabilities(self, dependencies: list[str]) -> list[dict]:
+        """Checks list of dependencies against OSV API for known vulnerabilities."""
+        import importlib.metadata
+        import json
+        import urllib.error
+        import urllib.request
+
+        vulnerabilities = []
+        for dep in dependencies:
+            match = re.match(r"^([a-zA-Z0-9_\-]+)(?:==|>=|<=|>|<)?([0-9a-zA-Z\.\-]+)?", dep.strip())
+            if not match:
+                continue
+            pkg_name = match.group(1)
+            version = match.group(2)
+
+            if not version:
+                try:
+                    version = importlib.metadata.version(pkg_name)
+                except Exception:
+                    continue
+
+            url = "https://api.osv.dev/v1/query"
+            payload = {
+                "package": {
+                    "name": pkg_name,
+                    "ecosystem": "PyPI"
+                },
+                "version": version
+            }
+            try:
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(
+                    url,
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    res_data = json.loads(response.read().decode("utf-8"))
+                    vulns = res_data.get("vulns", [])
+                    for v in vulns:
+                        vulnerabilities.append({
+                            "id": v.get("id"),
+                            "package": pkg_name,
+                            "version": version,
+                            "summary": v.get("summary", "No summary provided"),
+                            "aliases": v.get("aliases", [])
+                        })
+            except Exception as e:
+                logger.warning(f"DependencyVouch: OSV API scan failed for {pkg_name}=={version}: {e}")
+                continue
+        return vulnerabilities
 
     def _is_stdlib(self, module_name: str) -> bool:
         std = {
