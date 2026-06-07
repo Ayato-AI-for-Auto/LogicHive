@@ -252,11 +252,11 @@ class SqliteStorage:
                                     processed["similarity"] = match["similarity"]
                                     final_results[res_key] = processed
 
-                # Calculate hybrid search score: 70% similarity + 30% reliability
+                # Calculate hybrid search score using Scaled Multiplicative Model (ADR-0021)
                 for item in final_results.values():
                     sim = item.get("similarity", 0.0)
                     rel = item.get("reliability_score", 0.0) / 100.0
-                    item["search_score"] = 0.7 * sim + 0.3 * rel
+                    item["search_score"] = sim * (0.5 + 0.5 * rel)
 
                 results_list = sorted(
                     final_results.values(), key=lambda x: x.get("search_score", 0.0), reverse=True

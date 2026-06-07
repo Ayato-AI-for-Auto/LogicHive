@@ -24,3 +24,5 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-018: Thin Settings Client and Dynamic Hub Engine Venv](ADR-0018-thin-client-dynamic-venv.md)
 - [ADR-019: Windows Unified CI Test Environment](ADR-0019-windows-unified-ci-test-environment.md)
 - [ADR-020: Remove Task Scheduler Auto-Start Integration](ADR-0020-remove-task-scheduler-autostart-integration.md)
+- [ADR-021: Score-Scaled Multiplicative RAG Prioritization](ADR-0021-score-scaled-multiplicative-rag-prioritization.md)
+
