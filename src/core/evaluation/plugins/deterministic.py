@@ -22,6 +22,9 @@ class DeterministicEvaluator(BaseEvaluator):
 
     async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
         lang = language.lower()
+        if lang == "html":
+            return EvaluationResult(score=100.0, reason="Skipped (Not logic-based language).")
+
         test_code = kwargs.get("test_code", "")
         reasons = []
         score = 100.0
@@ -176,12 +179,12 @@ class DeterministicEvaluator(BaseEvaluator):
         import re
 
         patterns = {
-            "javascript": r"(expect|assert)\(.*?\)",
-            "typescript": r"(expect|assert)\(.*?\)",
-            "cpp": r"(assert|EXPECT_|ASSERT_)\(.*?\)",
+            "javascript": r"(expect|assert)(?:\.\w+)*\(.*?\)",
+            "typescript": r"(expect|assert)(?:\.\w+)*\(.*?\)",
+            "cpp": r"(assert|EXPECT_|ASSERT_)(?:\w+)*\(.*?\)",
             "c": r"(assert|assert_c)\(.*?\)",
-            "java": r"assert(True|False|Equals|NotNull|Same)\(.*?\)",
-            "php": r"(assert|assertTrue|assertEquals|assertEquals)\(.*?\)",
+            "java": r"assert(True|False|Equals|NotNull|Same|Null|ArrayEquals)(?:\.\w+)*\(.*?\)",
+            "php": r"(assert|assertTrue|assertEquals|assertNotEquals)(?:\.\w+)*\(.*?\)",
         }
 
         pattern = patterns.get(lang.lower(), r"(assert|expect|assume).*?\(.*?\)")

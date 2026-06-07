@@ -124,7 +124,7 @@ class EvaluationManager:
         lang = language.lower()
 
         # 1. Pre-evaluation checks
-        pre_check = self._perform_pre_checks(kwargs)
+        pre_check = self._perform_pre_checks(lang, kwargs)
         if pre_check:
             return pre_check
 
@@ -142,14 +142,14 @@ class EvaluationManager:
         # 5. Build final report
         return self._build_final_report(final_score, reasons, results)
 
-    def _perform_pre_checks(self, kwargs):
+    def _perform_pre_checks(self, lang, kwargs):
         desc = (kwargs.get("description") or "").upper()
         is_draft = kwargs.get("is_draft", False) or any(
             k in desc for k in ["DRAFT", "AI_DRAFT", "AI-DRAFT"]
         )
         test_code = kwargs.get("test_code", "")
 
-        if not is_draft and not test_code:
+        if not is_draft and not test_code and lang != "html":
             return {
                 "score": 40.0,
                 "reason": (
@@ -235,11 +235,26 @@ class EvaluationManager:
                 "is_system_error": aggregate_system_error,
             }
 
+        # Language-specific static Veto (e.g. html_static, c_static, etc.)
+        for key in ["html_static", "c_static", "java_static", "php_static"]:
+            stat = results.get(key)
+            if stat and stat.score == 0:
+                return {
+                    "score": 0.0,
+                    "reason": f"STATIC VALIDATION REJECTION ({key}): {stat.reason}",
+                    "details": self._serialize_results(results),
+                    "is_system_error": stat.is_system_error or aggregate_system_error,
+                }
+
         # Runtime Veto
         run = results.get("runtime")
-        if run and run.score == 0 and not any(k in (language or "").lower() for k in ["draft"]):
-            # Check is_draft from kwargs indirectly or pass it
-            logger.debug(f"Evaluator: Assessing code reliability for '{name}'")
+        if run and run.score == 0 and not kwargs.get("_is_draft"):
+            return {
+                "score": 0.0,
+                "reason": f"RUNTIME REJECTION: {run.reason}",
+                "details": self._serialize_results(results),
+                "is_system_error": run.is_system_error or aggregate_system_error,
+            }
 
         return None
 

@@ -364,7 +364,7 @@ class HtmlStaticEvaluator(BaseEvaluator):
             if parser.errors:
                 return EvaluationResult(score=0.0, reason=f"HTML Validation Errors: {'; '.join(parser.errors)}")
             if parser.tags:
-                return EvaluationResult(score=50.0, reason=f"Unclosed HTML tags: {', '.join(parser.tags)}")
+                return EvaluationResult(score=0.0, reason=f"Unclosed HTML tags: {', '.join(parser.tags)}")
         except Exception as e:
             return EvaluationResult(score=0.0, reason=f"HTML static analysis crashed: {e}")
 
