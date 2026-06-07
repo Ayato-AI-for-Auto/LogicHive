@@ -34,12 +34,6 @@ from core.system.uninstall import (  # noqa: E402
     kill_logichive_processes,
     remove_data_directory,
 )
-from core.system.windows_tasks import (  # noqa: E402
-    install_scheduled_tasks,
-    is_admin,
-    remove_scheduled_tasks,
-    run_as_admin,
-)
 from orchestrator import check_integrity  # noqa: E402
 
 logger = get_logger("settings_ui")
@@ -403,82 +397,13 @@ class LogicHiveUI:
             padding=20,
         )
 
-    def build_system_tab(self):  # noqa: C901
-        # 1. Auto Start (Task Scheduler)
-        admin_status_text = ft.Text(
-            f"Admin Privileges: {'YES' if is_admin() else 'NO'}",
-            color=ft.Colors.GREEN if is_admin() else ft.Colors.RED,
-        )
-
-        async def on_install_tasks(e):
-            if not is_admin():
-                self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
-                self.page.snack_bar.open = True
-                self.page.update()
-                if run_as_admin():
-                    await self.page.window.destroy()
-                return
-
-            hub_path = Path(sys.executable).parent / "LogicHive-Hub.exe"
-            if not getattr(sys, "frozen", False):
-                hub_path = Path(sys.executable)
-
-            success = install_scheduled_tasks(hub_path)
-            self.page.snack_bar = ft.SnackBar(
-                ft.Text(f"Task installation: {'SUCCESS' if success else 'FAILED'}")
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-
-        async def on_remove_tasks(e):
-            if not is_admin():
-                self.page.snack_bar = ft.SnackBar(ft.Text("Restarting as Administrator..."))
-                self.page.snack_bar.open = True
-                self.page.update()
-                if run_as_admin():
-                    await self.page.window.destroy()
-                return
-
-            success = remove_scheduled_tasks()
-            self.page.snack_bar = ft.SnackBar(
-                ft.Text(f"Task removal: {'SUCCESS' if success else 'FAILED'}")
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-
-        install_btn = ft.ElevatedButton(
-            "Install Auto-Start Tasks", icon=ft.Icons.SCHEDULE, on_click=on_install_tasks
-        )
-        remove_btn = ft.ElevatedButton(
-            "Remove Auto-Start Tasks", icon=ft.Icons.DELETE_OUTLINE, on_click=on_remove_tasks
-        )
-
-        tasks_card = ft.Card(
-            content=ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text("Task Scheduler Integration", size=18, weight=ft.FontWeight.BOLD),
-                        ft.Text(
-                            "Register LogicHive to start automatically on logon and watch for crashes."
-                        ),
-                        admin_status_text,
-                        ft.Row([install_btn, remove_btn]),
-                    ]
-                ),
-                padding=20,
-            )
-        )
-
-        # 2. Uninstall Wizard
+    def build_system_tab(self):
+        # Uninstall Wizard
         remove_data_checkbox = ft.Checkbox(label="Remove User Data (~/.logichive)", value=True)
 
         async def confirm_uninstall(e):
             self.page.dialog.open = False
             self.page.update()
-
-            # タスク削除は管理者権限がある場合のみ試みる
-            if is_admin():
-                remove_scheduled_tasks()
 
             if remove_data_checkbox.value:
                 remove_data_directory()
@@ -553,7 +478,7 @@ class LogicHiveUI:
         )
 
         return ft.Container(
-            content=ft.Column([tasks_card, uninstall_card], spacing=20), padding=20
+            content=ft.Column([uninstall_card], spacing=20), padding=20
         )
 
     def build(self):
