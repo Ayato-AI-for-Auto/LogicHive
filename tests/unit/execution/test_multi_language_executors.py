@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from core.execution.base import ExecutionStatus
@@ -12,8 +14,8 @@ from core.execution.php import EphemeralPhpExecutor
 async def test_javascript_executor():
     executor = EphemeralJavaScriptExecutor()
     # Simple JS execution
-    code = "module.exports = { add: (a, b) => a + b };"
-    test_code = "assert.strictEqual(solution.add(2, 3), 5);"
+    code = "module.exports = { add: (a, b) => a * b };"
+    test_code = "assert.strictEqual(solution.add(2, 3), 6);"
     result = await executor.execute(code, test_code=test_code, language="javascript")
 
     assert result.status == ExecutionStatus.SUCCESS
@@ -57,7 +59,8 @@ async def test_php_executor_missing():
     executor = EphemeralPhpExecutor()
     # Verify php executor handles lack of php gracefully
     code = "function test() { return 1; }"
-    result = await executor.execute(code, test_code="assert(test() === 1);")
+    with patch.object(executor, "_is_php_available", return_value=False):
+        result = await executor.execute(code, test_code="assert(test() === 1);")
 
     # Since php is not on path, it should fail gracefully with missing runtime warning
     assert result.status == ExecutionStatus.FAILURE
@@ -68,7 +71,8 @@ async def test_php_executor_missing():
 async def test_c_executor_missing():
     executor = EphemeralCExecutor()
     code = "int test() { return 1; }"
-    result = await executor.execute(code, test_code="assert_c(test() == 1, \"error\");")
+    with patch.object(executor, "_find_compiler", return_value=None):
+        result = await executor.execute(code, test_code="assert_c(test() == 1, \"error\");")
 
     assert result.status == ExecutionStatus.FAILURE
     assert "c compiler" in result.logs.stderr.lower()

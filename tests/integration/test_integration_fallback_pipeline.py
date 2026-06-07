@@ -18,14 +18,14 @@ async def test_evaluation_manager_with_php_missing_runtime():
     code = "function test() { return 1; }"
     test_code = "assert(test() === 1);"
 
-    # Run php evaluation with php missing on PATH
-    # Since we know php is missing on this host, it will naturally hit the fallback
-    results = await manager.evaluate_all(
-        code=code,
-        language="php",
-        test_code=test_code,
-        description="PHP Asset"
-    )
+    # Run php evaluation with php missing on PATH by mocking detection
+    with patch("core.execution.php.EphemeralPhpExecutor._is_php_available", return_value=False):
+        results = await manager.evaluate_all(
+            code=code,
+            language="php",
+            test_code=test_code,
+            description="PHP Asset"
+        )
 
     assert results["score"] == 0.0
     assert "php cli is not installed" in results["reason"].lower()
@@ -38,12 +38,13 @@ async def test_evaluation_manager_with_c_missing_runtime():
     code = "int test() { return 1; }"
     test_code = "assert_c(test() == 1, \"error\");"
 
-    results = await manager.evaluate_all(
-        code=code,
-        language="c",
-        test_code=test_code,
-        description="C Asset"
-    )
+    with patch("core.execution.c.EphemeralCExecutor._find_compiler", return_value=None):
+        results = await manager.evaluate_all(
+            code=code,
+            language="c",
+            test_code=test_code,
+            description="C Asset"
+        )
 
     assert results["score"] == 0.0
     assert "no c compiler" in results["reason"].lower()
