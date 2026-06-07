@@ -1,3 +1,11 @@
+# [0.17.0](https://github.com/ayato-labs/LogicHive/compare/v0.16.0...v0.17.0) (2026-06-07)
+
+
+### Features
+
+* implement SQLite storage engine and add unit tests for scoring pipeline and system tests for RAG prioritization ([625ddf3](https://github.com/ayato-labs/LogicHive/commit/625ddf391b26aaca1c8b842a12a7524ce93b0680))
+* implement SQLite storage engine and define ADR-021 for score-scaled multiplicative RAG prioritization ([253eaa8](https://github.com/ayato-labs/LogicHive/commit/253eaa83f71519aa188837a015375b7249628fc5))
+
 # [0.16.0](https://github.com/ayato-labs/LogicHive/compare/v0.15.0...v0.16.0) (2026-06-06)
 
 
