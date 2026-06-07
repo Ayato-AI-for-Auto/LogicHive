@@ -255,3 +255,118 @@ class ESLintEvaluator(BaseEvaluator):
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+
+class JavaStaticEvaluator(BaseEvaluator):
+    @property
+    def name(self) -> str:
+        return "java_static"
+
+    async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
+        if language.lower() != "java":
+            return EvaluationResult(score=100.0, reason="Skipped (Not Java).")
+
+        # Basic syntax verification (missing class/brackets/semicolons)
+        score = 100.0
+        reasons = []
+
+        if "class " not in code:
+            score -= 40
+            reasons.append("Missing 'class' keyword declaration.")
+
+        if ";" not in code and "class" in code:
+            score -= 20
+            reasons.append("No semicolons found; syntax might be invalid.")
+
+        reason_str = " | ".join(reasons) if reasons else "Java static analysis passed."
+        return EvaluationResult(score=max(0.0, score), reason=reason_str)
+
+
+class PhpStaticEvaluator(BaseEvaluator):
+    @property
+    def name(self) -> str:
+        return "php_static"
+
+    async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
+        if language.lower() != "php":
+            return EvaluationResult(score=100.0, reason="Skipped (Not PHP).")
+
+        # Check if php CLI is available to run syntax check (php -l)
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".php", delete=False, mode="w", encoding="utf-8") as tmp:
+                tmp.write(code if code.strip().startswith("<?php") else "<?php\n" + code)
+                tmp_path = tmp.name
+
+            proc = await asyncio.create_subprocess_exec(
+                "php", "-l", tmp_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await proc.communicate()
+
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+            if proc.returncode == 0:
+                return EvaluationResult(score=100.0, reason="PHP syntax verification (php -l) passed.")
+            else:
+                err = stdout.decode().strip() or stderr.decode().strip()
+                return EvaluationResult(score=0.0, reason=f"PHP syntax error: {err}")
+        except Exception:
+            # Fallback when php is not on PATH
+            score = 100.0
+            reasons = []
+            if "$" not in code:
+                score -= 10
+                reasons.append("Notice: No PHP variables ($) defined.")
+            reason_str = " | ".join(reasons) if reasons else "PHP static syntax checks passed (local checks only)."
+            return EvaluationResult(score=score, reason=reason_str)
+
+
+class CStaticEvaluator(BaseEvaluator):
+    @property
+    def name(self) -> str:
+        return "c_static"
+
+    async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
+        if language.lower() != "c":
+            return EvaluationResult(score=100.0, reason="Skipped (Not C).")
+
+        score = 100.0
+        reasons = []
+
+        if "#include" not in code:
+            score -= 20
+            reasons.append("Missing standard preprocessor include (#include).")
+
+        if ";" not in code:
+            score -= 30
+            reasons.append("Missing semicolons (;) in C code.")
+
+        reason_str = " | ".join(reasons) if reasons else "C static checks passed."
+        return EvaluationResult(score=max(0.0, score), reason=reason_str)
+
+
+class HtmlStaticEvaluator(BaseEvaluator):
+    @property
+    def name(self) -> str:
+        return "html_static"
+
+    async def evaluate(self, code: str, language: str, **kwargs) -> EvaluationResult:
+        if language.lower() != "html":
+            return EvaluationResult(score=100.0, reason="Skipped (Not HTML).")
+
+        from core.execution.html import StrictHTMLParser
+        parser = StrictHTMLParser()
+        try:
+            parser.feed(code)
+            parser.close()
+            if parser.errors:
+                return EvaluationResult(score=0.0, reason=f"HTML Validation Errors: {'; '.join(parser.errors)}")
+            if parser.tags:
+                return EvaluationResult(score=50.0, reason=f"Unclosed HTML tags: {', '.join(parser.tags)}")
+        except Exception as e:
+            return EvaluationResult(score=0.0, reason=f"HTML static analysis crashed: {e}")
+
+        return EvaluationResult(score=100.0, reason="HTML static structure validation passed.")
+

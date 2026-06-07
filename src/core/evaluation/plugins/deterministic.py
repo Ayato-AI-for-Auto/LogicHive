@@ -179,7 +179,9 @@ class DeterministicEvaluator(BaseEvaluator):
             "javascript": r"(expect|assert)\(.*?\)",
             "typescript": r"(expect|assert)\(.*?\)",
             "cpp": r"(assert|EXPECT_|ASSERT_)\(.*?\)",
+            "c": r"(assert|assert_c)\(.*?\)",
             "java": r"assert(True|False|Equals|NotNull|Same)\(.*?\)",
+            "php": r"(assert|assertTrue|assertEquals|assertEquals)\(.*?\)",
         }
 
         pattern = patterns.get(lang.lower(), r"(assert|expect|assume).*?\(.*?\)")
