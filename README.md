@@ -1,5 +1,6 @@
 # LogicHive (Professional AI Logic Hub)
 
+[![SafeSkill 89/100](https://img.shields.io/badge/SafeSkill-89%2F100_Passes%20with%20Notes-yellow)](https://safeskill.dev/scan/ayato-labs-logichive)
 🛡️ **LogicHive** is a high-precision knowledge extraction and logic management system. It enables AI agents to accumulate, verify, and reuse high-quality code assets via the Model Context Protocol (MCP).
 
 > **"Stop rebuilding the same logic. Build a long-term intelligence asset."**  
