@@ -252,10 +252,16 @@ class SqliteStorage:
                                     processed["similarity"] = match["similarity"]
                                     final_results[res_key] = processed
 
+                # Calculate hybrid search score: 70% similarity + 30% reliability
+                for item in final_results.values():
+                    sim = item.get("similarity", 0.0)
+                    rel = item.get("reliability_score", 0.0) / 100.0
+                    item["search_score"] = 0.7 * sim + 0.3 * rel
+
                 results_list = sorted(
-                    final_results.values(), key=lambda x: x.get("similarity", 0), reverse=True
+                    final_results.values(), key=lambda x: x.get("search_score", 0.0), reverse=True
                 )
-                logger.info(f"SQLite: Hybrid Search returned {len(results_list)} results.")
+                logger.info(f"SQLite: Hybrid Search returned {len(results_list)} results prioritized by quality score.")
                 return results_list[:limit]
         except Exception as e:
             logger.error(f"SQLite: Find similar failed: {e}", exc_info=True)
