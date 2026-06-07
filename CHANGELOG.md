@@ -1,3 +1,10 @@
+# [0.16.0](https://github.com/ayato-labs/LogicHive/compare/v0.15.0...v0.16.0) (2026-06-06)
+
+
+### Features
+
+* add Flet-based settings and environment management UI to LogicHive ([b074890](https://github.com/ayato-labs/LogicHive/commit/b0748901f53509a8f4e15f1d714958cf57228cb3))
+
 # [0.15.0](https://github.com/ayato-labs/LogicHive/compare/v0.14.0...v0.15.0) (2026-06-06)
 
 
