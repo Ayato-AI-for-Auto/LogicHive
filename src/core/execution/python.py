@@ -30,6 +30,9 @@ class EphemeralPythonExecutor(BaseExecutor):
 
     def __init__(self):
         self.name = "python"
+        from core.execution.sandbox import WindowsNativeSandbox
+        self.sandbox = WindowsNativeSandbox()
+
 
     def _kill_process_tree(self, pid: int):
         """Kills a process and all its children cross-platform."""
@@ -164,45 +167,15 @@ class EphemeralPythonExecutor(BaseExecutor):
         }
         process_env.update({"PYTHONPATH": "", "PYTHONNOUSERSITE": "1"})
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        return await self.sandbox.execute_command(
+            cmd=cmd,
             cwd=cwd,
             env=process_env,
+            timeout=timeout,
+            memory_limit_mb=memory_limit,
+            result_file=str(result_file),
         )
 
-        # Track state across tasks
-        state = {"memory_exceeded": False}
-        done_event = asyncio.Event()
-        monitor_task = asyncio.create_task(
-            self._monitor_resources(process, memory_limit, done_event, state)
-        )
-
-        try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(), timeout=timeout
-            )
-            stdout = stdout_bytes.decode("utf-8", errors="replace")
-            stderr = stderr_bytes.decode("utf-8", errors="replace")
-
-            if state["memory_exceeded"]:
-                return ExecutionResult(
-                    status=ExecutionStatus.MEMORY_LIMIT,
-                    logs=ExecutionLogs(stderr="Memory limit exceeded."),
-                )
-
-            return self._parse_results(process.returncode, stdout, stderr, result_file)
-
-        except asyncio.TimeoutError:
-            self._kill_process_tree(process.pid)
-            await process.wait()
-            return ExecutionResult(
-                status=ExecutionStatus.TIMEOUT, logs=ExecutionLogs(stderr="Execution timed out.")
-            )
-        finally:
-            done_event.set()
-            monitor_task.cancel()
 
     async def _monitor_resources(self, process, limit_mb, done_event, state):
         import psutil
