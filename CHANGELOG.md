@@ -1,3 +1,12 @@
+# [0.19.0](https://github.com/ayato-labs/LogicHive/compare/v0.18.0...v0.19.0) (2026-06-07)
+
+
+### Features
+
+* add multi-language execution fallback support, system E2E tests, and a dynamic plugin-based evaluation manager ([e0de13a](https://github.com/ayato-labs/LogicHive/commit/e0de13ae8db232283abbc32ba5b366943d39700b))
+* implement DeterministicEvaluator for structural code analysis and add associated testing infrastructure ([75e0fa5](https://github.com/ayato-labs/LogicHive/commit/75e0fa570739bda7ac013f1c7e44521b343c1eb3))
+* implement multi-language evaluation framework with language-specific executors and static analysis plugins ([5c5142f](https://github.com/ayato-labs/LogicHive/commit/5c5142ffe2ffb92df30a31c4af710bf562d97303))
+
 # [0.18.0](https://github.com/ayato-labs/LogicHive/compare/v0.17.0...v0.18.0) (2026-06-07)
 
 
