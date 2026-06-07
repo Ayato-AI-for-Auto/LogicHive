@@ -1,9 +1,9 @@
 import asyncio
 import os
 import sqlite3
+
 import pytest
 
-from core.db import get_db_connection
 from orchestrator import do_get_verification_status, do_save_async, do_search_async
 
 
@@ -50,7 +50,7 @@ async def test_system_multi_language_flow(test_db):
     # ==========================================
     html_name = "html_bad_snippet"
     html_code = "<div><p>unclosed tags"
-    
+
     saved_html = await do_save_async(
         name=html_name,
         code=html_code,

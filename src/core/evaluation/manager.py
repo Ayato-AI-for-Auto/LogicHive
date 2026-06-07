@@ -185,7 +185,6 @@ class EvaluationManager:
 
     def _check_critical_rejections(self, results, language, **kwargs):
         aggregate_system_error = any(v.is_system_error for v in results.values())
-        name = kwargs.get("name", "unknown")
 
         # Structural Veto
         struct = results.get("structural")
