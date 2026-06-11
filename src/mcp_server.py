@@ -87,19 +87,31 @@ async def _periodic_vulnerability_scan_loop():
                                         if k.startswith(f"{pkg}=="):
                                             f_vulns.extend(vs)
 
-                        current_report = f.get("verification_report") or {}
-                        current_vulns = current_report.get("details", {}).get("dependency_vouch", {}).get("details", {}).get("vulnerabilities", [])
+                        current_report = f.get("verification_report")
+                        if not isinstance(current_report, dict):
+                            current_report = {}
+
+                        current_vulns = []
+                        details = current_report.get("details")
+                        if isinstance(details, dict):
+                            dep_vouch = details.get("dependency_vouch")
+                            if isinstance(dep_vouch, dict):
+                                vouch_details = dep_vouch.get("details")
+                                if isinstance(vouch_details, dict):
+                                    current_vulns = vouch_details.get("vulnerabilities") or []
+                        if not isinstance(current_vulns, list):
+                            current_vulns = []
 
                         if len(f_vulns) != len(current_vulns):
                             logger.info(f"Vulnerability change detected for '{name}' [{project}]. Updating database.")
                             new_score = max(0.0, 100.0 - len(f_vulns) * 40.0)
 
                             new_report = current_report.copy() if isinstance(current_report, dict) else {}
-                            if "details" not in new_report:
+                            if "details" not in new_report or not isinstance(new_report["details"], dict):
                                 new_report["details"] = {}
-                            if "dependency_vouch" not in new_report["details"]:
+                            if "dependency_vouch" not in new_report["details"] or not isinstance(new_report["details"]["dependency_vouch"], dict):
                                 new_report["details"]["dependency_vouch"] = {}
-                            if "details" not in new_report["details"]["dependency_vouch"]:
+                            if "details" not in new_report["details"]["dependency_vouch"] or not isinstance(new_report["details"]["dependency_vouch"]["details"], dict):
                                 new_report["details"]["dependency_vouch"]["details"] = {}
                             new_report["details"]["dependency_vouch"]["details"]["vulnerabilities"] = f_vulns
 
@@ -147,10 +159,21 @@ def _get_vulnerability_warning_msg(f_data: dict) -> str:
     if not report or not isinstance(report, dict):
         return ""
 
-    details = report.get("details", {})
-    dep_vouch = details.get("dependency_vouch", {})
-    dep_details = dep_vouch.get("details", {}) if isinstance(dep_vouch, dict) else {}
-    vulns = dep_details.get("vulnerabilities", []) if isinstance(dep_details, dict) else []
+    details = report.get("details")
+    if not isinstance(details, dict):
+        return ""
+
+    dep_vouch = details.get("dependency_vouch")
+    if not isinstance(dep_vouch, dict):
+        return ""
+
+    dep_details = dep_vouch.get("details")
+    if not isinstance(dep_details, dict):
+        return ""
+
+    vulns = dep_details.get("vulnerabilities")
+    if not isinstance(vulns, list):
+        return ""
 
     if vulns and isinstance(vulns, list):
         summary_list = []

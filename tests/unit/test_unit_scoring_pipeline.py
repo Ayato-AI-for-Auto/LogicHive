@@ -127,3 +127,52 @@ async def test_periodic_vulnerability_scan_loop(test_db):
     report = updated.get("verification_report") or {}
     vulns = report.get("details", {}).get("dependency_vouch", {}).get("details", {}).get("vulnerabilities", [])
     assert len(vulns) > 0
+
+
+@pytest.mark.asyncio
+async def test_periodic_vulnerability_scan_loop_corrupt_report(test_db):
+    """UNIT: Verify that the background periodic scan loop handles corrupt/None fields in the report safely."""
+    import asyncio
+    from unittest.mock import patch
+
+    from mcp_server import _periodic_vulnerability_scan_loop, _get_vulnerability_warning_msg
+    from storage.sqlite_api import sqlite_storage
+
+    # Insert a function with vulnerable dependency but report is explicitly corrupt (details is None)
+    func_data = {
+        "name": "func_corrupt",
+        "code": "import urllib3",
+        "description": "test",
+        "tags": [],
+        "language": "python",
+        "reliability_score": 100.0,
+        "embedding": [0.1] * 768,
+        "project": "default",
+        "verification_status": "verified",
+        "dependencies": ["urllib3==1.26.15"],
+        "verification_report": {"details": None}
+    }
+    await sqlite_storage.upsert_function(func_data)
+
+    sleep_count = 0
+    original_sleep = asyncio.sleep
+
+    async def mock_sleep(delay, result=None):
+        nonlocal sleep_count
+        sleep_count += 1
+        if sleep_count > 1:
+            raise asyncio.CancelledError()
+        await original_sleep(0.01)
+
+    with patch("asyncio.sleep", side_effect=mock_sleep):
+        try:
+            await _periodic_vulnerability_scan_loop()
+        except asyncio.CancelledError:
+            pass
+
+    updated = await sqlite_storage.get_function_by_name("func_corrupt")
+    assert updated is not None
+    assert updated["verification_status"] == "failed"
+
+    # Test that warning message extractor doesn't throw when details is None
+    assert _get_vulnerability_warning_msg(updated) == "" or "[SECURITY WARNING]" in _get_vulnerability_warning_msg(updated)
