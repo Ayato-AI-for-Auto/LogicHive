@@ -6,21 +6,35 @@
 # (at your option) any later version.
 
 import os
-import socket
 import sqlite3
 import sys
 from contextlib import asynccontextmanager
 
 import fastmcp
-import psutil
 from fastmcp import FastMCP
 
 import orchestrator
 from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
+from core.formatters import (
+    format_report as _format_report,
+    format_syntax_error as _format_syntax_error,
+    format_validation_error as _format_validation_error,
+    get_status_description as _get_status_description,
+)
 from core.logging_config import get_logger
+from core.network import (
+    find_available_port,
+    get_conflicting_process,
+    handle_port_conflict,
+    wait_on_error,
+)
 from core.tracer import trace_execution
+from core.vulnerability import (
+    get_vulnerability_warning_msg as _get_vulnerability_warning_msg,
+    periodic_vulnerability_scan_loop as _periodic_vulnerability_scan_loop,
+)
 from orchestrator import (
     do_delete_async,
     do_get_verification_status,
@@ -31,104 +45,7 @@ from storage.vector_store import vector_manager
 
 logger = get_logger(__name__)
 
-async def _periodic_vulnerability_scan_loop():
-    """Background task that runs a dependency vulnerability scan every 24 hours."""
-    import asyncio
-    import re
 
-    from core.evaluation.plugins.dependency_vouch import DependencyVouchEvaluator
-
-    evaluator = DependencyVouchEvaluator()
-    # Wait a short duration after startup to not contend with initial server load
-    await asyncio.sleep(5)
-
-    while True:
-        try:
-            logger.info("Starting background vulnerability scan...")
-            functions = await sqlite_storage.get_all_functions()
-            if not functions:
-                logger.debug("No functions stored in database to scan.")
-            else:
-                unique_deps = set()
-                for f in functions:
-                    # Stored dependencies is a JSON list (already deserialized by sqlite_storage)
-                    f_deps = f.get("dependencies") or []
-                    for dep in f_deps:
-                        unique_deps.add(dep)
-
-                if unique_deps:
-                    logger.info(f"Scanning {len(unique_deps)} unique dependencies via OSV API...")
-                    vulns = evaluator._check_osv_vulnerabilities(list(unique_deps))
-
-                    # Group vulns by package-version for easy lookup
-                    vuln_map = {}
-                    for v in vulns:
-                        key = f"{v['package']}=={v['version']}"
-                        if key not in vuln_map:
-                            vuln_map[key] = []
-                        vuln_map[key].append(v)
-
-                    # Update matching functions
-                    for f in functions:
-                        name = f["name"]
-                        project = f.get("project", "default")
-                        f_deps = f.get("dependencies") or []
-
-                        f_vulns = []
-                        for dep in f_deps:
-                            dep_key = dep.strip()
-                            if dep_key in vuln_map:
-                                f_vulns.extend(vuln_map[dep_key])
-                            else:
-                                match = re.match(r"^([a-zA-Z0-9_\-]+)", dep_key)
-                                if match:
-                                    pkg = match.group(1)
-                                    for k, vs in vuln_map.items():
-                                        if k.startswith(f"{pkg}=="):
-                                            f_vulns.extend(vs)
-
-                        current_report = f.get("verification_report")
-                        if not isinstance(current_report, dict):
-                            current_report = {}
-
-                        current_vulns = []
-                        details = current_report.get("details")
-                        if isinstance(details, dict):
-                            dep_vouch = details.get("dependency_vouch")
-                            if isinstance(dep_vouch, dict):
-                                vouch_details = dep_vouch.get("details")
-                                if isinstance(vouch_details, dict):
-                                    current_vulns = vouch_details.get("vulnerabilities") or []
-                        if not isinstance(current_vulns, list):
-                            current_vulns = []
-
-                        if len(f_vulns) != len(current_vulns):
-                            logger.info(f"Vulnerability change detected for '{name}' [{project}]. Updating database.")
-                            new_score = max(0.0, 100.0 - len(f_vulns) * 40.0)
-
-                            new_report = current_report.copy() if isinstance(current_report, dict) else {}
-                            if "details" not in new_report or not isinstance(new_report["details"], dict):
-                                new_report["details"] = {}
-                            if "dependency_vouch" not in new_report["details"] or not isinstance(new_report["details"]["dependency_vouch"], dict):
-                                new_report["details"]["dependency_vouch"] = {}
-                            if "details" not in new_report["details"]["dependency_vouch"] or not isinstance(new_report["details"]["dependency_vouch"]["details"], dict):
-                                new_report["details"]["dependency_vouch"]["details"] = {}
-                            new_report["details"]["dependency_vouch"]["details"]["vulnerabilities"] = f_vulns
-
-                            new_status = "failed" if f_vulns else f.get("verification_status", "verified")
-
-                            await sqlite_storage.update_verification_status(
-                                name,
-                                project,
-                                status=new_status,
-                                report=new_report,
-                                reliability_score=new_score
-                            )
-            logger.info("Background vulnerability scan completed successfully.")
-        except Exception as e:
-            logger.error(f"Error during background vulnerability scan: {e}")
-
-        await asyncio.sleep(24 * 3600)
 
 
 @asynccontextmanager
@@ -153,39 +70,7 @@ async def lifespan(server: FastMCP):
 mcp = FastMCP("LogicHive", lifespan=lifespan)
 
 
-def _get_vulnerability_warning_msg(f_data: dict) -> str:
-    """Extracts vulnerability warning message from the verification report if present."""
-    report = f_data.get("verification_report")
-    if not report or not isinstance(report, dict):
-        return ""
 
-    details = report.get("details")
-    if not isinstance(details, dict):
-        return ""
-
-    dep_vouch = details.get("dependency_vouch")
-    if not isinstance(dep_vouch, dict):
-        return ""
-
-    dep_details = dep_vouch.get("details")
-    if not isinstance(dep_details, dict):
-        return ""
-
-    vulns = dep_details.get("vulnerabilities")
-    if not isinstance(vulns, list):
-        return ""
-
-    if vulns and isinstance(vulns, list):
-        summary_list = []
-        for v in vulns:
-            pkg = v.get("package", "unknown")
-            ver = v.get("version", "unknown")
-            vid = v.get("id", "unknown")
-            summary_list.append(f"{pkg}=={ver} ({vid})")
-
-        pkgs_str = ", ".join(summary_list)
-        return f"[SECURITY WARNING] Known vulnerabilities detected in dependencies: {pkgs_str}."
-    return ""
 
 
 @mcp.tool()
@@ -319,52 +204,7 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
         return f"LogicHive Error: Failed to retrieve function. Detail: {str(e)}"
 
 
-def _format_syntax_error(e: SyntaxValidationError) -> str:
-    """Format a syntax validation error into a user-friendly markdown report."""
-    details = e.details or {}
-    eval_details = details.get("eval_details", {}).get("static_analysis", {})
-    inner_details = eval_details.get("details", {})
 
-    line = inner_details.get("line", "?")
-    offset = inner_details.get("offset", "?")
-    text = inner_details.get("text", "N/A")
-
-    md = [
-        "### ❌ IMMEDIATE REJECTION: Syntax Error",
-        f"**Message**: {str(e)}",
-        f"- **Line**: {line}",
-        f"- **Offset**: {offset}",
-        f"\n**Context**:\n```python\n{text.strip()}\n```",
-        "\nPlease correct the syntax before attempting to save again.",
-    ]
-    return "\n".join(md)
-
-
-def _format_validation_error(e: ValidationError) -> str:
-    """Format a quality gate validation error into a user-friendly markdown report."""
-    details = e.details or {}
-    score = details.get("score", 0)
-    reason = details.get("reason", str(e))
-    eval_details = details.get("eval_details", {})
-
-    # Build a helpful report
-    report = [f"Quality Gate REJECTED: {reason}", f"Final Score: {score:.1f}/100"]
-
-    if eval_details:
-        report.append("\nBreakdown:")
-        for tool_name, res in eval_details.items():
-            tool_score = res.get("score", 0)
-            tool_reason = res.get("reason", "N/A")
-            report.append(f"- {tool_name}: {tool_score:.1f} ({tool_reason})")
-
-            # Show traceback or stderr if available (Crucial for debugging)
-            inner_details = res.get("details", {}) or {}
-            if inner_details.get("traceback"):
-                report.append(f"  [TRACEBACK]\n{inner_details['traceback']}")
-            elif inner_details.get("stderr"):
-                report.append(f"  [STDERR]\n{inner_details['stderr']}")
-
-    return "\n".join(report)
 
 
 @mcp.tool()
@@ -617,33 +457,7 @@ async def get_verification_status(
         return f"Error retrieving status: {str(e)}"
 
 
-def _get_status_description(status):
-    mapping = {
-        "verified": "Quality Gate passed. Asset is active in the vault.\n",
-        "pending": "Verification is still in progress. Please check back shortly.\n",
-        "failed": "Quality Gate rejected the asset. Review the report below for details.\n",
-        "error": "A system error occurred during verification. Infrastructure might be unstable.\n",
-    }
-    return mapping.get(status, "")
 
-
-def _format_report(report):
-    if not isinstance(report, dict):
-        return f"```json\n{report}\n```"
-
-    if "error" in report:
-        return f"**Error Details**: {report['error']}\n"
-
-    if "reason" in report:
-        md = f"- **Reason**: {report.get('reason', 'N/A')}\n"
-        details = report.get("details", {})
-        for tool, res in details.items():
-            md += f"- **{tool.title()}**: {res.get('score', 0):.1f} ({res.get('reason', 'N/A')})\n"
-        return md
-
-    import json
-
-    return f"```json\n{json.dumps(report, indent=2)}\n```"
 
 
 @mcp.tool()
@@ -664,37 +478,7 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 
 
-def wait_on_error():
-    """Prevents the terminal window from closing immediately in frozen mode."""
-    if getattr(sys, "frozen", False):
-        logger.info("=" * 60)
-        input("Press Enter to exit...")
 
-
-def get_conflicting_process(port: int):
-    """Identifies the process currently using the specified port."""
-    try:
-        for conn in psutil.net_connections(kind="inet"):
-            if conn.laddr.port == port and conn.status == "LISTEN":
-                return psutil.Process(conn.pid)
-    except Exception as e:
-        logger.debug(
-            f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
-        )
-    return None
-
-
-def find_available_port(start_port: int, host: str = "0.0.0.0") -> int:
-    """Finds the first available port starting from start_port."""
-    port = start_port
-    while port < 65535:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind((host, port))
-                return port
-            except OSError:
-                port += 1
-    return start_port
 
 
 def run_server():
@@ -802,93 +586,8 @@ def run_server():
         except OSError as e:
             if e.errno == 10048 or "10048" in str(e):
                 logger.error(f"Network bind error on port {current_port}: {e}")
-                # Diagnostics
-                proc = get_conflicting_process(current_port)
-                proc_info = ""
-                if proc:
-                    try:
-                        proc_info = f"Conflicting process found: {proc.name()} (PID: {proc.pid})"
-                        logger.error(proc_info)
-                    except Exception:
-                        proc_info = "Conflicting process detected, but failed to retrieve details."
-                        logger.error(proc_info)
-
-                if sys.stdin.isatty():
-                    print("\n" + "=" * 60)
-                    print(f"PORT CONFLICT: Port {current_port} is already in use.")
-                    if proc_info:
-                        print(proc_info)
-                    else:
-                        print("No conflicting process could be identified.")
-                    print("=" * 60)
-                    print("Please choose a recovery option:")
-                    print("1. [Retry] Re-attempt binding (manually free the port first)")
-                    print("2. [Kill] Terminate the conflicting process")
-                    print("3. [Auto-find] Automatically search for the next available port")
-                    print("4. [Exit] Exit the application")
-                    print("=" * 60)
-
-                    try:
-                        choice = input("Enter choice (1-4): ").strip()
-                    except (KeyboardInterrupt, EOFError):
-                        logger.info("Cancelled by user. Exiting.")
-                        wait_on_error()
-                        sys.exit(1)
-
-                    if choice == "1":
-                        logger.info("Retrying port binding...")
-                        continue
-                    elif choice == "2":
-                        if proc:
-                            try:
-                                logger.info(f"Attempting to terminate process {proc.name()} (PID: {proc.pid})...")
-                                proc.terminate()
-                                try:
-                                    proc.wait(timeout=3)
-                                    logger.info("Process terminated successfully. Retrying port binding...")
-                                except psutil.TimeoutExpired:
-                                    logger.warning("Process did not terminate in time. Forcing kill...")
-                                    proc.kill()
-                                    proc.wait(timeout=2)
-                                    logger.info("Process killed successfully. Retrying port binding...")
-                            except Exception as kill_err:
-                                logger.error(f"Failed to resolve conflicting process: {kill_err}")
-                        else:
-                            logger.warning("No conflicting process identified to terminate. Retrying anyway...")
-                        continue
-                    elif choice == "3":
-                        new_port = find_available_port(current_port + 1, host_val)
-                        if new_port == current_port:
-                            logger.error("No available ports could be found.")
-                            wait_on_error()
-                            sys.exit(1)
-                        logger.info(f"Auto-found available port: {new_port}")
-                        try:
-                            save_choice = input("Would you like to save this port as the default in your config? (y/N): ").strip().lower()
-                        except (KeyboardInterrupt, EOFError):
-                            save_choice = "n"
-                        if save_choice in ("y", "yes"):
-                            from core.config import save_config
-                            if save_config({"PORT": new_port}):
-                                logger.info(f"Port {new_port} successfully saved to config.")
-                            else:
-                                logger.error("Failed to save configuration.")
-                        current_port = new_port
-                        continue
-                    else:
-                        logger.info("Exiting application...")
-                        wait_on_error()
-                        sys.exit(1)
-                else:
-                    logger.warning("Non-interactive run detected. Port binding failed.")
-                    new_port = find_available_port(current_port + 1, host_val)
-                    if new_port == current_port:
-                        logger.error("No available ports could be found.")
-                        wait_on_error()
-                        sys.exit(1)
-                    logger.info(f"Auto-finding port in non-interactive mode. Selected: {new_port}")
-                    current_port = new_port
-                    continue
+                current_port = handle_port_conflict(current_port, host_val)
+                continue
             raise
 
         except Exception as e:

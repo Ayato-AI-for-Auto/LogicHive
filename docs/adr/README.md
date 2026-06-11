@@ -30,9 +30,4 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-024: In-Memory Periodic Vulnerability Scanning](ADR-0024-in-memory-periodic-vulnerability-scanning.md)
 - [ADR-025: Windows Native Sandbox and Multi-Language Architecture](ADR-0025-windows-native-sandbox-and-multilanguage-architecture.md)
 - [ADR-026: Multi-Language Execution and Evaluation Expansion](ADR-0026-multi-language-expansion.md)
-
-
-
-
-
-
+- [ADR-027: MCP Server Module Decomposition](ADR-0027-mcp-server-module-decomposition.md)
