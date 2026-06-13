@@ -41,8 +41,22 @@ class EvaluationManager:
 
     def _discover_modules(self):
         """Discovers modules via package and filesystem."""
-        plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
-        if not os.path.exists(plugins_dir):
+        # --- PyInstaller Path Fix ---
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            # Bundled app: path relative to _MEIPASS
+            base_dir = Path(sys._MEIPASS)
+            # Find core/evaluation/plugins in the bundle
+            plugins_dir = base_dir / "core" / "evaluation" / "plugins"
+            if not plugins_dir.exists():
+                # Try src/core/... if the bundle structure is different
+                plugins_dir = base_dir / "src" / "core" / "evaluation" / "plugins"
+        else:
+            # Source mode: standard relative path
+            plugins_dir = Path(os.path.dirname(__file__)) / "plugins"
+
+        logger.debug(f"EvaluationManager: Searching for plugins in {plugins_dir}")
+
+        if not plugins_dir.exists():
             logger.error(f"EvaluationManager: Plugins directory not found at {plugins_dir}")
             return []
 
@@ -52,7 +66,7 @@ class EvaluationManager:
             return modules
 
         # 2. Filesystem fallback
-        return self._discover_via_filesystem(plugins_dir)
+        return self._discover_via_filesystem(str(plugins_dir))
 
     def _discover_via_package(self):
         modules = []
