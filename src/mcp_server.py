@@ -49,6 +49,15 @@ from storage.vector_store import vector_manager
 
 logger = get_logger(__name__)
 
+# Re-export utilities for external use and testing
+__all__ = [
+    "find_available_port",
+    "get_conflicting_process",
+    "handle_port_conflict",
+    "wait_on_error",
+    "run_server",
+]
+
 
 @asynccontextmanager
 async def lifespan(server: FastMCP):
