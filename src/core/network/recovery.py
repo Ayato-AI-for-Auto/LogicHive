@@ -6,11 +6,9 @@
 # (at your option) any later version.
 
 import sys
-
 import psutil
 
 import core.config
-import mcp_server
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -18,6 +16,9 @@ logger = get_logger(__name__)
 
 def handle_port_conflict(current_port: int, host_val: str) -> int:
     """Handles network bind errors (port conflict) by offering interactive recovery or auto-finding a port."""
+    # Delay import to break circular dependency with mcp_server
+    import mcp_server
+
     # Diagnostics
     proc = mcp_server.get_conflicting_process(current_port)
     proc_info = ""
