@@ -31,3 +31,4 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-025: Windows Native Sandbox and Multi-Language Architecture](ADR-0025-windows-native-sandbox-and-multilanguage-architecture.md)
 - [ADR-026: Multi-Language Execution and Evaluation Expansion](ADR-0026-multi-language-expansion.md)
 - [ADR-027: MCP Server Module Decomposition](ADR-0027-mcp-server-module-decomposition.md)
+- [ADR-028: バイナリ配布環境における動的リソースのパス解決戦略](ADR-0028-resource-path-resolution-for-frozen-binaries.md)
