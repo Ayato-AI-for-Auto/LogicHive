@@ -1,3 +1,10 @@
+# [0.20.0-dev.3](https://github.com/ayato-labs/LogicHive/compare/v0.20.0-dev.2...v0.20.0-dev.3) (2026-06-13)
+
+
+### Features
+
+* implement interactive network recovery for port conflicts and simplify dev_run.bat execution flow ([504bead](https://github.com/ayato-labs/LogicHive/commit/504bead4419f835e83ea484bb899606276747399))
+
 # [0.20.0-dev.2](https://github.com/ayato-labs/LogicHive/compare/v0.20.0-dev.1...v0.20.0-dev.2) (2026-06-13)
 
 
