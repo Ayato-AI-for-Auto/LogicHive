@@ -1,3 +1,16 @@
+# [0.21.0](https://github.com/ayato-labs/LogicHive/compare/v0.20.0...v0.21.0) (2026-06-13)
+
+
+### Bug Fixes
+
+* resolve mypy errors in EvaluationManager by refining type annotations ([6491ef2](https://github.com/ayato-labs/LogicHive/commit/6491ef25734341d6c2ce609e9408cd55c211dc2d))
+
+
+### Features
+
+* implement dynamic plugin discovery for EvaluationManager and increment package version ([37558c4](https://github.com/ayato-labs/LogicHive/commit/37558c4b249a2a254629c1eecd75dee19bd3feb1))
+* implement interactive network recovery for port conflicts and simplify dev_run.bat execution flow ([504bead](https://github.com/ayato-labs/LogicHive/commit/504bead4419f835e83ea484bb899606276747399))
+
 # [0.21.0-dev.1](https://github.com/ayato-labs/LogicHive/compare/v0.20.0...v0.21.0-dev.1) (2026-06-13)
 
 
