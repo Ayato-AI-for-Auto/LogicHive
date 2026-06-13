@@ -52,6 +52,9 @@ class EvaluationManager:
             if not plugins_dir.exists():
                 # Try src/core/... if the bundle structure is different
                 plugins_dir = base_dir / "src" / "core" / "evaluation" / "plugins"
+            if not plugins_dir.exists():
+                # LogicHive.spec copies 'src' to 'engine/src'
+                plugins_dir = base_dir / "engine" / "src" / "core" / "evaluation" / "plugins"
         else:
             # Source mode: standard relative path
             plugins_dir = Path(os.path.dirname(__file__)) / "plugins"
