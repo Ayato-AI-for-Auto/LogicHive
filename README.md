@@ -211,30 +211,37 @@ uv run pytest tests/unit tests/integration tests/system tests/chaos
 
 ---
 
-## 🏢 Commercial & Enterprise Compliance
+## 🏢 Commercial & Enterprise Compliance (商用・ビジネス利用への対応)
 
-LogicHive は、ビジネス環境での商用利用を前提として設計されています。
-コア技術および依存関係には、商用利用に非常に寛容な **MIT** や **Apache 2.0** ライセンスを採用しているライブラリのみを使用しており、安心して導入いただけます。
+LogicHiveは、ビジネス環境での商用利用およびエンタープライズ導入を前提として設計されています。
+コア技術および依存関係には、商用利用に非常に寛容な **MIT** や **Apache 2.0** などのパーミッシブ・ライセンス（Permissive License）を採用しているライブラリのみを使用しており、法務的なコピーレフト汚染のリスクなく安心して導入いただけます。
 
-### 依存ライブラリのライセンス状況
+### 依存技術のライセンス状況と根拠
 
-LogicHive を構成する主要な依存ライブラリは以下の通りです。すべて商用利用可能なライセンスであることを確認済みです。
+LogicHiveを構成する主要な依存ライブラリと動作環境は以下の通りです。すべて商用利用可能なライセンスであることを確認済です。
 
-| ライブラリ | ライセンス | 根拠 (LICENSE) |
+| コンポーネント / ライブラリ | ライセンス | 根拠となるURL (LICENSE) |
 | :--- | :--- | :--- |
-| **Ollama Python** | MIT | [GitHub](https://github.com/ollama/ollama-python/blob/main/LICENSE) |
-| **FastMCP** | Apache 2.0 | [GitHub](https://github.com/PrefectHQ/fastmcp/blob/main/LICENSE) |
+| **Ollama (ソフトウェア本体)** | MIT | [GitHub](https://github.com/ollama/ollama/blob/main/LICENSE) |
+| **Ollama Python Client** | MIT | [GitHub](https://github.com/ollama/ollama-python/blob/main/LICENSE) |
+| **ChromaDB** | Apache 2.0 | [GitHub](https://github.com/chroma-core/chroma/blob/main/LICENSE) |
+| **FastEmbed** | MIT | [GitHub](https://github.com/qdrant/fastembed/blob/main/LICENSE) |
+| **FastMCP** | MIT | [GitHub](https://github.com/jlowin/fastmcp/blob/main/LICENSE) |
+| **FastAPI** | MIT | [GitHub](https://github.com/tiangolo/fastapi/blob/master/LICENSE) |
 | **Flet** | Apache 2.0 | [GitHub](https://github.com/flet-dev/flet/blob/main/LICENSE) |
 | **Google GenAI** | Apache 2.0 | [GitHub](https://github.com/google-gemini/generative-ai-python/blob/main/LICENSE) |
-| **FAISS** | MIT | [GitHub](https://github.com/facebookresearch/faiss/blob/main/LICENSE) |
-| **FastAPI** | MIT | [GitHub](https://github.com/tiangolo/fastapi/blob/master/LICENSE) |
-| **Ruff** | MIT | [GitHub](https://github.com/astral-sh/ruff/blob/main/LICENSE) |
 | **Loguru** | MIT | [GitHub](https://github.com/Delgan/loguru/blob/master/LICENSE) |
 | **HTTPX** | BSD 3-Clause | [GitHub](https://github.com/encode/httpx/blob/master/LICENSE.md) |
+| **Pydantic** | MIT | [GitHub](https://github.com/pydantic/pydantic/blob/main/LICENSE) |
 | **Stripe** | MIT | [GitHub](https://github.com/stripe/stripe-python/blob/master/LICENSE) |
 
+> [!WARNING]
+> **LLMモデルのライセンスについてのご注意**
+> Ollamaソフトウェア自体はMITライセンスですが、Ollama上で実行する**各LLMモデル（Llama 3, Qwen, Gemmaなど）の商用利用条件はモデル提供者のライセンスに依存**します。商用利用の際は、自社のビジネス規模（MAUなど）が各モデルの商用利用許諾条件を満たしているか、ご自身で確認してモデルを選定してください。
+
+> [!IMPORTANT]
 > **セキュリティと機密性について**:
-> LogicHive のユーザーデータ（保存されたロジック資産）は、ローカル環境の SQLite/FAISS にのみ保持されます。AIプロバイダーへ送信されるのは、ユーザーが明示的にリクエストした範囲内のコンテキストのみであり、資産自体が外部へ漏洩する設計ではありません。
+> LogicHiveのユーザーデータ（保存されたロジック資産等）は、ローカル環境のデータベース（SQLite/ChromaDB等）にのみ保持されます。AIプロバイダーへ送信されるのは、ユーザーが明示的にリクエストした範囲内のコンテキストのみであり、資産自体が外部へ漏洩する設計ではありません。
 
 ---
 
