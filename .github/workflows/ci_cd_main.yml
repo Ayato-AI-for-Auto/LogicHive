@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Lint (Ruff)
         run: |
-          uv run ruff check src tests
+          uv run ruff check .
 
       - name: Run tests
         run: |

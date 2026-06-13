@@ -5,6 +5,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+import asyncio
 import os
 import sqlite3
 import sys
@@ -12,8 +13,12 @@ from contextlib import asynccontextmanager
 
 import fastmcp
 from fastmcp import FastMCP
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 
 import orchestrator
+import core.config
+import core.network
 from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
@@ -24,12 +29,6 @@ from core.formatters import (
     get_status_description as _get_status_description,
 )
 from core.logging_config import get_logger
-from core.network import (
-    find_available_port,
-    get_conflicting_process,
-    handle_port_conflict,
-    wait_on_error,
-)
 from core.tracer import trace_execution
 from core.vulnerability import (
     get_vulnerability_warning_msg as _get_vulnerability_warning_msg,
@@ -46,13 +45,9 @@ from storage.vector_store import vector_manager
 logger = get_logger(__name__)
 
 
-
-
 @asynccontextmanager
 async def lifespan(server: FastMCP):
     """Initializes and cleans up background workers for environment pooling and vulnerability scanning."""
-    import asyncio
-
     from core.execution.pool import PoolManager
 
     manager = PoolManager.get_instance()
@@ -68,9 +63,6 @@ async def lifespan(server: FastMCP):
 
 # Initialize FastMCP server with lifespan management
 mcp = FastMCP("LogicHive", lifespan=lifespan)
-
-
-
 
 
 @mcp.tool()
@@ -202,9 +194,6 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
     except Exception as e:
         logger.error(f"MCP Server: Error in get_function: {name} - {e}")
         return f"LogicHive Error: Failed to retrieve function. Detail: {str(e)}"
-
-
-
 
 
 @mcp.tool()
@@ -457,9 +446,6 @@ async def get_verification_status(
         return f"Error retrieving status: {str(e)}"
 
 
-
-
-
 @mcp.tool()
 @trace_execution
 async def rebuild_index(wait_for_previous: bool = False) -> str:
@@ -477,14 +463,8 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
         return f"LogicHive Error: Failed to rebuild index. Detail: {str(e)}"
 
 
-
-
-
-
 def run_server():
     import uvicorn
-
-    import core.config
     from core import __version__
     from core.config import validate_config_lazy
 
@@ -554,10 +534,6 @@ def run_server():
 
             # Create the app instance using Streamable HTTP with our middleware
             try:
-                # Create CORS middleware configuration
-                from starlette.middleware import Middleware
-                from starlette.middleware.cors import CORSMiddleware
-
                 cors_middleware = Middleware(
                     CORSMiddleware,
                     allow_origins=["*"],
@@ -586,7 +562,7 @@ def run_server():
         except OSError as e:
             if e.errno == 10048 or "10048" in str(e):
                 logger.error(f"Network bind error on port {current_port}: {e}")
-                current_port = handle_port_conflict(current_port, host_val)
+                current_port = core.network.handle_port_conflict(current_port, host_val)
                 continue
             raise
 

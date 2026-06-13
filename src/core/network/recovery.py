@@ -5,26 +5,18 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+import core.config
+import mcp_server
+import psutil
 import sys
 
-import psutil
-
-from core.config import save_config
 from core.logging_config import get_logger
-from core.network.diagnostics import (
-    find_available_port,
-    get_conflicting_process,
-    wait_on_error,
-)
 
 logger = get_logger(__name__)
 
 
 def handle_port_conflict(current_port: int, host_val: str) -> int:
     """Handles network bind errors (port conflict) by offering interactive recovery or auto-finding a port."""
-    import mcp_server
-    import core.config
-
     # Diagnostics
     proc = mcp_server.get_conflicting_process(current_port)
     proc_info = ""
