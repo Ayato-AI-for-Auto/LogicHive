@@ -5,25 +5,23 @@ echo ==========================================
 echo 🚀 LogicHive Hub: Development Launcher
 echo ==========================================
 
-:: 1. Cleanup existing processes (Port 10880)
-echo [1/3] Checking for conflicting processes on port 10880...
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :10880 ^| findstr LISTENING') do (
-    echo [!] Found process with PID %%a. Terminating...
-    taskkill /F /PID %%a >nul 2>&1
-)
-
-:: 2. Setup Environment
-echo [2/3] Setting up environment...
-set PYTHONPATH=src
+:: 1. Ensure environment is ready
+echo [1/2] Checking environment...
 if not exist .venv (
     echo [!] .venv not found. Please run 'uv sync' first.
     exit /b 1
 )
 
-:: 3. Launch Server
-echo [3/3] Launching LogicHive Hub...
-echo Model: %GEMINI_MODEL% (from .env)
+:: 2. Launch Server
+:: The application itself handles port conflicts interactively via core.network.recovery.
+:: We simply launch the server using uv.
+echo [2/2] Launching LogicHive Hub...
 echo.
+
 uv run src/mcp_server.py
 
-pause
+if %errorlevel% neq 0 (
+    echo.
+    echo [!] Server exited with error code %errorlevel%.
+    pause
+)
