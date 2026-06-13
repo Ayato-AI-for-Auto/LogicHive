@@ -108,8 +108,14 @@ class DependencyVouchEvaluator(BaseEvaluator):
                 )
                 with urllib.request.urlopen(req, timeout=5) as response:
                     res_data = json.loads(response.read().decode("utf-8"))
+                    if not isinstance(res_data, dict):
+                        continue
                     vulns = res_data.get("vulns", [])
+                    if not isinstance(vulns, list):
+                        continue
                     for v in vulns:
+                        if not isinstance(v, dict):
+                            continue
                         vulnerabilities.append({
                             "id": v.get("id"),
                             "package": pkg_name,

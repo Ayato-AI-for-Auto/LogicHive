@@ -1,6 +1,6 @@
-import shutil
 import glob
 import os
+import shutil
 
 def cleanup_pools():
     target_dirs = glob.glob('storage/data/pools*')

@@ -1,8 +1,8 @@
+import concurrent.futures
+import math
 import os
 import re
-import math
-import concurrent.futures
-from typing import Tuple, List
+from typing import List, Tuple
 
 # --- LOGIC RETRIEVED FROM LOGICHIVE (v5: Final) ---
 SECRET_PATTERNS: List[str] = [
@@ -10,13 +10,16 @@ SECRET_PATTERNS: List[str] = [
 ]
 
 def calculate_entropy(data: str) -> float:
-    if not data: return 0.0
-    entropy = 0
+    if not data:
+        return 0.0
+    entropy = 0.0
     char_counts = {}
-    for char in data: char_counts[char] = char_counts.get(char, 0) + 1
+    for char in data:
+        char_counts[char] = char_counts.get(char, 0) + 1
     for count in char_counts.values():
         p_x = float(count) / len(data)
-        if p_x > 0: entropy += - p_x * math.log(p_x, 2)
+        if p_x > 0:
+            entropy += -p_x * math.log(p_x, 2)
     return entropy
 
 def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
@@ -24,7 +27,12 @@ def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
         matches = re.findall(pattern, code)
         if matches:
             secret = matches[0]
-            if secret.lower() in ["your_api_key_here", "your_gemini_api_key_here", "your_github_token", "your_personal_access_token"]:
+            if secret.lower() in [
+                "your_api_key_here",
+                "your_gemini_api_key_here",
+                "your_github_token",
+                "your_personal_access_token",
+            ]:
                  continue
             risk = calculate_entropy(secret)
             return True, secret, risk
@@ -41,7 +49,7 @@ def scan_file(path: str) -> Tuple[str, bool, str, float]:
         # Fast path size check
         if os.path.getsize(path) > MAX_FILE_SIZE:
             return path, False, "", 0.0
-            
+
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
             found, secret, risk = contains_secrets_scanner(content)
@@ -50,24 +58,34 @@ def scan_file(path: str) -> Tuple[str, bool, str, float]:
         return path, False, "", 0.0
 
 def run_full_audit():
-    print(f"🕵️  LogicHive ULTIMATE Audit: Scanning workspace (Concurrent Fast-path)...")
+    print("🕵️  LogicHive ULTIMATE Audit: Scanning workspace (Concurrent Fast-path)...")
     found_count = 0
     target_files = []
-    
+
     # 1. Collect target files
-    EXCLUDED_DIRS = {".git", ".venv", "storage", "build", "dist", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+    EXCLUDED_DIRS = {
+        ".git",
+        ".venv",
+        "storage",
+        "build",
+        "dist",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        "node_modules",
+    }
     for root, dirs, files in os.walk("."):
         # Modify dirs in-place to prevent os.walk from descending into excluded directories
         dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
-            
+
         for file in files:
             # Fast path extension check
             if any(file.endswith(ext) for ext in EXCLUDED_EXTS):
                 continue
             target_files.append(os.path.join(root, file))
-            
+
     print(f"📄 Found {len(target_files)} relevant files to scan.")
-    
+
     # 2. Concurrent scanning
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = {executor.submit(scan_file, path): path for path in target_files}
@@ -77,7 +95,7 @@ def run_full_audit():
                 print(f"[🚨] LEAK DETECTED in {path}")
                 print(f"    Secret: {secret[:4]}...{secret[-4:]} (Entropy: {risk:.2f})")
                 found_count += 1
-    
+
     if found_count == 0:
         print("\n🏆 LogicHive Certified: NO REAL SECRETS FOUND in the workspace.")
     else:
