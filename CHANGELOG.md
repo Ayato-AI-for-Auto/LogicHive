@@ -1,3 +1,10 @@
+# [0.21.0-dev.2](https://github.com/ayato-labs/LogicHive/compare/v0.21.0-dev.1...v0.21.0-dev.2) (2026-06-13)
+
+
+### Features
+
+* implement EvaluationManager with dynamic plugin discovery and PyInstaller path support ([4290b5d](https://github.com/ayato-labs/LogicHive/commit/4290b5dfb1088a617d14aad31dbf4a480c31cbaf))
+
 # [0.21.0-dev.1](https://github.com/ayato-labs/LogicHive/compare/v0.20.0...v0.21.0-dev.1) (2026-06-13)
 
 
