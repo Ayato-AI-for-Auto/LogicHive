@@ -5,11 +5,12 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-import core.config
-import mcp_server
-import psutil
 import sys
 
+import psutil
+
+import core.config
+import mcp_server
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)

@@ -16,9 +16,9 @@ from fastmcp import FastMCP
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-import orchestrator
 import core.config
 import core.network
+import orchestrator
 from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
 from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
@@ -29,6 +29,7 @@ from core.formatters import (
     get_status_description as _get_status_description,
 )
 from core.logging_config import get_logger
+from core.network import wait_on_error
 from core.tracer import trace_execution
 from core.vulnerability import (
     get_vulnerability_warning_msg as _get_vulnerability_warning_msg,
@@ -465,6 +466,7 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
 
 def run_server():
     import uvicorn
+
     from core import __version__
     from core.config import validate_config_lazy
 

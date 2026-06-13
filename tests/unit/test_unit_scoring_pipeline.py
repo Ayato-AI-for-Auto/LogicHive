@@ -135,7 +135,7 @@ async def test_periodic_vulnerability_scan_loop_corrupt_report(test_db):
     import asyncio
     from unittest.mock import patch
 
-    from mcp_server import _periodic_vulnerability_scan_loop, _get_vulnerability_warning_msg
+    from mcp_server import _get_vulnerability_warning_msg, _periodic_vulnerability_scan_loop
     from storage.sqlite_api import sqlite_storage
 
     # Insert a function with vulnerable dependency but report is explicitly corrupt (details is None)
