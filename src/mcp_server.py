@@ -17,7 +17,6 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 import core.config
-import core.network
 import orchestrator
 from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
@@ -29,7 +28,12 @@ from core.formatters import (
     get_status_description as _get_status_description,
 )
 from core.logging_config import get_logger
-from core.network import wait_on_error
+from core.network import (
+    find_available_port,
+    get_conflicting_process,
+    handle_port_conflict,
+    wait_on_error,
+)
 from core.tracer import trace_execution
 from core.vulnerability import (
     get_vulnerability_warning_msg as _get_vulnerability_warning_msg,
@@ -564,7 +568,7 @@ def run_server():
         except OSError as e:
             if e.errno == 10048 or "10048" in str(e):
                 logger.error(f"Network bind error on port {current_port}: {e}")
-                current_port = core.network.handle_port_conflict(current_port, host_val)
+                current_port = handle_port_conflict(current_port, host_val)
                 continue
             raise
 
