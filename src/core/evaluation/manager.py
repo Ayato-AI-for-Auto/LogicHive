@@ -10,7 +10,9 @@ import importlib
 import importlib.util
 import os
 import pkgutil
-from typing import Any
+import sys
+from pathlib import Path
+from typing import Any, cast
 
 from core.logging_config import get_logger
 
@@ -44,7 +46,7 @@ class EvaluationManager:
         # --- PyInstaller Path Fix ---
         if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
             # Bundled app: path relative to _MEIPASS
-            base_dir = Path(sys._MEIPASS)
+            base_dir = Path(getattr(sys, "_MEIPASS"))
             # Find core/evaluation/plugins in the bundle
             plugins_dir = base_dir / "core" / "evaluation" / "plugins"
             if not plugins_dir.exists():
@@ -156,7 +158,7 @@ class EvaluationManager:
         # 5. Build final report
         return self._build_final_report(final_score, reasons, results)
 
-    def _perform_pre_checks(self, lang, kwargs):
+    def _perform_pre_checks(self, lang: str, kwargs: dict[str, Any]) -> dict[str, Any] | None:
         desc = (kwargs.get("description") or "").upper()
         is_draft = kwargs.get("is_draft", False) or any(
             k in desc for k in ["DRAFT", "AI_DRAFT", "AI-DRAFT"]
@@ -164,14 +166,14 @@ class EvaluationManager:
         test_code = kwargs.get("test_code", "")
 
         if not is_draft and not test_code and lang != "html":
-            return {
+            return cast(dict[str, Any], {
                 "score": 40.0,
                 "reason": (
                     "Unverified Asset: No test code provided. "
                     "Use [AI-DRAFT] in description to skip verification check."
                 ),
                 "details": {"system": "Rigor Gate", "status": "missing_tests"},
-            }
+            })
         kwargs["_is_draft"] = is_draft  # Internal use
         return None
 
@@ -193,81 +195,88 @@ class EvaluationManager:
                 results[name] = EvaluationResult(
                     score=0.0, reason=f"Evaluator error: {res}", is_system_error=True
                 )
-            else:
+            elif isinstance(res, EvaluationResult):
                 results[name] = res
+            else:
+                # This case should not be reachable if evaluate() returns EvaluationResult
+                results[name] = EvaluationResult(
+                    score=0.0, reason="Unexpected internal result type", is_system_error=True
+                )
         return results
 
-    def _check_critical_rejections(self, results, language, **kwargs):
+    def _check_critical_rejections(
+        self, results: dict[str, EvaluationResult], language: str, **kwargs: Any
+    ) -> dict[str, Any] | None:
         aggregate_system_error = any(v.is_system_error for v in results.values())
 
         # Structural Veto
         struct = results.get("structural")
         if struct and struct.score == 0:
-            return {
+            return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"CRITICAL STRUCTURAL ERROR: {struct.reason}",
                 "details": {"structural": struct},
                 "is_system_error": struct.is_system_error,
-            }
+            })
 
         # Security Veto
         sec = results.get("security_static")
         if sec and sec.score < 60:
-            return {
+            return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"SECURITY REJECTION: {sec.reason}",
                 "details": self._serialize_results(results),
                 "is_system_error": aggregate_system_error,
-            }
+            })
 
         # Dependency Veto
         dep = results.get("dependency_vouch")
         if dep and dep.score < 70:
-            return {
+            return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"DEPENDENCY REJECTION: {dep.reason}",
                 "details": self._serialize_results(results),
                 "is_system_error": aggregate_system_error,
-            }
+            })
 
         # Deterministic Veto (Syntax Errors)
         det = results.get("deterministic")
         if det and det.score == 0:
             py_stat = results.get("python_static")
             if py_stat and py_stat.score == 0 and "Syntax Error" in py_stat.reason:
-                return {
+                return cast(dict[str, Any], {
                     "score": 0.0,
                     "reason": f"CRITICAL SYNTAX ERROR: {py_stat.reason}",
                     "details": self._serialize_results(results),
                     "is_system_error": aggregate_system_error,
-                }
-            return {
+                })
+            return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"DETERMINISTIC REJECTION: {det.reason}",
                 "details": self._serialize_results(results),
                 "is_system_error": aggregate_system_error,
-            }
+            })
 
         # Language-specific static Veto (e.g. html_static, c_static, etc.)
         for key in ["html_static", "c_static", "java_static", "php_static"]:
             stat = results.get(key)
             if stat and stat.score == 0:
-                return {
+                return cast(dict[str, Any], {
                     "score": 0.0,
                     "reason": f"STATIC VALIDATION REJECTION ({key}): {stat.reason}",
                     "details": self._serialize_results(results),
                     "is_system_error": stat.is_system_error or aggregate_system_error,
-                }
+                })
 
         # Runtime Veto
         run = results.get("runtime")
         if run and run.score == 0 and not kwargs.get("_is_draft"):
-            return {
+            return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"RUNTIME REJECTION: {run.reason}",
                 "details": self._serialize_results(results),
                 "is_system_error": run.is_system_error or aggregate_system_error,
-            }
+            })
 
         return None
 
@@ -347,11 +356,13 @@ class EvaluationManager:
             for k, v in results.items()
         }
 
-    def _build_final_report(self, final_score, reasons, results):
+    def _build_final_report(
+        self, final_score: float, reasons: list[str], results: dict[str, EvaluationResult]
+    ) -> dict[str, Any]:
         aggregate_system_error = any(v.is_system_error for v in results.values())
-        return {
+        return cast(dict[str, Any], {
             "score": final_score,
             "reason": " | ".join(reasons),
             "details": self._serialize_results(results),
             "is_system_error": aggregate_system_error,
-        }
+        })
