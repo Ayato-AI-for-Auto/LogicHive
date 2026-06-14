@@ -63,6 +63,7 @@ jobs:
         shell: pwsh
         run: |
           uv run python -m nuitka `
+            --assume-yes-for-downloads `
             --standalone `
             --onefile `
             --output-dir=dist-nuitka `
@@ -81,6 +82,7 @@ jobs:
         shell: pwsh
         run: |
           uv run python -m nuitka `
+            --assume-yes-for-downloads `
             --standalone `
             --onefile `
             --windows-disable-console `
