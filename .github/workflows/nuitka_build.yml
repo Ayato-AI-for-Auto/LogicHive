@@ -47,15 +47,13 @@ jobs:
             --onefile `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Hub-nuitka `
-            --include-data-files=pyproject.toml=. `
+            --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
             --include-package-data=google-genai `
             --include-package-data=chromadb `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
-            --follow-imports `
-            --enable-plugin=anti-bloat `
             src/mcp_server.py
 
       - name: Build LogicHive-Settings (GUI)
@@ -67,15 +65,13 @@ jobs:
             --windows-disable-console `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Settings-nuitka `
-            --include-data-files=pyproject.toml=. `
+            --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
             --include-package-data=google-genai `
             --include-package-data=chromadb `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
-            --follow-imports `
-            --enable-plugin=anti-bloat `
             src/settings_ui.py
 
       - name: Upload Nuitka Artifacts
