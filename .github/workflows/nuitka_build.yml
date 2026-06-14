@@ -41,6 +41,8 @@ jobs:
 
       - name: Build LogicHive-Hub (Console)
         shell: pwsh
+        env:
+          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
         run: |
           uv run python -m nuitka `
             --standalone `
@@ -58,6 +60,8 @@ jobs:
 
       - name: Build LogicHive-Settings (GUI)
         shell: pwsh
+        env:
+          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
         run: |
           uv run python -m nuitka `
             --standalone `
