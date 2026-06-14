@@ -1,0 +1,86 @@
+name: Nuitka Build (Beta)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build_nuitka:
+    name: Build Windows EXE with Nuitka
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pipx install uv
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+          uv pip install nuitka zstandard ordered-set
+
+      - name: Cache Nuitka build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Nuitka\Nuitka\Cache
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-
+
+      - name: Build LogicHive-Hub (Console)
+        shell: pwsh
+        run: |
+          uv run python -m nuitka `
+            --standalone `
+            --onefile `
+            --output-dir=dist-nuitka `
+            --output-filename=LogicHive-Hub-nuitka `
+            --include-data-files=pyproject.toml=. `
+            --include-data-dir=src=engine/src `
+            --include-package-data=fastmcp `
+            --include-package-data=google-genai `
+            --include-package-data=chromadb `
+            --include-package-data=flet `
+            --include-package-data=flet_desktop `
+            --follow-imports `
+            --enable-plugin=anti-bloat `
+            src/mcp_server.py
+
+      - name: Build LogicHive-Settings (GUI)
+        shell: pwsh
+        run: |
+          uv run python -m nuitka `
+            --standalone `
+            --onefile `
+            --windows-disable-console `
+            --output-dir=dist-nuitka `
+            --output-filename=LogicHive-Settings-nuitka `
+            --include-data-files=pyproject.toml=. `
+            --include-data-dir=src=engine/src `
+            --include-package-data=fastmcp `
+            --include-package-data=google-genai `
+            --include-package-data=chromadb `
+            --include-package-data=flet `
+            --include-package-data=flet_desktop `
+            --follow-imports `
+            --enable-plugin=anti-bloat `
+            src/settings_ui.py
+
+      - name: Upload Nuitka Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicHive-Nuitka-Builds
+          path: dist-nuitka/*.exe
+          if-no-files-found: error
