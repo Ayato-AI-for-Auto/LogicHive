@@ -15,6 +15,9 @@ jobs:
   build_nuitka:
     name: Build Windows EXE with Nuitka
     runs-on: windows-latest
+    env:
+      NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
+      NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,8 +44,6 @@ jobs:
 
       - name: Build LogicHive-Hub (Console)
         shell: pwsh
-        env:
-          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
         run: |
           uv run python -m nuitka `
             --standalone `
@@ -60,8 +61,6 @@ jobs:
 
       - name: Build LogicHive-Settings (GUI)
         shell: pwsh
-        env:
-          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
         run: |
           uv run python -m nuitka `
             --standalone `
