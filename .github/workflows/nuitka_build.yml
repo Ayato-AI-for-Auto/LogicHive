@@ -31,7 +31,21 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --all-extras
-          uv pip install nuitka zstandard ordered-set
+          uv pip install nuitka zstandard ordered-set pefile
+
+      - name: Download Dependency Walker
+        shell: pwsh
+        run: |
+          $depWalkerPath = "$env:USERPROFILE\AppData\Local\Nuitka\Nuitka\Cache\depwalker"
+          if (-not (Test-Path $depWalkerPath)) {
+            Write-Host "Downloading Dependency Walker..."
+            New-Item -ItemType Directory -Path $depWalkerPath -Force | Out-Null
+            $dwUrl = "https://dependencywalker.com/depends22_x64.zip"
+            $zipPath = "$depWalkerPath\depends.zip"
+            Invoke-WebRequest -Uri $dwUrl -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $depWalkerPath -Force
+            Remove-Item $zipPath
+          }
 
       - name: Cache Nuitka build
         uses: actions/cache@v4
@@ -44,10 +58,14 @@ jobs:
 
       - name: Build LogicHive-Hub (Console)
         shell: pwsh
+        env:
+          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
+          NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
         run: |
           uv run python -m nuitka `
             --standalone `
             --onefile `
+            --windows-dependency-tool=pefile `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Hub-nuitka `
             --include-data-files=pyproject.toml=pyproject.toml `
@@ -61,11 +79,15 @@ jobs:
 
       - name: Build LogicHive-Settings (GUI)
         shell: pwsh
+        env:
+          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
+          NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
         run: |
           uv run python -m nuitka `
             --standalone `
             --onefile `
             --windows-disable-console `
+            --windows-dependency-tool=pefile `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Settings-nuitka `
             --include-data-files=pyproject.toml=pyproject.toml `
