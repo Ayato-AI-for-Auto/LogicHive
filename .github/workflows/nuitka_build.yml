@@ -11,6 +11,9 @@ on:
       - develop
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build_nuitka:
     name: Build Windows EXE with Nuitka
