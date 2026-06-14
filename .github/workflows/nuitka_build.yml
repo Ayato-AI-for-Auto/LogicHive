@@ -16,7 +16,6 @@ jobs:
     name: Build Windows EXE with Nuitka
     runs-on: windows-latest
     env:
-      NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
       NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
     steps:
       - name: Checkout code
@@ -37,7 +36,7 @@ jobs:
         shell: pwsh
         run: |
           $depWalkerPath = "$env:USERPROFILE\AppData\Local\Nuitka\Nuitka\Cache\depwalker"
-          if (-not (Test-Path $depWalkerPath)) {
+          if (-not (Test-Path "$depWalkerPath\depends.exe")) {
             Write-Host "Downloading Dependency Walker..."
             New-Item -ItemType Directory -Path $depWalkerPath -Force | Out-Null
             $dwUrl = "https://dependencywalker.com/depends22_x64.zip"
@@ -58,14 +57,10 @@ jobs:
 
       - name: Build LogicHive-Hub (Console)
         shell: pwsh
-        env:
-          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
-          NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
         run: |
           uv run python -m nuitka `
             --standalone `
             --onefile `
-            --windows-dependency-tool=pefile `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Hub-nuitka `
             --include-data-files=pyproject.toml=pyproject.toml `
@@ -79,15 +74,11 @@ jobs:
 
       - name: Build LogicHive-Settings (GUI)
         shell: pwsh
-        env:
-          NUITKA_DEPENDENCY_WALKER_AUTO_DOWNLOAD: "1"
-          NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
         run: |
           uv run python -m nuitka `
             --standalone `
             --onefile `
             --windows-disable-console `
-            --windows-dependency-tool=pefile `
             --output-dir=dist-nuitka `
             --output-filename=LogicHive-Settings-nuitka `
             --include-data-files=pyproject.toml=pyproject.toml `
