@@ -1,3 +1,10 @@
+# [0.22.0-dev.5](https://github.com/ayato-labs/LogicHive/compare/v0.22.0-dev.4...v0.22.0-dev.5) (2026-06-14)
+
+
+### Features
+
+* add GitHub Actions workflow to build Windows executables using Nuitka ([5e54cb2](https://github.com/ayato-labs/LogicHive/commit/5e54cb2a63546973859eb07d03d9a5f03da3140a))
+
 # [0.22.0-dev.4](https://github.com/ayato-labs/LogicHive/compare/v0.22.0-dev.3...v0.22.0-dev.4) (2026-06-14)
 
 
