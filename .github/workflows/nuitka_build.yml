@@ -71,6 +71,8 @@ jobs:
             --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
+            --include-package=fastmcp `
+            --include-distribution-metadata=fastmcp `
             --include-package-data=google.genai `
             --include-package=google.genai `
             --include-package-data=flet `
@@ -91,6 +93,8 @@ jobs:
             --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
+            --include-package=fastmcp `
+            --include-distribution-metadata=fastmcp `
             --include-package-data=google.genai `
             --include-package=google.genai `
             --include-package-data=flet `
