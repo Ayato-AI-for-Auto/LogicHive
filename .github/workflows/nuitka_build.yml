@@ -70,10 +70,11 @@ jobs:
             --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
-            --include-package-data=google-genai `
+            --include-package-data=google.genai `
             --include-package=google.genai `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
+            --nofollow-import-to=pytest `
             src/mcp_server.py
 
       - name: Build LogicHive-Settings (GUI)
@@ -88,10 +89,11 @@ jobs:
             --include-data-files=pyproject.toml=pyproject.toml `
             --include-data-dir=src=engine/src `
             --include-package-data=fastmcp `
-            --include-package-data=google-genai `
+            --include-package-data=google.genai `
             --include-package=google.genai `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
+            --nofollow-import-to=pytest `
             src/settings_ui.py
 
       - name: Upload Nuitka Artifacts
