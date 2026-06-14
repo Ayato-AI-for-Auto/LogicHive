@@ -79,6 +79,11 @@ jobs:
             --include-package-data=flet_desktop `
             --nofollow-import-to=pytest `
             src/mcp_server.py
+          
+          # Add -dev suffix for develop branch
+          if ("${{ github.ref_name }}" -eq "develop") {
+            Move-Item dist-nuitka/LogicHive-Hub-nuitka.exe dist-nuitka/LogicHive-Hub-dev-nuitka.exe
+          }
 
       - name: Build LogicHive-Settings (GUI)
         shell: pwsh
@@ -101,6 +106,11 @@ jobs:
             --include-package-data=flet_desktop `
             --nofollow-import-to=pytest `
             src/settings_ui.py
+          
+          # Add -dev suffix for develop branch
+          if ("${{ github.ref_name }}" -eq "develop") {
+            Move-Item dist-nuitka/LogicHive-Settings-nuitka.exe dist-nuitka/LogicHive-Settings-dev-nuitka.exe
+          }
 
       - name: Upload Nuitka Artifacts
         uses: actions/upload-artifact@v4
@@ -108,3 +118,40 @@ jobs:
           name: LogicHive-Nuitka-Builds
           path: dist-nuitka/*.exe
           if-no-files-found: error
+
+      - name: Upload Nuitka to GitHub Release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = ""
+          if ("${{ github.ref_type }}" -eq "tag") {
+             $tag = "${{ github.ref_name }}"
+          } elseif ("${{ github.ref_name }}" -eq "develop") {
+             $tag = "v-develop"
+          } elseif ("${{ github.ref_name }}" -eq "main") {
+             # Try to find the latest versioned tag if on main
+             $tag = gh release list --limit 1 --exclude-drafts --exclude-pre-releases | ForEach-Object { $_.Split("`t")[2] }
+          }
+
+          if ($tag -ne "" -and $tag -ne $null) {
+             Write-Host "Targeting Release: $tag"
+             
+             # Proactive cleanup for development release or specific tag
+             if ($tag -eq "v-develop" -or $tag.StartsWith("v")) {
+                Write-Host "Cleaning existing Nuitka assets for $tag..."
+                $assets = gh release view $tag --json assets --jq '.assets[].name' 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    foreach ($asset in $assets) {
+                        if ($asset -like "*-nuitka.exe") {
+                            Write-Host "Deleting old Nuitka asset: $asset"
+                            gh release delete-asset $tag $asset -y
+                        }
+                    }
+                }
+             }
+
+             gh release upload $tag dist-nuitka/*.exe --clobber
+          } else {
+             Write-Host "No suitable release tag found for upload."
+          }

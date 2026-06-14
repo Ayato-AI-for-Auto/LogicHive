@@ -44,6 +44,7 @@ common_hiddenimports = [
     'flet',
     'flet_desktop',
     'flet_runtime',
+    'flet_core',
     'flet.canvas',
     'flet.charts',
     'flet.svg'
