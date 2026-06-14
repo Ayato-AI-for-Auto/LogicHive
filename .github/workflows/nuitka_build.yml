@@ -80,6 +80,8 @@ jobs:
             --include-package=google.genai `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
+            --include-package=chromadb `
+            --include-package-data=chromadb `
             --nofollow-import-to=pytest `
             src/mcp_server.py
           
@@ -107,6 +109,8 @@ jobs:
             --include-package=google.genai `
             --include-package-data=flet `
             --include-package-data=flet_desktop `
+            --include-package=chromadb `
+            --include-package-data=chromadb `
             --nofollow-import-to=pytest `
             src/settings_ui.py
           

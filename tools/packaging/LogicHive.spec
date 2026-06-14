@@ -37,6 +37,8 @@ common_hiddenimports = [
     'aiosqlite',
     'numpy',
     'chromadb',
+    'chromadb.api.rust',
+    'chromadb.telemetry.product.posthog',
     'fastembed',
     'radon',
     'sqlite3',
