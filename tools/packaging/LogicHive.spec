@@ -37,6 +37,8 @@ common_hiddenimports = [
     'aiosqlite',
     'numpy',
     'chromadb',
+    'chromadb.api.rust',
+    'chromadb.telemetry.product.posthog',
     'fastembed',
     'radon',
     'sqlite3',
@@ -44,6 +46,7 @@ common_hiddenimports = [
     'flet',
     'flet_desktop',
     'flet_runtime',
+    'flet_core',
     'flet.canvas',
     'flet.charts',
     'flet.svg'

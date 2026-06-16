@@ -165,7 +165,14 @@ Add the following configuration block to your `%APPDATA%\Claude\claude_desktop_c
 
 ## 🛠️ Local Development (Manual Setup)
 
-If you prefer to run LogicHive without Docker:
+### Windows (Recommended)
+We provide automated scripts for a seamless setup:
+
+1.  **Run `setup.bat`**: Creates a virtual environment and installs all dependencies in editable mode.
+2.  **Run `launch.bat`**: Starts the LogicHive MCP server.
+
+### Manual Commands
+If you prefer manual control:
 
 ```powershell
 # 1. Install dependencies

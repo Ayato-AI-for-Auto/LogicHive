@@ -1,9 +1,16 @@
-# [0.22.0](https://github.com/ayato-labs/LogicHive/compare/v0.21.0...v0.22.0) (2026-06-13)
+# [0.22.0](https://github.com/ayato-labs/LogicHive/compare/v0.21.0...v0.22.0) (2026-06-17)
 
 
 ### Features
 
+* implement asynchronous orchestrator for function lifecycle management and add vector store integration ([ca42706](https://github.com/ayato-labs/LogicHive/commit/ca427062e411bd86181aca7c1ac30ee63a0b0630))
+* implement centralized structured logging system using loguru with JSON output and automatic rotation ([b9b8192](https://github.com/ayato-labs/LogicHive/commit/b9b8192845a09f9b33c6f535518c44cbb68279f8))
+* implement Nuitka build workflow and PyInstaller configuration for Windows distribution ([8a544ed](https://github.com/ayato-labs/LogicHive/commit/8a544ed156bd2e961b88742b4e847894ed1819a2))
 * implement EvaluationManager with dynamic plugin discovery and PyInstaller path support ([4290b5d](https://github.com/ayato-labs/LogicHive/commit/4290b5dfb1088a617d14aad31dbf4a480c31cbaf))
+* add GitHub Actions workflow to build and release Windows executables using Nuitka ([9b14cfd](https://github.com/ayato-labs/LogicHive/commit/9b14cfd5c5fee5c4972500dd0679ff4888a55b2b))
+* implement multi-engine distribution CI/CD pipeline with PyInstaller and Nuitka build support ([be9a480](https://github.com/ayato-labs/LogicHive/commit/be9a480b9b9c65a57350fc28d0c650a9e1384392))
+* add GitHub Actions workflow to build Windows executables using Nuitka ([0fed1d6](https://github.com/ayato-labs/LogicHive/commit/0fed1d6387b51f5ddd004e58949b20c51abd6549))
+* add Windows setup and launch batch scripts ([3d35251](https://github.com/ayato-labs/LogicHive/commit/3d352518040eb362937a6f9740deb38652f2f327))
 
 # [0.22.0-dev.1](https://github.com/ayato-labs/LogicHive/compare/v0.21.0...v0.22.0-dev.1) (2026-06-13)
 

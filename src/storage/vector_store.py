@@ -7,7 +7,15 @@ import asyncio
 import json
 from typing import Any
 
-import chromadb
+# Try to import chromadb, handle missing Rust bindings or missing package gracefully
+try:
+    import chromadb
+    CHROMADB_AVAILABLE = True
+    CHROMADB_ERROR = None
+except Exception as e:
+    chromadb = None
+    CHROMADB_AVAILABLE = False
+    CHROMADB_ERROR = e
 
 from core.config import (
     CHROMA_DB_DIR,
@@ -54,6 +62,8 @@ class VectorIndexManager:
                 return
 
             try:
+                if not CHROMADB_AVAILABLE:
+                    raise ImportError(f"ChromaDB is not available: {CHROMADB_ERROR}")
                 CHROMA_DB_DIR.mkdir(parents=True, exist_ok=True)
                 # SQLite へのコネクション確立前に ChromaDB が立ち上がるようにする
                 self.client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
@@ -226,6 +236,9 @@ class VectorIndexManager:
     async def check_health(self) -> dict[str, Any]:
         """コンポーネントの状態を確認します。"""
         try:
+            if not CHROMADB_AVAILABLE:
+                return {"status": "Warning", "message": f"ChromaDB not available: {CHROMADB_ERROR}"}
+
             if not self._initialized:
                 return {"status": "Warning", "message": "Vector store not initialized."}
 

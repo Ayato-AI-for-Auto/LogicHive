@@ -12,6 +12,9 @@ current_run_id: ContextVar[str] = ContextVar("run_id", default="system")
 
 class InterceptHandler(logging.Handler):
     def emit(self, record):
+        # Prevent re-entrant logging from standard library logging internals
+        if record.name == "logging" or record.name.startswith("logging."):
+            return
         try:
             level = logger.level(record.levelname).name
         except ValueError:

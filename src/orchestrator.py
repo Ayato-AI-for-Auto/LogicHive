@@ -23,7 +23,6 @@ from core.hash_utils import calculate_code_hash
 from core.logging_config import get_logger
 from core.tracer import trace_execution
 from storage.sqlite_api import sqlite_storage
-from storage.vector_store import vector_manager
 
 logger = get_logger(__name__)
 
@@ -199,6 +198,7 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
             return False
 
         # 2. Vector index deletion (background)
+        from storage.vector_store import vector_manager
         asyncio.create_task(vector_manager.remove_vector(name, project=project))
 
         logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful.")
@@ -276,6 +276,7 @@ async def _run_async_verification_pipeline(
             await sqlite_storage.update_function_embedding(name, project, embedding)
 
             # Sync to Vector Store
+            from storage.vector_store import vector_manager
             await vector_manager.upsert_vector(
                 name,
                 embedding,

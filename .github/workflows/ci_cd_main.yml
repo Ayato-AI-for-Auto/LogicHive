@@ -137,6 +137,9 @@ jobs:
             }
             if (Test-Path "dist/LogicHive-Hub.exe") {
                 Move-Item dist/LogicHive-Hub.exe dist/LogicHive-Hub-dev.exe
+            } else {
+                Write-Error "Expected file dist/LogicHive-Hub.exe not found after build"
+                exit 1
             }
           }
 
@@ -160,9 +163,24 @@ jobs:
              $settings_file = if (Test-Path "dist/LogicHive-Settings-dev.exe") { "dist/LogicHive-Settings-dev.exe" } else { "dist/LogicHive-Settings.exe" }
              $hub_file = if (Test-Path "dist/LogicHive-Hub-dev.exe") { "dist/LogicHive-Hub-dev.exe" } else { "dist/LogicHive-Hub.exe" }
              
+             if (-not (Test-Path $settings_file)) { Write-Error "Settings binary not found: $settings_file"; exit 1 }
+             if (-not (Test-Path $hub_file)) { Write-Error "Hub binary not found: $hub_file"; exit 1 }
+
              Write-Host "Targeting Release: $tag"
              Write-Host "Uploading Assets: $settings_file, $hub_file"
              
+             # For development releases, delete existing assets first to ensure a clean upload
+             if ($tag -eq "v-develop") {
+                Write-Host "Cleaning existing assets for $tag..."
+                $assets = gh release view $tag --json assets --jq '.assets[].name'
+                foreach ($asset in $assets) {
+                    if ($asset -eq (Split-Path $settings_file -Leaf) -or $asset -eq (Split-Path $hub_file -Leaf)) {
+                        Write-Host "Deleting old asset: $asset"
+                        gh release delete-asset $tag $asset -y
+                    }
+                }
+             }
+
              gh release upload $tag $settings_file $hub_file --clobber
           } else {
              Write-Error "No target tag identified for release upload."

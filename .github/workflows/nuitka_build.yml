@@ -1,0 +1,164 @@
+name: Nuitka Build (Beta)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_nuitka:
+    name: Build Windows EXE with Nuitka
+    runs-on: windows-latest
+    env:
+      NUITKA_ASSUME_YES_FOR_DOWNLOADS: "yes"
+      NUITKA_ASSUME_YES: "1"
+      NUITKA_CACHE_DIR: ${{ github.workspace }}/.nuitka-cache
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pipx install uv
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+          uv pip install nuitka zstandard ordered-set pefile
+          # Print installed packages to help debug package location warnings
+          uv pip list
+
+      - name: Download Dependency Walker
+        shell: pwsh
+        run: |
+          $depWalkerPath = "$env:NUITKA_CACHE_DIR/depwalker"
+          if (-not (Test-Path "$depWalkerPath/depends.exe")) {
+            Write-Host "Downloading Dependency Walker..."
+            New-Item -ItemType Directory -Path $depWalkerPath -Force | Out-Null
+            $dwUrl = "https://dependencywalker.com/depends22_x64.zip"
+            $zipPath = "$depWalkerPath/depends.zip"
+            Invoke-WebRequest -Uri $dwUrl -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $depWalkerPath -Force
+            Remove-Item $zipPath
+          }
+
+      - name: Nuitka Cache
+        uses: actions/cache@v4
+        with:
+          path: .nuitka-cache
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('**/uv.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-${{ hashFiles('**/uv.lock') }}-
+            ${{ runner.os }}-nuitka-
+
+      - name: Build LogicHive-Hub (Console)
+        shell: pwsh
+        run: |
+          uv run python -m nuitka `
+            --assume-yes-for-downloads `
+            --standalone `
+            --onefile `
+            --output-dir=dist-nuitka `
+            --output-filename=LogicHive-Hub-nuitka `
+            --include-data-files=pyproject.toml=pyproject.toml `
+            --include-data-dir=src=engine/src `
+            --include-package-data=fastmcp `
+            --include-package=fastmcp `
+            --include-distribution-metadata=fastmcp `
+            --include-package-data=google.genai `
+            --include-package=google.genai `
+            --include-package-data=flet `
+            --include-package-data=flet_desktop `
+            --include-package=chromadb `
+            --include-package-data=chromadb `
+            --nofollow-import-to=pytest `
+            src/mcp_server.py
+          
+          # Add -dev suffix for develop branch
+          if ("${{ github.ref_name }}" -eq "develop") {
+            Move-Item dist-nuitka/LogicHive-Hub-nuitka.exe dist-nuitka/LogicHive-Hub-dev-nuitka.exe
+          }
+
+      - name: Build LogicHive-Settings (GUI)
+        shell: pwsh
+        run: |
+          uv run python -m nuitka `
+            --assume-yes-for-downloads `
+            --standalone `
+            --onefile `
+            --windows-disable-console `
+            --output-dir=dist-nuitka `
+            --output-filename=LogicHive-Settings-nuitka `
+            --include-data-files=pyproject.toml=pyproject.toml `
+            --include-data-dir=src=engine/src `
+            --include-package-data=fastmcp `
+            --include-package=fastmcp `
+            --include-distribution-metadata=fastmcp `
+            --include-package-data=google.genai `
+            --include-package=google.genai `
+            --include-package-data=flet `
+            --include-package-data=flet_desktop `
+            --include-package=chromadb `
+            --include-package-data=chromadb `
+            --nofollow-import-to=pytest `
+            src/settings_ui.py
+          
+          # Add -dev suffix for develop branch
+          if ("${{ github.ref_name }}" -eq "develop") {
+            Move-Item dist-nuitka/LogicHive-Settings-nuitka.exe dist-nuitka/LogicHive-Settings-dev-nuitka.exe
+          }
+
+      - name: Upload Nuitka Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicHive-Nuitka-Builds
+          path: dist-nuitka/*.exe
+          if-no-files-found: error
+
+      - name: Upload Nuitka to GitHub Release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = ""
+          if ("${{ github.ref_type }}" -eq "tag") {
+             $tag = "${{ github.ref_name }}"
+          } elseif ("${{ github.ref_name }}" -eq "develop") {
+             $tag = "v-develop"
+          } elseif ("${{ github.ref_name }}" -eq "main") {
+             # Try to find the latest versioned tag if on main
+             $tag = gh release list --limit 1 --exclude-drafts --exclude-pre-releases | ForEach-Object { $_.Split("`t")[2] }
+          }
+
+          if ($tag -ne "" -and $tag -ne $null) {
+             Write-Host "Targeting Release: $tag"
+             
+             # Proactive cleanup for development release or specific tag
+             if ($tag -eq "v-develop" -or $tag.StartsWith("v")) {
+                Write-Host "Cleaning existing Nuitka assets for $tag..."
+                $assets = gh release view $tag --json assets --jq '.assets[].name' 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    foreach ($asset in $assets) {
+                        if ($asset -like "*-nuitka.exe") {
+                            Write-Host "Deleting old Nuitka asset: $asset"
+                            gh release delete-asset $tag $asset -y
+                        }
+                    }
+                }
+             }
+
+             gh release upload $tag dist-nuitka/*.exe --clobber
+          } else {
+             Write-Host "No suitable release tag found for upload."
+          }
