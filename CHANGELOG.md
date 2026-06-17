@@ -1,3 +1,10 @@
+# [0.24.0](https://github.com/ayato-labs/LogicHive/compare/v0.23.0...v0.24.0) (2026-06-17)
+
+
+### Features
+
+* add PyInstaller spec file for LogicHive hub and settings binaries ([5a239a1](https://github.com/ayato-labs/LogicHive/commit/5a239a1ca4834859937b8595bbf13d050538773b))
+
 # [0.23.0](https://github.com/ayato-labs/LogicHive/compare/v0.22.0...v0.23.0) (2026-06-16)
 
 
