@@ -20,10 +20,13 @@ class InterceptHandler(logging.Handler):
         except ValueError:
             level = record.levelno
         frame, depth = logging.currentframe(), 2
-        while frame.f_code.co_filename == logging.__file__:
+        while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        if not frame:
+            logger.opt(exception=record.exc_info).log(level, record.getMessage())
+        else:
+            logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def json_serializer(record):
@@ -136,7 +139,7 @@ def setup_logging():
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
     # --- NOISE REDUCTION ---
-    for lib in ["faiss", "swig", "httpx", "uvicorn"]:
+    for lib in ["faiss", "swig", "httpx", "uvicorn", "httpcore", "urllib3"]:
         logging.getLogger(lib).setLevel(logging.WARNING)
 
 

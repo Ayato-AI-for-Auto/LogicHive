@@ -23,3 +23,12 @@ def test_logging_isolation_by_process():
     log = get_logger("test_proc")
     log.info("Test message")
     assert True # If no exception, it's initialized
+
+
+def test_logging_noise_reduction():
+    """UNIT: Verify that noise reduction applies to httpcore and urllib3 loggers."""
+    import logging
+    setup_logging()
+    for lib in ["faiss", "swig", "httpx", "uvicorn", "httpcore", "urllib3"]:
+        assert logging.getLogger(lib).level == logging.WARNING
+
