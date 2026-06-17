@@ -38,6 +38,7 @@ common_hiddenimports = [
     'numpy',
     'chromadb',
     'chromadb.api.rust',
+    'chromadb_rust_bindings',
     'chromadb.telemetry.product.posthog',
     'fastembed',
     'radon',
