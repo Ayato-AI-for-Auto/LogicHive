@@ -1,3 +1,10 @@
+# [0.25.0](https://github.com/ayato-labs/LogicHive/compare/v0.24.0...v0.25.0) (2026-06-17)
+
+
+### Features
+
+* add PyInstaller spec for dual-binary packaging and diagnostic script for ChromaDB telemetry ([69f076b](https://github.com/ayato-labs/LogicHive/commit/69f076bddb574bc1e752f5a4c36bfe31dc785ca2))
+
 # [0.24.0](https://github.com/ayato-labs/LogicHive/compare/v0.23.0...v0.24.0) (2026-06-17)
 
 
