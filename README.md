@@ -168,8 +168,9 @@ Add the following configuration block to your `%APPDATA%\Claude\claude_desktop_c
 ### Windows (Recommended)
 We provide automated scripts for a seamless setup:
 
-1.  **Run `setup.bat`**: Creates a virtual environment and installs all dependencies in editable mode.
-2.  **Run `launch.bat`**: Starts the LogicHive MCP server.
+1.  **Run `dev_setup.bat`**: Creates a virtual environment and installs all dependencies in editable mode using `uv`.
+2.  **Run `configure_logichive.bat`**: Opens the Settings UI to configure your LLM and Embedding providers.
+3.  **Run `start_mcp_server.bat`**: Starts the LogicHive MCP server.
 
 ### Manual Commands
 If you prefer manual control:
