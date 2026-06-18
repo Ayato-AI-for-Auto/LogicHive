@@ -1,3 +1,10 @@
+# [0.26.0](https://github.com/ayato-labs/LogicHive/compare/v0.25.0...v0.26.0) (2026-06-18)
+
+
+### Features
+
+* add developer-focused batch files for setup, config, and execution ([fafdd06](https://github.com/ayato-labs/LogicHive/commit/fafdd0633cf00caae0397115e68a5af5e190be42))
+
 # [0.25.0](https://github.com/ayato-labs/LogicHive/compare/v0.24.0...v0.25.0) (2026-06-17)
 
 
