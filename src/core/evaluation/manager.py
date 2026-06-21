@@ -35,6 +35,7 @@ class EvaluationManager:
         """
         Dynamically discovers and instantiates all BaseEvaluator subclasses.
         """
+        logger.debug("EvaluationManager: _load_plugins called")
         try:
             modules = self._discover_modules()
             self._instantiate_evaluators(modules)
@@ -45,16 +46,32 @@ class EvaluationManager:
         """Discovers modules via package and filesystem."""
         # --- PyInstaller Path Fix ---
         if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            # Bundled app: path relative to _MEIPASS
-            base_dir = Path(getattr(sys, "_MEIPASS"))
-            # Find core/evaluation/plugins in the bundle
-            plugins_dir = base_dir / "core" / "evaluation" / "plugins"
-            if not plugins_dir.exists():
-                # Try src/core/... if the bundle structure is different
-                plugins_dir = base_dir / "src" / "core" / "evaluation" / "plugins"
-            if not plugins_dir.exists():
-                # LogicHive.spec copies 'src' to 'engine/src'
-                plugins_dir = base_dir / "engine" / "src" / "core" / "evaluation" / "plugins"
+            # Bundled app: find the plugins directory recursively in _MEIPASS
+            import os
+            plugins_dir = None
+            for root, dirs, files in os.walk(getattr(sys, "_MEIPASS")):
+                if "plugins" in dirs:
+                    plugins_dir = Path(os.path.join(root, "plugins"))
+                    logger.debug(f"EvaluationManager: Found plugins dir at: {plugins_dir}")
+                    break
+            
+            # If not found via search, fallback to historical locations
+            if not plugins_dir:
+                base_dir = Path(getattr(sys, "_MEIPASS"))
+                # Potential locations
+                potential_dirs = [
+                    base_dir / "core" / "evaluation" / "plugins",
+                    base_dir / "src" / "core" / "evaluation" / "plugins",
+                    base_dir / "engine" / "src" / "core" / "evaluation" / "plugins"
+                ]
+                for p in potential_dirs:
+                    if p.exists():
+                        plugins_dir = p
+                        break
+                else:
+                    # Final resort: use the first one
+                    plugins_dir = potential_dirs[0]
+
         else:
             # Source mode: standard relative path
             plugins_dir = Path(os.path.dirname(__file__)) / "plugins"
