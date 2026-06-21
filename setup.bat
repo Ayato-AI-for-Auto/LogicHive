@@ -1,8 +1,11 @@
 @echo off
 setlocal
+pushd "%~dp0"
+
 echo ==========================================
 echo LogicHive: 開発用仮想環境構築 (uv)
 echo ==========================================
+echo.
 
 :: uvの確認
 where uv >nul 2>nul
@@ -25,11 +28,17 @@ if not exist .venv (
 echo [2/4] 依存関係を編集可能モード (-e .) でインストール中...
 uv pip install -e .
 
+if %errorlevel% neq 0 (
+    echo [ERROR] 依存関係のインストールに失敗しました。
+    pause
+    exit /b 1
+)
+
 :: .env ファイルの設定
 echo [3/4] .env ファイルを確認中...
 if not exist .env (
     if exist .env.example (
-        copy .env.example .env
+        copy .env.example .env >nul
         echo [i] .env.example から .env を作成しました。内容を確認してください。
     ) else (
         echo [!] .env.example が見つかりません。手動で .env を作成してください。
@@ -46,5 +55,6 @@ if not exist storage (
 
 echo.
 echo ✅ 構築が完了しました！
-echo configure_logichive.bat で設定を行い、start_mcp_server.bat でサーバーを起動できます。
+echo configure.bat で設定を行い、start_mcp.bat でサーバーを起動できます。
+popd
 pause
