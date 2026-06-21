@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: logichive-hub
-Version: 0.5.2
+Version: 0.26.0
 Summary: LogicHive: Private Hub Backend
 Requires-Python: >=3.10
 License-File: LICENSE
@@ -17,7 +17,8 @@ Requires-Dist: pytest-asyncio
 Requires-Dist: pytest-mock
 Requires-Dist: python-dateutil
 Requires-Dist: fastmcp
-Requires-Dist: faiss-cpu
+Requires-Dist: chromadb
+Requires-Dist: fastembed
 Requires-Dist: radon
 Requires-Dist: ruff
 Requires-Dist: mypy
@@ -26,4 +27,9 @@ Requires-Dist: streamlit
 Requires-Dist: pandas
 Requires-Dist: pyinstaller
 Requires-Dist: psutil
+Requires-Dist: flet
+Requires-Dist: flet-desktop
+Requires-Dist: aiohttp>=3.13.5
+Requires-Dist: pydantic>=2.12.5
+Requires-Dist: loguru>=0.7.3
 Dynamic: license-file

@@ -3,26 +3,34 @@ setlocal
 pushd "%~dp0"
 
 echo ==========================================
-echo LogicHive: 設定ツール (Settings UI)
+echo LogicHive: Settings Configuration
 echo ==========================================
 echo.
 
-:: 仮想環境の確認
-if not exist .venv (
-    echo [!] 仮想環境が見つかりません。先に setup.bat を実行してください。
-    pause
-    exit /b 1
-)
+:: Check for .venv
+if not exist .venv goto no_venv
 
-:: 設定UIの起動
+:: Set PYTHONPATH to support both root and src-based imports
+set PYTHONPATH=.;src
+
+:: Run settings UI
 uv run python src/settings_ui.py
+if %errorlevel% neq 0 goto err_run
 
-if %errorlevel% neq 0 (
-    echo.
-    echo [ERROR] 設定ツールがエラーコード %errorlevel% で終了しました。
-    pause
-    exit /b 1
-)
+goto end
 
+:no_venv
+echo [ERROR] Virtual environment (.venv) not found.
+echo Please run setup.bat first to initialize the environment.
+pause
+exit /b 1
+
+:err_run
+echo.
+echo [ERROR] Settings UI exited with error code %errorlevel%.
+pause
+exit /b 1
+
+:end
 popd
 pause
