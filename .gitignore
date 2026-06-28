@@ -19,6 +19,7 @@ __pycache__/
 *.db-shm
 *.db-wal
 *.db.bak
+logichive.db.bak
 logichive.db
 faiss_index.bin
 faiss_mapping.json
