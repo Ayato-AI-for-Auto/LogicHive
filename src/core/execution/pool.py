@@ -43,6 +43,9 @@ class PoolManager:
         self.has_gpu = self._detect_gpu()
         self._worker_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
+        self._in_progress_replenishments: dict[str, int] = {
+            spec: 0 for spec in DEFAULT_POOL_SPECS
+        }
 
     @classmethod
     def get_instance(cls) -> "PoolManager":
@@ -78,6 +81,15 @@ class PoolManager:
             Uses a 'rename-then-delete' strategy to make startup near-instant.
             """
             try:
+                # Clean up any leftover orphaned cleanup directories from previous runs first
+                if self.base_dir.parent.exists():
+                    for item in self.base_dir.parent.iterdir():
+                        if item.is_dir() and item.name.startswith("pools_cleanup_"):
+                            try:
+                                shutil.rmtree(item, ignore_errors=True)
+                            except Exception as ce:
+                                logger.debug(f"PoolManager: Failed to delete leftover cleanup dir {item.name}: {ce}")
+
                 if self.base_dir.exists():
                     # Move old pools to a temporary location for background deletion
                     cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
@@ -164,15 +176,41 @@ class PoolManager:
 
         # Environments are single-use to ensure isolation
         def cleanup():
+            import time
+            for delay in [0.1, 0.5, 1.0, 2.0]:
+                try:
+                    if env.path.exists():
+                        shutil.rmtree(env.path)
+                    return
+                except Exception as e:
+                    logger.debug(f"PoolManager: Cleanup retry failed (delay={delay}s): {e}")
+                    time.sleep(delay)
+            # If still fails, try renaming to parent directory for background cleanup
             try:
                 if env.path.exists():
-                    shutil.rmtree(env.path)
+                    cleanup_path = env.path.parent.parent / f"pools_cleanup_fail_{uuid.uuid4().hex[:8]}"
+                    env.path.rename(cleanup_path)
+                    logger.debug(f"PoolManager: Moved locked env {env.path.name} to {cleanup_path.name} for background cleanup")
+                    return
             except Exception as e:
-                logger.debug(f"PoolManager: Failed to delete released env {env.path}: {e}")
+                logger.debug(f"PoolManager: Rename fallback failed: {e}")
+            raise RuntimeError("Cleanup and rename failed")
 
-        # Run cleanup in thread to avoid blocking loop
-        await asyncio.to_thread(cleanup)
-        logger.debug(f"PoolManager: Released and deleted {env.path.name}")
+        async def retry_cleanup_task():
+            await asyncio.sleep(5.0)
+            try:
+                await asyncio.to_thread(cleanup)
+                logger.info(f"PoolManager: Delayed cleanup of {env.path.name} succeeded")
+            except Exception as e:
+                logger.warning(f"PoolManager: Delayed cleanup of {env.path.name} failed: {e}")
+
+        try:
+            # Run cleanup in thread to avoid blocking loop
+            await asyncio.to_thread(cleanup)
+            logger.debug(f"PoolManager: Released and deleted {env.path.name}")
+        except Exception:
+            logger.debug(f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry...")
+            asyncio.create_task(retry_cleanup_task())
 
     async def _background_worker(self):
         """Keeps pools filled up to POOL_MAX_SIZE."""
@@ -185,6 +223,16 @@ class PoolManager:
             try:
                 if ENABLE_ENV_POOLING:
                     self._check_and_replenish_pools()
+                    # Periodically clean up any orphaned cleanup directories
+                    def cleanup_orphaned():
+                        if self.base_dir.parent.exists():
+                            for item in self.base_dir.parent.iterdir():
+                                if item.is_dir() and item.name.startswith("pools_cleanup_"):
+                                    try:
+                                        shutil.rmtree(item, ignore_errors=True)
+                                    except Exception:
+                                        pass
+                    await asyncio.to_thread(cleanup_orphaned)
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
                 logger.info("PoolManager: Background worker cancelled.")
@@ -200,81 +248,90 @@ class PoolManager:
             if spec_name == "torch-gpu" and not ENABLE_GPU:
                 continue
             for _ in range(POOL_MAX_SIZE):
+                self._in_progress_replenishments[spec_name] = self._in_progress_replenishments.get(spec_name, 0) + 1
                 asyncio.create_task(self._prepare_env(spec_name))
 
     def _check_and_replenish_pools(self):
         from core.config import ENABLE_GPU
 
         for spec_name, queue in self.pools.items():
-            if queue.qsize() < POOL_MAX_SIZE:
+            current_size = queue.qsize()
+            in_progress = self._in_progress_replenishments.get(spec_name, 0)
+            needed = POOL_MAX_SIZE - (current_size + in_progress)
+            if needed > 0:
                 if spec_name == "torch-gpu" and not ENABLE_GPU:
                     continue
-                logger.debug(f"PoolManager: Replenishing {spec_name} (size: {queue.qsize()})")
-                asyncio.create_task(self._prepare_env(spec_name))
+                logger.debug(f"PoolManager: Replenishing {spec_name} (size: {current_size}, in_progress: {in_progress}, needed: {needed})")
+                for _ in range(needed):
+                    self._in_progress_replenishments[spec_name] = self._in_progress_replenishments.get(spec_name, 0) + 1
+                    asyncio.create_task(self._prepare_env(spec_name))
 
     async def _prepare_env(self, spec_name: str):
         """Creates a new venv and installs dependencies using uv."""
-        async with self._uv_semaphore:
-            env_id = str(uuid.uuid4())[:8]
-            env_path = self.base_dir / f"{spec_name}_{env_id}"
+        try:
+            async with self._uv_semaphore:
+                env_id = str(uuid.uuid4())[:8]
+                env_path = self.base_dir / f"{spec_name}_{env_id}"
 
-            # Path to uv.exe (absolute path for reliability on Windows)
-            uv_path = r"C:\Users\saiha\.local\bin\uv.exe"
-            if not os.path.exists(uv_path):
-                uv_path = "uv"  # fallback
+                # Path to uv.exe (absolute path for reliability on Windows)
+                uv_path = r"C:\Users\saiha\.local\bin\uv.exe"
+                if not os.path.exists(uv_path):
+                    uv_path = "uv"  # fallback
 
-            # Determine python executable path (Windows specific)
-            python_exe = (
-                env_path / "Scripts" / "python.exe"
-                if os.name == "nt"
-                else env_path / "bin" / "python"
-            )
-
-            logger.info(f"PoolManager: Preparing {spec_name} ({env_id}) using {uv_path}...")
-
-            def run_cmd(cmd):
-                # We explicitly use utf-8 encoding to avoid cp932 errors on Japanese Windows
-                # when uv/pip output contains special characters or emojis.
-                return subprocess.run(
-                    cmd, capture_output=True, text=True, shell=True, encoding="utf-8"
+                # Determine python executable path (Windows specific)
+                python_exe = (
+                    env_path / "Scripts" / "python.exe"
+                    if os.name == "nt"
+                    else env_path / "bin" / "python"
                 )
 
-            try:
-                # 1. Create venv (Lightweight via system-site-packages)
-                vcmd = f'"{uv_path}" venv --system-site-packages "{env_path}"'
-                res = await asyncio.to_thread(run_cmd, vcmd)
+                logger.info(f"PoolManager: Preparing {spec_name} ({env_id}) using {uv_path}...")
 
-                if res.returncode != 0:
-                    logger.error(f"PoolManager: uv venv failed: {res.stderr}")
-                    raise RuntimeError(f"uv venv failed for {spec_name}")
-
-                # 2. Install packages
-                packages = DEFAULT_POOL_SPECS.get(spec_name, [])
-                if packages:
-                    pkg_str = " ".join(packages)
-                    python_exe_str = str(python_exe)
-                    # Optimization: Use --link-mode=hardlink to save disk space
-                    # by sharing blocks with global cache
-                    icmd = (
-                        f'"{uv_path}" pip install --link-mode=hardlink '
-                        f'--python "{python_exe_str}" {pkg_str}'
+                def run_cmd(cmd):
+                    # We explicitly use utf-8 encoding to avoid cp932 errors on Japanese Windows
+                    # when uv/pip output contains special characters or emojis.
+                    return subprocess.run(
+                        cmd, capture_output=True, text=True, shell=True, encoding="utf-8"
                     )
 
-                    res = await asyncio.to_thread(run_cmd, icmd)
+                try:
+                    # 1. Create venv (Lightweight via system-site-packages)
+                    vcmd = f'"{uv_path}" venv --system-site-packages "{env_path}"'
+                    res = await asyncio.to_thread(run_cmd, vcmd)
 
                     if res.returncode != 0:
-                        logger.error(f"PoolManager: uv pip install failed: {res.stderr}")
-                        raise RuntimeError(f"uv pip install failed for {spec_name}")
+                        logger.error(f"PoolManager: uv venv failed: {res.stderr}")
+                        raise RuntimeError(f"uv venv failed for {spec_name}")
 
-                # 3. Add to pool
-                new_env = PreWarmedEnv(spec_name, env_path, python_exe)
-                await self.pools[spec_name].put(new_env)
-                logger.info(f"PoolManager: {spec_name} ({env_id}) is READY.")
+                    # 2. Install packages
+                    packages = DEFAULT_POOL_SPECS.get(spec_name, [])
+                    if packages:
+                        pkg_str = " ".join(packages)
+                        python_exe_str = str(python_exe)
+                        # Optimization: Use --link-mode=hardlink to save disk space
+                        # by sharing blocks with global cache
+                        icmd = (
+                            f'"{uv_path}" pip install --link-mode=hardlink '
+                            f'--python "{python_exe_str}" {pkg_str}'
+                        )
 
-            except Exception as e:
-                logger.error(f"PoolManager: Failed to prepare {spec_name}: {e}", exc_info=True)
-                if env_path.exists():
-                    shutil.rmtree(env_path, ignore_errors=True)
+                        res = await asyncio.to_thread(run_cmd, icmd)
+
+                        if res.returncode != 0:
+                            logger.error(f"PoolManager: uv pip install failed: {res.stderr}")
+                            raise RuntimeError(f"uv pip install failed for {spec_name}")
+
+                    # 3. Add to pool
+                    new_env = PreWarmedEnv(spec_name, env_path, python_exe)
+                    await self.pools[spec_name].put(new_env)
+                    logger.info(f"PoolManager: {spec_name} ({env_id}) is READY.")
+
+                except Exception as e:
+                    logger.error(f"PoolManager: Failed to prepare {spec_name}: {e}", exc_info=True)
+                    if env_path.exists():
+                        shutil.rmtree(env_path, ignore_errors=True)
+        finally:
+            self._in_progress_replenishments[spec_name] = max(0, self._in_progress_replenishments.get(spec_name, 0) - 1)
 
     async def check_health(self) -> dict[str, Any]:
         """Checks if the pooling system is active and pools have environments."""

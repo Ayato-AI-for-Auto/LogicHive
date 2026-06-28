@@ -47,7 +47,6 @@ class EvaluationManager:
         # --- PyInstaller Path Fix ---
         if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
             # Bundled app: find the plugins directory recursively in _MEIPASS
-            import os
             plugins_dir = None
             for root, dirs, files in os.walk(getattr(sys, "_MEIPASS")):
                 if "plugins" in dirs:
