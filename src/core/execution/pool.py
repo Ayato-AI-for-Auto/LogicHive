@@ -39,7 +39,7 @@ class PoolManager:
         self.pools: dict[str, asyncio.Queue[PreWarmedEnv]] = {
             spec: asyncio.Queue() for spec in DEFAULT_POOL_SPECS
         }
-        self.active_envs: dict[str, PreWarmedEnv] = {}
+        self.managed_envs: set[Path] = set()
         self.has_gpu = self._detect_gpu()
         self._worker_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
@@ -81,7 +81,7 @@ class PoolManager:
             Uses a 'rename-then-delete' strategy to make startup near-instant.
             """
             try:
-                # Clean up any leftover orphaned cleanup directories from previous runs first
+                # 1. Clean up any leftover orphaned cleanup directories from previous runs
                 if self.base_dir.parent.exists():
                     for item in self.base_dir.parent.iterdir():
                         if item.is_dir() and item.name.startswith("pools_cleanup_"):
@@ -90,33 +90,16 @@ class PoolManager:
                             except Exception as ce:
                                 logger.debug(f"PoolManager: Failed to delete leftover cleanup dir {item.name}: {ce}")
 
+                # 2. Clean up everything inside base_dir during startup (since pools are empty)
                 if self.base_dir.exists():
-                    # Move old pools to a temporary location for background deletion
-                    cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
-                    try:
-                        self.base_dir.rename(cleanup_path)
-                        logger.info(
-                            "PoolManager: Old pools moved to "
-                            f"{cleanup_path.name} for background cleanup."
-                        )
-                        # Now delete the renamed folder
-                        shutil.rmtree(cleanup_path, ignore_errors=True)
-                        logger.info(
-                            f"PoolManager: Background cleanup of {cleanup_path.name} complete."
-                        )
-                    except OSError as e:
-                        # Fallback if rename fails (e.g. files in use)
-                        logger.warning(
-                            f"PoolManager: Rename failed ({e}), performing standard cleanup."
-                        )
-                        for item in self.base_dir.iterdir():
-                            if item.is_dir():
-                                try:
-                                    shutil.rmtree(item)
-                                except Exception as re:
-                                    logger.debug(
-                                        f"PoolManager: Partial cleanup failed for {item}: {re}"
-                                    )
+                    for item in self.base_dir.iterdir():
+                        if item.is_dir():
+                            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                            try:
+                                item.rename(cleanup_path)
+                                shutil.rmtree(cleanup_path, ignore_errors=True)
+                            except Exception as e:
+                                logger.debug(f"PoolManager: Failed to cleanup leftover pool dir {item.name}: {e}")
 
                 self.base_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
@@ -176,30 +159,28 @@ class PoolManager:
 
         # Environments are single-use to ensure isolation
         def cleanup():
-            import time
-            for delay in [0.1, 0.5, 1.0, 2.0]:
-                try:
-                    if env.path.exists():
-                        shutil.rmtree(env.path)
-                    return
-                except Exception as e:
-                    logger.debug(f"PoolManager: Cleanup retry failed (delay={delay}s): {e}")
-                    time.sleep(delay)
-            # If still fails, try renaming to parent directory for background cleanup
+            if not env.path.exists():
+                return
+            
+            # Attempt rename-then-delete
+            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
             try:
-                if env.path.exists():
-                    cleanup_path = env.path.parent.parent / f"pools_cleanup_fail_{uuid.uuid4().hex[:8]}"
-                    env.path.rename(cleanup_path)
-                    logger.debug(f"PoolManager: Moved locked env {env.path.name} to {cleanup_path.name} for background cleanup")
-                    return
+                env.path.rename(cleanup_path)
+                shutil.rmtree(cleanup_path, ignore_errors=True)
+                return
             except Exception as e:
-                logger.debug(f"PoolManager: Rename fallback failed: {e}")
-            raise RuntimeError("Cleanup and rename failed")
+                logger.debug(f"PoolManager: Cleanup via rename failed: {e}")
+                # Fallback to direct delete
+                try:
+                    shutil.rmtree(env.path, ignore_errors=True)
+                except Exception as e2:
+                    logger.warning(f"PoolManager: Direct cleanup failed: {e2}")
 
         async def retry_cleanup_task():
             await asyncio.sleep(5.0)
             try:
                 await asyncio.to_thread(cleanup)
+                self.managed_envs.discard(env.path)
                 logger.info(f"PoolManager: Delayed cleanup of {env.path.name} succeeded")
             except Exception as e:
                 logger.warning(f"PoolManager: Delayed cleanup of {env.path.name} failed: {e}")
@@ -207,6 +188,7 @@ class PoolManager:
         try:
             # Run cleanup in thread to avoid blocking loop
             await asyncio.to_thread(cleanup)
+            self.managed_envs.discard(env.path)
             logger.debug(f"PoolManager: Released and deleted {env.path.name}")
         except Exception:
             logger.debug(f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry...")
@@ -225,6 +207,7 @@ class PoolManager:
                     self._check_and_replenish_pools()
                     # Periodically clean up any orphaned cleanup directories
                     def cleanup_orphaned():
+                        # 1. Clean old cleanup dirs
                         if self.base_dir.parent.exists():
                             for item in self.base_dir.parent.iterdir():
                                 if item.is_dir() and item.name.startswith("pools_cleanup_"):
@@ -232,6 +215,17 @@ class PoolManager:
                                         shutil.rmtree(item, ignore_errors=True)
                                     except Exception:
                                         pass
+                        # 2. Sweep active pools directory for orphaned folders (not in managed_envs)
+                        if self.base_dir.exists():
+                            for item in self.base_dir.iterdir():
+                                if item.is_dir():
+                                    if item not in self.managed_envs:
+                                        try:
+                                            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                                            item.rename(cleanup_path)
+                                            shutil.rmtree(cleanup_path, ignore_errors=True)
+                                        except Exception:
+                                            pass
                     await asyncio.to_thread(cleanup_orphaned)
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
@@ -323,6 +317,7 @@ class PoolManager:
 
                     # 3. Add to pool
                     new_env = PreWarmedEnv(spec_name, env_path, python_exe)
+                    self.managed_envs.add(env_path)
                     await self.pools[spec_name].put(new_env)
                     logger.info(f"PoolManager: {spec_name} ({env_id}) is READY.")
 
