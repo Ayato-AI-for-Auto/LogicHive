@@ -40,5 +40,19 @@ When an environment is released:
 - **Background Tasks**: Spawns short-lived background tasks for retries, which must be safely managed during shutdown (handled via CancelledError guards).
 
 ## References
-- Issue: Virtual environment storage leak
+- Issue: Virtual environment storage leak (https://github.com/ayato-labs/LogicHive/issues/28)
 - ADR-0015 (Lightweight ephemeral environments)
+
+## Amendment: Active Pool Tracking and Sweep Integration (2026-07-01)
+
+### Context & Implementation Refinement
+During integration testing on Windows, we discovered that:
+1. `self.active_envs` was defined but never populated during `acquire()` or cleared during `release()`. This rendered background sweeps unable to distinguish active/leased environments from orphaned ones.
+2. The startup sweep only targeted `pools_cleanup_*` directories in the parent folder, leaving behind orphaned `torch-cpu_*` environment folders inside the active `pools` directory from crashed sessions.
+3. Checking `item.name.startswith(f"{spec}_")` during sweep caused the sweep to ignore virtual environments because they matched the spec prefix.
+
+### Decisions
+1. **Explicit Managed Set**: Track all active/leased and pre-warmed virtual environments using `self.managed_envs` (a set of paths) updated during `_prepare_env`, `release`, and delayed retry cleanups.
+2. **Comprehensive Startup Clear**: At startup, since no active environments exist, clean up *all* subdirectories under `pools` to ensure a fresh state.
+3. **Managed-Based Background Sweep**: The background worker scans the `pools` directory and clears any subdirectories whose paths are *not* present in `self.managed_envs`.
+
