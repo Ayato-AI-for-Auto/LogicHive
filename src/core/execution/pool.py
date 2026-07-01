@@ -6,6 +6,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
+MIN_DISK_SPACE_GB = 3  # Minimum free disk space required to create a venv
+
 from core.config import (
     DEFAULT_POOL_SPECS,
     ENABLE_ENV_POOLING,
@@ -53,6 +55,15 @@ class PoolManager:
             cls._instance = cls()
         return cls._instance
 
+    def _check_disk_space(self) -> float:
+        """Returns free disk space in GB for the drive containing base_dir."""
+        try:
+            usage = shutil.disk_usage(str(self.base_dir))
+            free_gb = usage.free / (1024 ** 3)
+            return free_gb
+        except Exception:
+            return float("inf")
+
     def _detect_gpu(self) -> bool:
         """Detects if an NVIDIA GPU is available and functional."""
         try:
@@ -86,9 +97,10 @@ class PoolManager:
                     for item in self.base_dir.parent.iterdir():
                         if item.is_dir() and item.name.startswith("pools_cleanup_"):
                             try:
-                                shutil.rmtree(item, ignore_errors=True)
-                            except Exception as ce:
-                                logger.debug(f"PoolManager: Failed to delete leftover cleanup dir {item.name}: {ce}")
+                                shutil.rmtree(item)
+                            except OSError:
+                                # Locked - skip, will retry in background worker
+                                pass
 
                 # 2. Clean up everything inside base_dir during startup (since pools are empty)
                 if self.base_dir.exists():
@@ -97,9 +109,10 @@ class PoolManager:
                             cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
                             try:
                                 item.rename(cleanup_path)
-                                shutil.rmtree(cleanup_path, ignore_errors=True)
-                            except Exception as e:
-                                logger.debug(f"PoolManager: Failed to cleanup leftover pool dir {item.name}: {e}")
+                                shutil.rmtree(cleanup_path)
+                            except OSError:
+                                # Locked - skip, will retry in background worker
+                                pass
 
                 self.base_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
@@ -157,41 +170,47 @@ class PoolManager:
     async def release(self, env: PreWarmedEnv):
         """Discards a used environment."""
 
-        # Environments are single-use to ensure isolation
         def cleanup():
             if not env.path.exists():
                 return
-            
-            # Attempt rename-then-delete
-            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
             try:
-                env.path.rename(cleanup_path)
-                shutil.rmtree(cleanup_path, ignore_errors=True)
-                return
-            except Exception as e:
-                logger.debug(f"PoolManager: Cleanup via rename failed: {e}")
-                # Fallback to direct delete
+                shutil.rmtree(env.path)
+            except OSError:
+                # Locked or disk full - try rename for background cleanup
                 try:
-                    shutil.rmtree(env.path, ignore_errors=True)
-                except Exception as e2:
-                    logger.warning(f"PoolManager: Direct cleanup failed: {e2}")
+                    fallback = self.base_dir.parent / f"pools_cleanup_fail_{uuid.uuid4().hex[:8]}"
+                    env.path.rename(fallback)
+                except Exception:
+                    pass
 
-        async def retry_cleanup_task():
-            await asyncio.sleep(5.0)
+        async def retry_cleanup_task(attempt: int = 0):
+            # Exponential backoff: 2s, 4s, 8s, 16s (max 3 retries)
+            delay = min(2 ** (attempt + 1), 16)
+            await asyncio.sleep(delay)
             try:
                 await asyncio.to_thread(cleanup)
                 self.managed_envs.discard(env.path)
-                logger.info(f"PoolManager: Delayed cleanup of {env.path.name} succeeded")
+                if not env.path.exists():
+                    logger.info(f"PoolManager: Delayed cleanup of {env.path.name} succeeded (attempt {attempt + 1})")
+                else:
+                    # Still locked - retry if we haven't exhausted attempts
+                    if attempt < 2:
+                        logger.debug(f"PoolManager: Retry {attempt + 1} for {env.path.name}, scheduling next...")
+                        asyncio.create_task(retry_cleanup_task(attempt + 1))
+                    else:
+                        logger.warning(f"PoolManager: Failed to cleanup {env.path.name} after {attempt + 1} attempts")
             except Exception as e:
-                logger.warning(f"PoolManager: Delayed cleanup of {env.path.name} failed: {e}")
+                logger.debug(f"PoolManager: Retry cleanup error for {env.path.name}: {e}")
 
         try:
-            # Run cleanup in thread to avoid blocking loop
             await asyncio.to_thread(cleanup)
             self.managed_envs.discard(env.path)
-            logger.debug(f"PoolManager: Released and deleted {env.path.name}")
+            if not env.path.exists():
+                logger.debug(f"PoolManager: Released and deleted {env.path.name}")
+            else:
+                logger.debug(f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry...")
+                asyncio.create_task(retry_cleanup_task())
         except Exception:
-            logger.debug(f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry...")
             asyncio.create_task(retry_cleanup_task())
 
     async def _background_worker(self):
@@ -207,25 +226,25 @@ class PoolManager:
                     self._check_and_replenish_pools()
                     # Periodically clean up any orphaned cleanup directories
                     def cleanup_orphaned():
-                        # 1. Clean old cleanup dirs
+                        # 1. Clean old cleanup dirs (with retry on locked files)
                         if self.base_dir.parent.exists():
                             for item in self.base_dir.parent.iterdir():
                                 if item.is_dir() and item.name.startswith("pools_cleanup_"):
                                     try:
-                                        shutil.rmtree(item, ignore_errors=True)
-                                    except Exception:
+                                        shutil.rmtree(item)
+                                    except OSError:
+                                        # Locked - skip, will retry next cycle
                                         pass
                         # 2. Sweep active pools directory for orphaned folders (not in managed_envs)
                         if self.base_dir.exists():
                             for item in self.base_dir.iterdir():
-                                if item.is_dir():
-                                    if item not in self.managed_envs:
-                                        try:
-                                            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
-                                            item.rename(cleanup_path)
-                                            shutil.rmtree(cleanup_path, ignore_errors=True)
-                                        except Exception:
-                                            pass
+                                if item.is_dir() and item not in self.managed_envs:
+                                    try:
+                                        cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                                        item.rename(cleanup_path)
+                                        shutil.rmtree(cleanup_path)
+                                    except OSError:
+                                        pass
                     await asyncio.to_thread(cleanup_orphaned)
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
@@ -248,6 +267,12 @@ class PoolManager:
     def _check_and_replenish_pools(self):
         from core.config import ENABLE_GPU
 
+        # Skip replenishment if disk space is low
+        free_gb = self._check_disk_space()
+        if free_gb < MIN_DISK_SPACE_GB:
+            logger.debug(f"PoolManager: Skipping replenish - low disk space ({free_gb:.1f}GB)")
+            return
+
         for spec_name, queue in self.pools.items():
             current_size = queue.qsize()
             in_progress = self._in_progress_replenishments.get(spec_name, 0)
@@ -263,6 +288,15 @@ class PoolManager:
     async def _prepare_env(self, spec_name: str):
         """Creates a new venv and installs dependencies using uv."""
         try:
+            # Disk space check before doing anything
+            free_gb = self._check_disk_space()
+            if free_gb < MIN_DISK_SPACE_GB:
+                logger.warning(
+                    f"PoolManager: Skipping {spec_name} preparation - "
+                    f"only {free_gb:.1f}GB free (minimum: {MIN_DISK_SPACE_GB}GB)"
+                )
+                return
+
             async with self._uv_semaphore:
                 env_id = str(uuid.uuid4())[:8]
                 env_path = self.base_dir / f"{spec_name}_{env_id}"
@@ -282,8 +316,6 @@ class PoolManager:
                 logger.info(f"PoolManager: Preparing {spec_name} ({env_id}) using {uv_path}...")
 
                 def run_cmd(cmd):
-                    # We explicitly use utf-8 encoding to avoid cp932 errors on Japanese Windows
-                    # when uv/pip output contains special characters or emojis.
                     return subprocess.run(
                         cmd, capture_output=True, text=True, shell=True, encoding="utf-8"
                     )
@@ -297,19 +329,29 @@ class PoolManager:
                         logger.error(f"PoolManager: uv venv failed: {res.stderr}")
                         raise RuntimeError(f"uv venv failed for {spec_name}")
 
-                    # 2. Install packages
+                    # 2. Install packages (try hardlink first, fallback to copy)
                     packages = DEFAULT_POOL_SPECS.get(spec_name, [])
                     if packages:
                         pkg_str = " ".join(packages)
                         python_exe_str = str(python_exe)
-                        # Optimization: Use --link-mode=hardlink to save disk space
-                        # by sharing blocks with global cache
+
+                        # First attempt: hardlink (saves disk space)
                         icmd = (
                             f'"{uv_path}" pip install --link-mode=hardlink '
                             f'--python "{python_exe_str}" {pkg_str}'
                         )
-
                         res = await asyncio.to_thread(run_cmd, icmd)
+
+                        if res.returncode != 0:
+                            # Fallback: copy mode (works when hardlink fails)
+                            logger.warning(
+                                f"PoolManager: hardlink failed, falling back to copy mode: {res.stderr[:200]}"
+                            )
+                            icmd = (
+                                f'"{uv_path}" pip install --link-mode=copy '
+                                f'--python "{python_exe_str}" {pkg_str}'
+                            )
+                            res = await asyncio.to_thread(run_cmd, icmd)
 
                         if res.returncode != 0:
                             logger.error(f"PoolManager: uv pip install failed: {res.stderr}")
@@ -324,7 +366,15 @@ class PoolManager:
                 except Exception as e:
                     logger.error(f"PoolManager: Failed to prepare {spec_name}: {e}", exc_info=True)
                     if env_path.exists():
-                        shutil.rmtree(env_path, ignore_errors=True)
+                        try:
+                            shutil.rmtree(env_path)
+                        except OSError:
+                            # Disk full or locked - try rename for later cleanup
+                            try:
+                                fallback = self.base_dir.parent / f"pools_cleanup_fail_{env_id}"
+                                env_path.rename(fallback)
+                            except Exception:
+                                pass
         finally:
             self._in_progress_replenishments[spec_name] = max(0, self._in_progress_replenishments.get(spec_name, 0) - 1)
 
