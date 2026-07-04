@@ -1,3 +1,10 @@
+## [0.27.1](https://github.com/ayato-labs/LogicHive/compare/v0.27.0...v0.27.1) (2026-07-04)
+
+
+### Bug Fixes
+
+* **sandbox:** pass result_file and add memory monitoring to fallback execute ([b28e1e1](https://github.com/ayato-labs/LogicHive/commit/b28e1e1b02252ade684392636d6c79a9f3b649fe))
+
 # [0.27.0](https://github.com/ayato-labs/LogicHive/compare/v0.26.0...v0.27.0) (2026-07-04)
 
 
