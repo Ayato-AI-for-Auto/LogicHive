@@ -174,7 +174,7 @@ class WindowsNativeSandbox(BaseSandbox):
         if os.name != "nt" or not self.job_handle:
             # Fallback to standard subprocess run on non-Windows/failed initialization
             logger.warning("WindowsSandbox: Falling back to un-isolated subprocess execution.")
-            return await self._fallback_execute(cmd, cwd, env, timeout)
+            return await self._fallback_execute(cmd, cwd, env, timeout, memory_limit_mb, result_file)
 
         self._configure_limits(memory_limit_mb)
 
@@ -247,7 +247,13 @@ class WindowsNativeSandbox(BaseSandbox):
             monitor_task.cancel()
 
     async def _fallback_execute(
-        self, cmd: list[str], cwd: str, env: dict[str, str] | None, timeout: float
+        self,
+        cmd: list[str],
+        cwd: str,
+        env: dict[str, str] | None,
+        timeout: float,
+        memory_limit_mb: int = 256,
+        result_file: str | None = None,
     ) -> ExecutionResult:
         process_env = os.environ.copy()
         if env:
@@ -260,14 +266,28 @@ class WindowsNativeSandbox(BaseSandbox):
             cwd=cwd,
             env=process_env,
         )
+
+        state = {"memory_exceeded": False}
+        done_event = asyncio.Event()
+        monitor_task = asyncio.create_task(
+            self._monitor_resources(process, memory_limit_mb, done_event, state)
+        )
+
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(), timeout=timeout
             )
             stdout = stdout_bytes.decode("utf-8", errors="replace")
             stderr = stderr_bytes.decode("utf-8", errors="replace")
+
+            if state["memory_exceeded"]:
+                return ExecutionResult(
+                    status=ExecutionStatus.MEMORY_LIMIT,
+                    logs=ExecutionLogs(stderr="Memory limit exceeded."),
+                )
+
             status = ExecutionStatus.SUCCESS if process.returncode == 0 else ExecutionStatus.FAILURE
-            return self._build_result(status, stdout, stderr, process.returncode)
+            return self._build_result(status, stdout, stderr, process.returncode, result_file)
         except asyncio.TimeoutError:
             try:
                 process.kill()
@@ -278,6 +298,9 @@ class WindowsNativeSandbox(BaseSandbox):
                 status=ExecutionStatus.TIMEOUT,
                 logs=ExecutionLogs(stderr="Execution timed out."),
             )
+        finally:
+            done_event.set()
+            monitor_task.cancel()
 
     def _build_result(
         self,
