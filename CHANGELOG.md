@@ -1,3 +1,17 @@
+# [0.27.0](https://github.com/ayato-labs/LogicHive/compare/v0.26.0...v0.27.0) (2026-07-04)
+
+
+### Bug Fixes
+
+* **core:** improve plugin directory discovery for PyInstaller bundles ([d1ff76f](https://github.com/ayato-labs/LogicHive/commit/d1ff76fe0843611bbec1b65ced15bf803b121063))
+* remove stale (1) duplicate files causing test failures ([aaf5d78](https://github.com/ayato-labs/LogicHive/commit/aaf5d7874cc10f5539e6f374878bde66c9a36d2e))
+
+
+### Features
+
+* **core:** implement disk space checks and improve pool cleanup logic ([b74219b](https://github.com/ayato-labs/LogicHive/commit/b74219bfd8f9f98f55bfcfc9a2d1c7f3c03a4fc2))
+* ignore logichive.db.bak in .gitignore ([100f55e](https://github.com/ayato-labs/LogicHive/commit/100f55e98420feacd8ff6c09e56f8cc7d65142b3))
+
 # [0.26.0](https://github.com/ayato-labs/LogicHive/compare/v0.25.0...v0.26.0) (2026-06-18)
 
 
