@@ -53,7 +53,7 @@ class EvaluationManager:
                     plugins_dir = Path(os.path.join(root, "plugins"))
                     logger.debug(f"EvaluationManager: Found plugins dir at: {plugins_dir}")
                     break
-            
+
             # If not found via search, fallback to historical locations
             if not plugins_dir:
                 base_dir = Path(getattr(sys, "_MEIPASS"))

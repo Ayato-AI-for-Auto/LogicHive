@@ -6,8 +6,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-MIN_DISK_SPACE_GB = 3  # Minimum free disk space required to create a venv
-
 from core.config import (
     DEFAULT_POOL_SPECS,
     ENABLE_ENV_POOLING,
@@ -15,6 +13,8 @@ from core.config import (
     POOL_MAX_SIZE,
 )
 from core.logging_config import get_logger
+
+MIN_DISK_SPACE_GB = 3  # Minimum free disk space required to create a venv
 
 logger = get_logger(__name__)
 

@@ -9,13 +9,16 @@ SECRET_PATTERNS: List[str] = [
 ]
 
 def calculate_entropy(data: str) -> float:
-    if not data: return 0.0
+    if not data:
+        return 0.0
     entropy = 0
     char_counts = {}
-    for char in data: char_counts[char] = char_counts.get(char, 0) + 1
+    for char in data:
+        char_counts[char] = char_counts.get(char, 0) + 1
     for count in char_counts.values():
         p_x = float(count) / len(data)
-        if p_x > 0: entropy += - p_x * math.log(p_x, 2)
+        if p_x > 0:
+            entropy += - p_x * math.log(p_x, 2)
     return entropy
 
 def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
@@ -45,7 +48,7 @@ def run_dogfood_scan(directory: str):
                             found_count += 1
                 except Exception:
                     pass
-    
+
     if found_count == 0:
         print("✅ Scan complete: No high-risk secrets found in source files.")
     else:
