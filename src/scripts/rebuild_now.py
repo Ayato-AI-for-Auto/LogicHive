@@ -12,9 +12,6 @@ async def main():
     from core.consolidation import LogicIntelligence
     from storage.sqlite_api import sqlite_storage
     from storage.vector_store import vector_manager
-    from core.logging_config import get_logger
-
-    logger = get_logger("rebuild_now")
 
     db = await get_db_connection()
     async with db.execute(
