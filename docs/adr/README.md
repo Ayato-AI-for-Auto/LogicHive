@@ -32,3 +32,7 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-026: Multi-Language Execution and Evaluation Expansion](ADR-0026-multi-language-expansion.md)
 - [ADR-027: MCP Server Module Decomposition](ADR-0027-mcp-server-module-decomposition.md)
 - [ADR-028: バイナリ配布環境における動的リソースのパス解決戦略](ADR-0028-resource-path-resolution-for-frozen-binaries.md)
+- [ADR-029: Multi-Engine Distribution Strategy](ADR-0029-multi-engine-distribution-strategy.md)
+- [ADR-030: Robust Virtual Environment Cleanup and Concurrency Control](ADR-0030-robust-venv-cleanup-and-concurrency.md)
+- [ADR-031: Embedding Resilience and Recovery Strategy](ADR-0031-embedding-resilience-and-recovery-strategy.md)
+- [ADR-032: AI Gate Veto Power Softening and Weight Tuning](ADR-0032-ai-gate-veto-power-softening.md)
