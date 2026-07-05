@@ -164,13 +164,12 @@ class LogicIntelligence:
         Maintains backward compatibility by not changing _call_llm_async.
         """
         provider = await self._get_optimal_provider()
-        
+
         # Model info
         model_info = {
             "provider": provider,
             "model": self.model_id if provider == "gemini" else self.ollama_model,
         }
-        
         # Get raw response
         if provider == "gemini":
             # Modified _call_gemini to return (parsed, raw)
@@ -179,7 +178,6 @@ class LogicIntelligence:
             parsed, raw_text = await self._call_ollama_raw(prompt, use_json)
         else:
             raise AIProviderError("No valid AI provider available.")
-            
         return parsed, raw_text, model_info
 
     async def _call_gemini_raw(self, prompt: str, use_json: bool) -> tuple[Any, str]:
@@ -198,7 +196,6 @@ class LogicIntelligence:
                 model=self.model_id, contents=[prompt], config=config
             )
             raw_text = response.text
-            
             if not use_json:
                 return raw_text.strip(), raw_text.strip()
 
@@ -241,6 +238,13 @@ class LogicIntelligence:
                 raise AIProviderError(f"Ollama generation failed: {e}") from e
 
     async def _call_llm_async(self, prompt: str, use_json: bool = True) -> Any:
+        provider = await self._get_optimal_provider()
+        logger.info(f"[TRACE] LogicIntelligence: Routing LLM call to '{provider}'")
+        if provider == "gemini":
+            return await self._call_gemini(prompt, use_json)
+        elif provider == "ollama":
+            return await self._call_ollama(prompt, use_json)
+        raise AIProviderError("No valid AI provider available.")
 
     async def evaluate_quality(self, code: str, test_code: str = "") -> dict[str, Any]:
         """

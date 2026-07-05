@@ -25,13 +25,11 @@ class AIGateEvaluator(BaseEvaluator):
             quality = await self.intel.evaluate_quality(code, test_code=test_code)
             score = float(quality.get("score", 0))
             reason = quality.get("reason", "No reason provided by AI.")
-            
             # Store raw output and provider info in details
             details = {
                 "raw_output": quality.get("raw_output"),
                 "provider_info": quality.get("provider_info")
             }
-            
             return EvaluationResult(score=score, reason=reason, details=details)
         except Exception as e:
             logger.error(f"AIGateEvaluator: AI Evaluation failed: {e}")
