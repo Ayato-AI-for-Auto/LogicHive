@@ -1,3 +1,10 @@
+# [0.28.0](https://github.com/ayato-labs/LogicHive/compare/v0.27.1...v0.28.0) (2026-07-05)
+
+
+### Features
+
+* update .gitignore to exclude storage data and backup files ([f490338](https://github.com/ayato-labs/LogicHive/commit/f4903384efa873d4161c91b551eee0fe3dcd6cae))
+
 ## [0.27.1](https://github.com/ayato-labs/LogicHive/compare/v0.27.0...v0.27.1) (2026-07-04)
 
 
