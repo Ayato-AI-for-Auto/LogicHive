@@ -50,3 +50,7 @@ Thumbs.db
 
 # LogicHive Data Storage (contains large binaries and sandbox environments)
 storage/
+src/storage/data/
+
+# Duplicate backup files (Windows copies)
+* (1)*
