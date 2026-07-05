@@ -1,3 +1,11 @@
+# [0.29.0](https://github.com/ayato-labs/LogicHive/compare/v0.28.0...v0.29.0) (2026-07-05)
+
+
+### Features
+
+* **core:** implement embedding resilience and recovery (ADR-0031) ([39cf806](https://github.com/ayato-labs/LogicHive/commit/39cf80657d2a6f1b9d5606ead42c4b2442646612))
+* **eval:** soften AI Gate veto power and update scoring (ADR-0032) ([ac46e03](https://github.com/ayato-labs/LogicHive/commit/ac46e038d6a6ff237a88598796a05b36307ca3b7))
+
 # [0.28.0](https://github.com/ayato-labs/LogicHive/compare/v0.27.1...v0.28.0) (2026-07-05)
 
 
