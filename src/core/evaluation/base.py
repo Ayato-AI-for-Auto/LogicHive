@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
 class EvaluationResult:
-    score: float  # 0.0 to 100.0
+    score: Optional[float]  # 0.0 to 100.0, None if system error prevented evaluation
     reason: str
     details: dict[str, Any] | None = None
     is_system_error: bool = False

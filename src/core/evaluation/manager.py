@@ -230,7 +230,7 @@ class EvaluationManager:
 
         # Structural Veto
         struct = results.get("structural")
-        if struct and struct.score == 0:
+        if struct and struct.score is not None and struct.score == 0:
             return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"CRITICAL STRUCTURAL ERROR: {struct.reason}",
@@ -240,7 +240,7 @@ class EvaluationManager:
 
         # Security Veto
         sec = results.get("security_static")
-        if sec and sec.score < 60:
+        if sec and sec.score is not None and sec.score < 60:
             return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"SECURITY REJECTION: {sec.reason}",
@@ -250,7 +250,7 @@ class EvaluationManager:
 
         # Dependency Veto
         dep = results.get("dependency_vouch")
-        if dep and dep.score < 70:
+        if dep and dep.score is not None and dep.score < 70:
             return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"DEPENDENCY REJECTION: {dep.reason}",
@@ -260,9 +260,9 @@ class EvaluationManager:
 
         # Deterministic Veto (Syntax Errors)
         det = results.get("deterministic")
-        if det and det.score == 0:
+        if det and det.score is not None and det.score == 0:
             py_stat = results.get("python_static")
-            if py_stat and py_stat.score == 0 and "Syntax Error" in py_stat.reason:
+            if py_stat and py_stat.score is not None and py_stat.score == 0 and "Syntax Error" in py_stat.reason:
                 return cast(dict[str, Any], {
                     "score": 0.0,
                     "reason": f"CRITICAL SYNTAX ERROR: {py_stat.reason}",
@@ -279,7 +279,7 @@ class EvaluationManager:
         # Language-specific static Veto (e.g. html_static, c_static, etc.)
         for key in ["html_static", "c_static", "java_static", "php_static"]:
             stat = results.get(key)
-            if stat and stat.score == 0:
+            if stat and stat.score is not None and stat.score == 0:
                 return cast(dict[str, Any], {
                     "score": 0.0,
                     "reason": f"STATIC VALIDATION REJECTION ({key}): {stat.reason}",
@@ -289,7 +289,7 @@ class EvaluationManager:
 
         # Runtime Veto
         run = results.get("runtime")
-        if run and run.score == 0 and not kwargs.get("_is_draft"):
+        if run and run.score is not None and run.score == 0 and not kwargs.get("_is_draft"):
             return cast(dict[str, Any], {
                 "score": 0.0,
                 "reason": f"RUNTIME REJECTION: {run.reason}",
@@ -303,17 +303,24 @@ class EvaluationManager:
         parts = []
         reasons = []
 
-        # Weights: Deterministic (30%), Runtime (30%), Static/Security (20%), AI (15%), Metrics (5%)
+        # Configurable AI Gate weight (default 10%, was 15%)
+        ai_gate_weight = float(os.getenv("AI_GATE_WEIGHT", "0.10"))
+
+        # Weights: Deterministic (30%), Runtime (30%), Static/Security (20%), AI (10%), Metrics (5%)
         mapping = {
             "deterministic": (0.30, "Facts"),
             "runtime": (0.30, "Runtime"),
-            "ai_gate": (0.15, "AI Opinion"),
+            "ai_gate": (ai_gate_weight, "AI Opinion"),
             "metrics_gate": (0.05, "Maintainability"),
         }
 
         for key, (weight, label) in mapping.items():
             res = results.get(key)
             if res:
+                # Skip system errors (score=None) in weighted calculation
+                if res.is_system_error and res.score is None:
+                    reasons.append(f"{label}: Skipped (system error: {res.reason})")
+                    continue
                 parts.append((res.score, weight, f"{label}: {res.reason}"))
 
         # Complex static aggregation
@@ -334,32 +341,36 @@ class EvaluationManager:
         final_score = sum(score * (weight / total_weight) for score, weight, _ in parts)
         reasons = [p[2] for p in parts]
 
-        # AI Veto
+        # AI Veto (softened per ADR-0032)
         ai_res = results.get("ai_gate")
-        if ai_res:
+        if ai_res and not ai_res.is_system_error and ai_res.score is not None:
             if ai_res.score < 30:
-                final_score = 0.0
+                # 50% penalty instead of hard veto (was: final_score = 0.0)
+                final_score *= 0.5
                 reasons.insert(
                     0,
-                    "VETO: AI Auditor identified 'Quality Theater' - Opinion confirmed rejection.",
+                    "AI Auditor: Quality Theater suspected (50% penalty applied)",
                 )
             elif ai_res.score < 70:
-                final_score = min(final_score, ai_res.score)
+                # Soft cap with 20% headroom (was: hard cap at ai_score)
+                soft_cap = ai_res.score * 1.2
+                final_score = min(final_score, soft_cap)
+                reasons.append(f"AI Auditor: Soft cap applied at {soft_cap:.0f}")
 
         return final_score, reasons
 
     def _aggregate_static_scores(self, results, lang):
         scores = []
         for key in ["security_static", "dependency_vouch"]:
-            if key in results:
+            if key in results and results[key].score is not None:
                 scores.append(results[key].score)
 
         if lang == "python":
-            if "ruff" in results:
+            if "ruff" in results and results["ruff"].score is not None:
                 scores.append(results["ruff"].score)
-            elif "python_static" in results:
+            elif "python_static" in results and results["python_static"].score is not None:
                 scores.append(results["python_static"].score)
-        elif "eslint" in results:
+        elif "eslint" in results and results["eslint"].score is not None:
             scores.append(results["eslint"].score)
 
         return sum(scores) / len(scores) if scores else None

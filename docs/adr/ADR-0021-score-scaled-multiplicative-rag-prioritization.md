@@ -12,12 +12,13 @@ Note that `reliability_score` is a weighted synthesis of multiple validation gat
 * **Deterministic AST assertion check**: 30%
 * **Runtime test execution check**: 30%
 * **Static analysis & security static checks (Ruff, ESLint, AST vulnerabilities)**: 20%
-* **LLM Quality Gate (`ai_gate` using Gemini/Ollama)**: 15%
+* **LLM Quality Gate (`ai_gate` using Gemini/Ollama)**: 10% (reduced from 15% — see ADR-0032)
 * **Code metrics check**: 5%
 
-Crucially, the **LLM/AI Gate** holds veto/capping powers over the final `reliability_score`:
-1. If the AI Gate scores the asset below 30 (flagged as "Quality Theater" or empty logic), the entire `reliability_score` is forced to **0.0**.
-2. If the AI Gate scores the asset below 70, the final score is capped to not exceed the AI Gate score.
+Crucially, the **LLM/AI Gate** holds soft penalty/capping powers over the final `reliability_score` (softened per ADR-0032):
+1. If the AI Gate scores the asset below 30 (flagged as "Quality Theater" or empty logic), the final score is reduced by 50% (was: forced to **0.0**).
+2. If the AI Gate scores the asset below 70, the final score is soft-capped to `ai_score * 1.2` (was: hard cap at `ai_score`).
+3. If the AI Gate returns a system error (`is_system_error=True`), the AI score is **ignored entirely** and does not affect the final score.
 
 Thus, LLM-based evaluation is already a core component of `reliability_score`. Integrating this score into search priority directly allows the LLM's assessment of code quality to influence the search rank.
 
