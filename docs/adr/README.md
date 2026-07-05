@@ -36,3 +36,4 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-030: Robust Virtual Environment Cleanup and Concurrency Control](ADR-0030-robust-venv-cleanup-and-concurrency.md)
 - [ADR-031: Embedding Resilience and Recovery Strategy](ADR-0031-embedding-resilience-and-recovery-strategy.md)
 - [ADR-032: AI Gate Veto Power Softening and Weight Tuning](ADR-0032-ai-gate-veto-power-softening.md)
+- [ADR-033: Record Raw LLM Outputs and Provider Metadata](ADR-0033-record-raw-llm-outputs.md)

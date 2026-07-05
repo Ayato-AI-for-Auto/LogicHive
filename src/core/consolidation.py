@@ -158,6 +158,90 @@ class LogicIntelligence:
             return await self._call_ollama(prompt, use_json)
         raise AIProviderError("No valid AI provider available.")
 
+    async def _call_llm_async_raw(self, prompt: str, use_json: bool = True) -> tuple[Any, str, dict[str, Any]]:
+        """
+        Calls the LLM and returns (parsed_result, raw_text, model_info).
+        Maintains backward compatibility by not changing _call_llm_async.
+        """
+        provider = await self._get_optimal_provider()
+        
+        # Model info
+        model_info = {
+            "provider": provider,
+            "model": self.model_id if provider == "gemini" else self.ollama_model,
+        }
+        
+        # Get raw response
+        if provider == "gemini":
+            # Modified _call_gemini to return (parsed, raw)
+            parsed, raw_text = await self._call_gemini_raw(prompt, use_json)
+        elif provider == "ollama":
+            parsed, raw_text = await self._call_ollama_raw(prompt, use_json)
+        else:
+            raise AIProviderError("No valid AI provider available.")
+            
+        return parsed, raw_text, model_info
+
+    async def _call_gemini_raw(self, prompt: str, use_json: bool) -> tuple[Any, str]:
+        if not self.gemini_client:
+            return ({}, "") if use_json else ("", "")
+
+        use_json_mode = use_json and "gemma" not in self.model_id.lower()
+        config = (
+            types.GenerateContentConfig(response_mime_type="application/json")
+            if use_json_mode
+            else None
+        )
+
+        try:
+            response = self.gemini_client.models.generate_content(
+                model=self.model_id, contents=[prompt], config=config
+            )
+            raw_text = response.text
+            
+            if not use_json:
+                return raw_text.strip(), raw_text.strip()
+
+            start_idx = raw_text.find("{")
+            end_idx = raw_text.rfind("}")
+            if start_idx != -1 and end_idx != -1:
+                parsed = json.loads(raw_text[start_idx : end_idx + 1])
+                return (
+                    (
+                        parsed[0]
+                        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict)
+                        else parsed
+                    )
+                    if isinstance(parsed, dict)
+                    else {},
+                    raw_text
+                )
+            return {}, raw_text
+        except Exception as e:
+            raise AIProviderError(f"Gemini generation failed: {e}") from e
+
+    async def _call_ollama_raw(self, prompt: str, use_json: bool) -> tuple[Any, str]:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": self.ollama_model,
+                        "prompt": prompt + ("\nRespond ONLY with JSON." if use_json else ""),
+                        "stream": False,
+                        "format": "json" if use_json else None,
+                    },
+                )
+                if resp.status_code != 200:
+                    raise AIProviderError(f"Ollama returned status {resp.status_code}")
+                raw_text = resp.json().get("response", "")
+                parsed = json.loads(raw_text) if use_json else raw_text.strip()
+                return parsed, raw_text
+            except Exception as e:
+                raise AIProviderError(f"Ollama generation failed: {e}") from e
+
+    async def _call_llm_async(self, prompt: str, use_json: bool = True) -> Any:
+
     async def evaluate_quality(self, code: str, test_code: str = "") -> dict[str, Any]:
         """
         Evaluates the quality of assets through the lens of a Forensic Auditor.
@@ -191,7 +275,7 @@ class LogicIntelligence:
         )
 
         try:
-            res = await self._call_llm_async(prompt, use_json=True)
+            res, raw_text, model_info = await self._call_llm_async_raw(prompt, use_json=True)
         except AIProviderError:
             logger.error("Quality Gate: AI Provider failed during evaluation.")
             raise
@@ -221,6 +305,8 @@ class LogicIntelligence:
         return {
             "score": score,
             "reason": res.get("reason", "Failed to obtain evaluation reason."),
+            "raw_output": raw_text,
+            "provider_info": model_info
         }
 
     async def expand_query(self, user_query: str) -> str:
