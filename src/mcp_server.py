@@ -477,6 +477,100 @@ async def rebuild_index(wait_for_previous: bool = False) -> str:
         return f"LogicHive Error: Failed to rebuild index. Detail: {str(e)}"
 
 
+@mcp.tool()
+@trace_execution
+async def rebuild_embeddings(
+    project: str = None,
+    limit: int = 100,
+    wait_for_previous: bool = False,
+) -> str:
+    """
+    Regenerate embeddings for functions that have no embedding stored.
+    Use this after fixing embedding provider issues or when integrity check
+    reports functions with missing embeddings.
+    """
+    import asyncio
+    import json
+
+    from core.config import GEMINI_API_KEY
+    from core.consolidation import LogicIntelligence
+    from core.exceptions import EmbeddingUnavailableError
+
+    try:
+        logger.info("[TRACE] MCP: Tool 'rebuild_embeddings' called.")
+
+        # 1. Get functions without embeddings
+        db = await get_db_connection()
+        conditions = ["(embedding IS NULL OR embedding = '' OR embedding = '[]')"]
+        params = []
+        if project:
+            conditions.append("project = ?")
+            params.append(project)
+
+        where_clause = " WHERE " + " AND ".join(conditions)
+        sql = f"SELECT name, project, code, description, tags, language FROM logichive_functions{where_clause} LIMIT ?"
+        params.append(limit)
+
+        async with db.execute(sql, params) as cursor:
+            rows = await cursor.fetchall()
+
+        if not rows:
+            return "No functions with missing embeddings found."
+
+        logger.info(f"[TRACE] rebuild_embeddings: Found {len(rows)} functions to process.")
+        intel = LogicIntelligence(GEMINI_API_KEY)
+
+        # 2. Process each function with concurrency limit
+        semaphore = asyncio.Semaphore(3)
+        success_count = 0
+        fail_count = 0
+
+        async def process_one(row):
+            nonlocal success_count, fail_count
+            name, proj, code, desc, tags_json, lang = row
+            try:
+                async with semaphore:
+                    # Reconstruct search document
+                    tags = json.loads(tags_json) if tags_json else []
+                    search_doc = intel.construct_search_document(
+                        name, desc or "", tags, code or ""
+                    )
+                    embedding = await intel.generate_embedding(search_doc)
+
+                    # Update DB
+                    await sqlite_storage.update_function_embedding(name, proj, embedding)
+
+                    # Sync to vector store
+                    await vector_manager.upsert_vector(
+                        name,
+                        embedding,
+                        metadata={"project": proj, "language": lang or "python"},
+                        project=proj,
+                    )
+                    success_count += 1
+                    logger.info(f"  [OK] '{name}' in '{proj}'")
+            except EmbeddingUnavailableError as e:
+                fail_count += 1
+                logger.warning(f"  [SKIP] '{name}' in '{proj}': {e}")
+            except Exception as e:
+                fail_count += 1
+                logger.error(f"  [FAIL] '{name}' in '{proj}': {e}")
+
+        # 3. Run all tasks
+        await asyncio.gather(*[process_one(row) for row in rows])
+
+        result_msg = (
+            f"Embedding rebuild complete: {success_count} succeeded, "
+            f"{fail_count} failed, {len(rows)} total processed."
+        )
+        logger.info(f"[TRACE] rebuild_embeddings: {result_msg}")
+        return result_msg
+
+    except Exception as e:
+        logger.error(f"MCP Server: Error in rebuild_embeddings: {e}", exc_info=True)
+        return f"LogicHive Error: Failed to rebuild embeddings. Detail: {str(e)}"
+
+
 def run_server():
     import uvicorn
 
@@ -540,6 +634,26 @@ def run_server():
             else:
                 emb_model = core.config.OLLAMA_EMBEDDING_MODEL
             logger.info(f"Embedding   : {emb_provider.upper()} ({emb_model})")
+
+            # Check for functions with missing embeddings (async check in background)
+            if not os.environ.get("LOGICHIVE_TESTING"):
+                try:
+                    import sqlite3 as _sync_sqlite
+                    db_path = get_sqlite_db_path()
+                    _conn = _sync_sqlite.connect(db_path)
+                    _cursor = _conn.execute(
+                        "SELECT COUNT(*) FROM logichive_functions "
+                        "WHERE embedding IS NULL OR embedding = '' OR embedding = '[]'"
+                    )
+                    _missing_count = _cursor.fetchone()[0]
+                    _conn.close()
+                    if _missing_count > 0:
+                        logger.warning(
+                            f"[!] EMBEDDING WARNING: {_missing_count} function(s) have no embedding. "
+                            "Use the 'rebuild_embeddings' MCP tool to regenerate them."
+                        )
+                except Exception as _e:
+                    logger.debug(f"Startup embedding check skipped: {_e}")
 
             logger.info(f"Network     : {host_val}:{current_port}")
 

@@ -9,6 +9,7 @@ from core.config import (
     OLLAMA_URL,
     VECTOR_DIMENSION,
 )
+from core.exceptions import EmbeddingUnavailableError
 from core.logging_config import get_logger
 
 # Suppress verbose third-party logging
@@ -33,7 +34,9 @@ class GeminiEmbeddingService:
 
         if not self._api_key:
             logger.error("GeminiEmbeddingService: API Key is missing. Check settings.")
-            return
+            raise EmbeddingUnavailableError(
+                "Gemini API key is missing. Please configure GEMINI_API_KEY in settings."
+            )
 
         try:
             from google import genai
@@ -46,7 +49,9 @@ class GeminiEmbeddingService:
     def get_embedding(self, text: str, is_query: bool = False) -> list[float]:
         self._ensure_initialized()
         if not self._client:
-            return [0.0] * VECTOR_DIMENSION
+            raise EmbeddingUnavailableError(
+                "Gemini client failed to initialize. Check API key and network."
+            )
 
         try:
             result = self._client.models.embed_content(
@@ -61,7 +66,9 @@ class GeminiEmbeddingService:
             return list(vector)
         except Exception as e:
             logger.error(f"GeminiEmbeddingService: Inference Failed - {e}")
-            return [0.0] * VECTOR_DIMENSION
+            raise EmbeddingUnavailableError(
+                f"Gemini embedding inference failed: {e}"
+            ) from e
 
     def get_model_info(self) -> dict:
         return {
@@ -107,9 +114,16 @@ class OllamaEmbeddingService:
                 return vector
             else:
                 logger.error(f"OllamaEmbeddingService: HTTP Error {resp.status_code}: {resp.text}")
+                raise EmbeddingUnavailableError(
+                    f"Ollama embedding failed with HTTP {resp.status_code}: {resp.text}"
+                )
+        except EmbeddingUnavailableError:
+            raise
         except Exception as e:
             logger.error(f"OllamaEmbeddingService: Embedding generation failed: {e}")
-        return [0.0] * VECTOR_DIMENSION
+            raise EmbeddingUnavailableError(
+                f"Ollama embedding generation failed: {e}"
+            ) from e
 
     def get_model_info(self) -> dict:
         return {
@@ -157,7 +171,9 @@ class FastEmbedEmbeddingService:
         try:
             self._ensure_initialized()
             if not self._model:
-                return [0.0] * VECTOR_DIMENSION
+                raise EmbeddingUnavailableError(
+                    "FastEmbed model failed to initialize."
+                )
             embeddings = list(self._model.embed([text]))
             if embeddings:
                 vector = list(embeddings[0])
@@ -167,9 +183,13 @@ class FastEmbedEmbeddingService:
                     else:
                         vector = vector[:VECTOR_DIMENSION]
                 return vector
+        except EmbeddingUnavailableError:
+            raise
         except Exception as e:
             logger.error(f"FastEmbedEmbeddingService: Embedding generation failed: {e}")
-        return [0.0] * VECTOR_DIMENSION
+            raise EmbeddingUnavailableError(
+                f"FastEmbed embedding generation failed: {e}"
+            ) from e
 
     def get_model_info(self) -> dict:
         return {

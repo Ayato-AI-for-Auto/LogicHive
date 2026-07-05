@@ -38,3 +38,9 @@ class SyntaxValidationError(QualityGateError):
     """Raised specifically for syntax errors detected during pre-save validation."""
 
     pass
+
+
+class EmbeddingUnavailableError(LogicHiveError):
+    """Raised when embedding generation fails due to provider unavailability (API key missing, network error, rate limit, etc.)."""
+
+    pass

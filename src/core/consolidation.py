@@ -62,10 +62,12 @@ class LogicIntelligence:
         """
         Generates embedding for the given text using the configured provider.
         Input is truncated to stay within limits.
+        Raises EmbeddingUnavailableError if provider is unavailable.
         """
         import time
 
         from core.embedding import embedding_service
+        from core.exceptions import EmbeddingUnavailableError
 
         start_time = time.perf_counter()
         logger.info(
@@ -82,11 +84,13 @@ class LogicIntelligence:
                 f"[TRACE] LogicIntelligence: Embedding generated successfully in {duration:.4f}s"
             )
             return vector
+        except EmbeddingUnavailableError:
+            raise
         except Exception as e:
             logger.error(
                 f"[TRACE] LogicIntelligence: Embedding generation failed: {e}", exc_info=True
             )
-            raise AIProviderError(f"Embedding generation failed: {e}") from e
+            raise EmbeddingUnavailableError(f"Embedding generation failed: {e}") from e
 
     async def _call_gemini(self, prompt: str, use_json: bool) -> Any:
         if not self.gemini_client:

@@ -42,3 +42,18 @@ LogicHive はローカル（Ollama/FastEmbed）とクラウド（Gemini）のハ
 ## References
 - ADR-0012: Centralized User Data Storage
 - ADR-0014: Standardized Hybrid Configuration Strategy
+- ADR-0031: Embedding Resilience and Recovery Strategy (後継の救済策)
+
+## Amendment: FAISS レガシーコードクリーンアップ完了 (2026-07-05)
+
+### Context
+ADR-0017 で策定された FAISS インデックス分離戦略は、ADR-0018 の ChromaDB 移行により実質的に解決済みであったが、コードベースに FAISS 残骸が残存していた。
+
+### Completed Cleanup
+1. `src/mcp_server.py:467` — docstring の "FAISS vector index" → "ChromaDB vector index" に修正
+2. `src/core/logging_config.py:142` — FAISS ログ抑制リストから `"faiss"` を削除
+3. `.gitignore` — `src/storage/data/` と `* (1)*` パターンを追加
+4. Phase 1 クリーンアップ完了 — 25件の重複ファイル、11件の `__pycache__` ディレクトリ、`logichive_hub.egg-info/` を削除
+
+### Status
+FAISS 関連のコード参照は完全に排除され、ADR-0017 は **Superseded + Resolved** となった。

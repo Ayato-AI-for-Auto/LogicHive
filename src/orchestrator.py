@@ -18,7 +18,7 @@ from core.config import (
 )
 from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
-from core.exceptions import SyntaxValidationError, ValidationError
+from core.exceptions import EmbeddingUnavailableError, SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
 from core.logging_config import get_logger
 from core.tracer import trace_execution
@@ -259,18 +259,37 @@ async def _run_async_verification_pipeline(
 
         # 3. Embedding
         search_doc = intel.construct_search_document(name, description, tags, code)
-        embedding = await intel.generate_embedding(search_doc)
+        embedding = None
+        embedding_failed = False
+        try:
+            embedding = await intel.generate_embedding(search_doc)
+        except EmbeddingUnavailableError as e:
+            logger.warning(
+                f"[TRACE] Orchestrator: Embedding generation failed for '{name}': {e}. "
+                "Function will be marked as 'embedding_pending'."
+            )
+            embedding_failed = True
 
         # 4. Update DB with final results
-        await sqlite_storage.update_verification_status(
-            name,
-            project,
-            status=status,
-            report=eval_res,
-            reliability_score=final_score,
-        )
+        if embedding_failed and status == "verified":
+            # Mark as embedding_pending instead of verified
+            await sqlite_storage.update_verification_status(
+                name,
+                project,
+                status="embedding_pending",
+                report=eval_res,
+                reliability_score=final_score,
+            )
+        else:
+            await sqlite_storage.update_verification_status(
+                name,
+                project,
+                status=status,
+                report=eval_res,
+                reliability_score=final_score,
+            )
 
-        # 5. Sync to Database and Vector Store (if verified)
+        # 5. Sync to Database and Vector Store (if verified and embedding available)
         if status == "verified" and embedding:
             # Update DB with embedding
             await sqlite_storage.update_function_embedding(name, project, embedding)
