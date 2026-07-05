@@ -1,3 +1,16 @@
+# [0.30.0](https://github.com/ayato-labs/LogicHive/compare/v0.29.0...v0.30.0) (2026-07-05)
+
+
+### Bug Fixes
+
+* **core:** resolve linting and syntax issues in LLM raw output recording ([79b0989](https://github.com/ayato-labs/LogicHive/commit/79b0989ec263b73ec109a970a679cc40fe489332))
+
+
+### Features
+
+* **core:** record raw LLM outputs and provider metadata (ADR-0033) ([0ef5657](https://github.com/ayato-labs/LogicHive/commit/0ef56571759eebfa63c924b6b32224084fba0702))
+* **scripts:** add database maintenance and diagnostic tools ([1ab2795](https://github.com/ayato-labs/LogicHive/commit/1ab27951215aa866f89f6f8856e40e9f1d10cfcb))
+
 # [0.29.0](https://github.com/ayato-labs/LogicHive/compare/v0.28.0...v0.29.0) (2026-07-05)
 
 
