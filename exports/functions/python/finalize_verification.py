@@ -5,6 +5,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
 class VerificationEvaluator:
     def __init__(self, check_score_only_func):
         self.check_score_only = check_score_only_func

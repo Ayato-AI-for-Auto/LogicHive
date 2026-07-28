@@ -19,7 +19,11 @@ async def test_pipeline_versioning_and_history_archival(test_db):
 
     # 1. First registration (V1)
     success = await do_save_async(
-        name=name, code=code_v1, description="adds two numbers", test_code=test_code, project=project
+        name=name,
+        code=code_v1,
+        description="adds two numbers",
+        test_code=test_code,
+        project=project,
     )
     assert success is True
 
@@ -31,14 +35,22 @@ async def test_pipeline_versioning_and_history_archival(test_db):
     # 2. Second registration with SAME code hash (should raise ValidationError)
     with pytest.raises(ValidationError) as exc_info:
         await do_save_async(
-            name=name, code=code_v1, description="adds two numbers - updated desc", test_code=test_code, project=project
+            name=name,
+            code=code_v1,
+            description="adds two numbers - updated desc",
+            test_code=test_code,
+            project=project,
         )
     assert "already exists" in str(exc_info.value)
 
     # 3. Third registration with DIFFERENT code (should increment version to 2 and archive V1)
     code_v2 = "def calculate_sum(a, b):\n    # Optimized version\n    return sum([a, b])"
     success = await do_save_async(
-        name=name, code=code_v2, description="adds two numbers - v2 optimized", test_code=test_code, project=project
+        name=name,
+        code=code_v2,
+        description="adds two numbers - v2 optimized",
+        test_code=test_code,
+        project=project,
     )
     assert success is True
 
@@ -51,7 +63,9 @@ async def test_pipeline_versioning_and_history_archival(test_db):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM logichive_function_history WHERE name = ? AND project = ?", (name, project))
+    cursor.execute(
+        "SELECT * FROM logichive_function_history WHERE name = ? AND project = ?", (name, project)
+    )
     history_records = cursor.fetchall()
 
     # We should have exactly 1 archived version (the original V1)
@@ -59,7 +73,7 @@ async def test_pipeline_versioning_and_history_archival(test_db):
     archive = history_records[0]
     assert archive["version"] == 1
     assert archive["code"] == code_v1
-    assert archive["description"] == "adds two numbers" # The latest state of V1
+    assert archive["description"] == "adds two numbers"  # The latest state of V1
     conn.close()
 
 
@@ -69,11 +83,17 @@ async def test_pipeline_verification_failure_injection(test_db):
     project = "pipeline_test"
     name = "flaky_function"
     # 'break_eval' in code triggers FakeLogicIntelligence to return quality score = 10 (fails gate)
-    code = "def flaky_function():\n    # break_eval to trigger low quality score\n    return 'flaky'"
+    code = (
+        "def flaky_function():\n    # break_eval to trigger low quality score\n    return 'flaky'"
+    )
     test_code = "assert flaky_function() == 'flaky'"
 
     success = await do_save_async(
-        name=name, code=code, description="flaky quality gate test", test_code=test_code, project=project
+        name=name,
+        code=code,
+        description="flaky quality gate test",
+        test_code=test_code,
+        project=project,
     )
     assert success is True
 
@@ -94,7 +114,10 @@ async def test_pipeline_verification_failure_injection(test_db):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("SELECT verification_status, reliability_score FROM logichive_functions WHERE name = ? AND project = ?", (name, project))
+    cursor.execute(
+        "SELECT verification_status, reliability_score FROM logichive_functions WHERE name = ? AND project = ?",
+        (name, project),
+    )
     row = cursor.fetchone()
     assert row is not None
     assert row["verification_status"] == "failed"

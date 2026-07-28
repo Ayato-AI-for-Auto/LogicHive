@@ -6,6 +6,7 @@ from pathlib import Path
 
 # Set PYTHONPATH and setup environment for the local imports
 import sys
+
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
@@ -18,6 +19,7 @@ os.environ["SQLITE_DB_PATH"] = temp_db_path
 
 from core.db import get_db_connection, close_db_connection
 from orchestrator import do_save_async, do_get_verification_status
+
 
 async def main():
     print("=============================================================")
@@ -39,7 +41,7 @@ async def main():
         description="Multiplies numbers",
         test_code="assert.strictEqual(solution.multiply(2, 3), 6);",
         project=project,
-        language="javascript"
+        language="javascript",
     )
     print(f"JS Save Status: {js_saved}")
 
@@ -51,7 +53,7 @@ async def main():
         description="Broken layout",
         test_code="",
         project=project,
-        language="html"
+        language="html",
     )
     print(f"HTML Save Status: {html_saved}")
 
@@ -63,7 +65,7 @@ async def main():
         description="Adds numbers in PHP",
         test_code="assert(add(2, 3) === 5);",
         project=project,
-        language="php"
+        language="php",
     )
     print(f"PHP Save Status: {php_saved}")
 
@@ -74,7 +76,9 @@ async def main():
         # Check if any are still pending
         check_conn = sqlite3.connect(temp_db_path)
         cursor = check_conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM logichive_functions WHERE verification_status = 'pending'")
+        cursor.execute(
+            "SELECT COUNT(*) FROM logichive_functions WHERE verification_status = 'pending'"
+        )
         pending_count = cursor.fetchone()[0]
         check_conn.close()
         if pending_count == 0:
@@ -85,7 +89,9 @@ async def main():
     check_conn = sqlite3.connect(temp_db_path)
     check_conn.row_factory = sqlite3.Row
     cursor = check_conn.cursor()
-    cursor.execute("SELECT name, language, verification_status, reliability_score, verification_report FROM logichive_functions")
+    cursor.execute(
+        "SELECT name, language, verification_status, reliability_score, verification_report FROM logichive_functions"
+    )
     rows = cursor.fetchall()
 
     for row in rows:
@@ -93,9 +99,9 @@ async def main():
         print(f"  - Verification Status: {row['verification_status']}")
         print(f"  - Reliability Score  : {row['reliability_score']}")
         print(f"  - Report / Log Excerpt:")
-        report_text = row['verification_report'] or ""
+        report_text = row["verification_report"] or ""
         print(f"    {report_text[:200]}...")
-    
+
     check_conn.close()
 
     # Clean up DB connection and file
@@ -104,6 +110,7 @@ async def main():
         os.remove(temp_db_path)
     except OSError:
         pass
+
 
 if __name__ == "__main__":
     asyncio.run(main())

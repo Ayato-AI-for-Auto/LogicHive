@@ -46,14 +46,14 @@ class EphemeralJavaScriptExecutor(BaseExecutor):
         # Check Node.js availability
         node_check = await self._is_node_available()
         if not node_check:
-            err_msg = "Execution failed: Node.js runtime is not installed or not found in system PATH."
+            err_msg = (
+                "Execution failed: Node.js runtime is not installed or not found in system PATH."
+            )
             logger.error(err_msg)
             return ExecutionResult(
                 status=ExecutionStatus.FAILURE,
                 logs=ExecutionLogs(stderr=err_msg),
-                error=ExecutionError(
-                    name="RuntimeError", value=err_msg, traceback=""
-                ),
+                error=ExecutionError(name="RuntimeError", value=err_msg, traceback=""),
                 duration=time.perf_counter() - start_time,
             )
 
@@ -104,7 +104,9 @@ class EphemeralJavaScriptExecutor(BaseExecutor):
         except Exception:
             return False
 
-    def _prepare_workspace(self, tmpdir: str, code: str, test_code: str, language: str) -> dict[str, Path]:
+    def _prepare_workspace(
+        self, tmpdir: str, code: str, test_code: str, language: str
+    ) -> dict[str, Path]:
         tmp_path = Path(tmpdir)
         ext = "ts" if language == "typescript" else "js"
 
@@ -167,4 +169,3 @@ runTest();
 js_executor = EphemeralJavaScriptExecutor()
 ExecutorFactory.register("javascript", js_executor)
 ExecutorFactory.register("typescript", js_executor)
-ClassEphemeralJavaScriptExecutor = "EphemeralJavaScriptExecutor"

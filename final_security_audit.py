@@ -9,6 +9,7 @@ SECRET_PATTERNS: List[str] = [
     r"(?i)(?:api_key|apikey|key|token|secret)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_-]{16,})"
 ]
 
+
 def calculate_entropy(data: str) -> float:
     if not data:
         return 0.0
@@ -22,6 +23,7 @@ def calculate_entropy(data: str) -> float:
             entropy += -p_x * math.log(p_x, 2)
     return entropy
 
+
 def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
     for pattern in SECRET_PATTERNS:
         matches = re.findall(pattern, code)
@@ -33,15 +35,18 @@ def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
                 "your_github_token",
                 "your_personal_access_token",
             ]:
-                 continue
+                continue
             risk = calculate_entropy(secret)
             return True, secret, risk
     return False, "", 0.0
+
+
 # --------------------------------------
 
 # Fast-path: Exclude binary and large files
 EXCLUDED_EXTS = {".exe", ".dll", ".so", ".pyc", ".pyd", ".png", ".jpg", ".pdf", ".zip", ".tar"}
 MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB limit
+
 
 def scan_file(path: str) -> Tuple[str, bool, str, float]:
     """Scans a single file and returns the result."""
@@ -56,6 +61,7 @@ def scan_file(path: str) -> Tuple[str, bool, str, float]:
             return path, found, secret, risk
     except Exception:
         return path, False, "", 0.0
+
 
 def run_full_audit():
     print("🕵️  LogicHive ULTIMATE Audit: Scanning workspace (Concurrent Fast-path)...")
@@ -100,6 +106,7 @@ def run_full_audit():
         print("\n🏆 LogicHive Certified: NO REAL SECRETS FOUND in the workspace.")
     else:
         print(f"\n☢️  TOTAL LEAKS: {found_count}")
+
 
 if __name__ == "__main__":
     run_full_audit()

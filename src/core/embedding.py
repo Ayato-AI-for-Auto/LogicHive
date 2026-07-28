@@ -66,9 +66,7 @@ class GeminiEmbeddingService:
             return list(vector)
         except Exception as e:
             logger.error(f"GeminiEmbeddingService: Inference Failed - {e}")
-            raise EmbeddingUnavailableError(
-                f"Gemini embedding inference failed: {e}"
-            ) from e
+            raise EmbeddingUnavailableError(f"Gemini embedding inference failed: {e}") from e
 
     def get_model_info(self) -> dict:
         return {
@@ -121,9 +119,7 @@ class OllamaEmbeddingService:
             raise
         except Exception as e:
             logger.error(f"OllamaEmbeddingService: Embedding generation failed: {e}")
-            raise EmbeddingUnavailableError(
-                f"Ollama embedding generation failed: {e}"
-            ) from e
+            raise EmbeddingUnavailableError(f"Ollama embedding generation failed: {e}") from e
 
     def get_model_info(self) -> dict:
         return {
@@ -161,6 +157,7 @@ class FastEmbedEmbeddingService:
                 "================================================================================\n"
             )
             import sys
+
             sys.stderr.write(msg)
             logger.error("FastEmbedEmbeddingService: Missing fastembed library.")
             raise ImportError("Missing 'fastembed' package.")
@@ -171,9 +168,7 @@ class FastEmbedEmbeddingService:
         try:
             self._ensure_initialized()
             if not self._model:
-                raise EmbeddingUnavailableError(
-                    "FastEmbed model failed to initialize."
-                )
+                raise EmbeddingUnavailableError("FastEmbed model failed to initialize.")
             embeddings = list(self._model.embed([text]))
             if embeddings:
                 vector = list(embeddings[0])
@@ -187,9 +182,7 @@ class FastEmbedEmbeddingService:
             raise
         except Exception as e:
             logger.error(f"FastEmbedEmbeddingService: Embedding generation failed: {e}")
-            raise EmbeddingUnavailableError(
-                f"FastEmbed embedding generation failed: {e}"
-            ) from e
+            raise EmbeddingUnavailableError(f"FastEmbed embedding generation failed: {e}") from e
 
     def get_model_info(self) -> dict:
         return {

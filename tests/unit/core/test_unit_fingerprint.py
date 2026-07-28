@@ -9,16 +9,18 @@ def test_fingerprint_generation():
     assert "cpu_arch" in fp
     assert "execution_driver" in fp
 
+
 def test_fingerprint_comparison_no_diff():
     """UNIT: Verify that identical fingerprints result in no differences."""
     fp = {
         "os": "Windows",
         "python_version": "3.11.3",
         "cpu_arch": "AMD64",
-        "execution_driver": "venv"
+        "execution_driver": "venv",
     }
     diffs = SystemFingerprint.compare(fp, fp)
     assert len(diffs) == 0
+
 
 def test_fingerprint_comparison_with_diffs():
     """UNIT: Verify that significant differences are detected."""
@@ -26,13 +28,13 @@ def test_fingerprint_comparison_with_diffs():
         "os": "Windows",
         "python_version": "3.11.3",
         "cpu_arch": "AMD64",
-        "execution_driver": "venv"
+        "execution_driver": "venv",
     }
     fp2 = {
         "os": "Linux",
         "python_version": "3.12.0",
         "cpu_arch": "arm64",
-        "execution_driver": "docker"
+        "execution_driver": "docker",
     }
     diffs = SystemFingerprint.compare(fp1, fp2)
     assert len(diffs) >= 4

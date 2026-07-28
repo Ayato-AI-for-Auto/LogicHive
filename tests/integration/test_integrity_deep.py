@@ -11,6 +11,7 @@ from orchestrator import do_save_async, do_search_async
 async def test_deep_data_integrity_handshake(test_db):
     """INTEGRATION: Deep dive into DB and FAISS to ensure physical data integrity."""
     from storage.vector_store import vector_manager
+
     name = "integrity_test"
     code = "def add_logic(a, b):\n    return a + b"
     project = "integrity_deep"
@@ -23,7 +24,7 @@ async def test_deep_data_integrity_handshake(test_db):
         tags=["integrity"],
         project=project,
         test_code="res = add_logic(1, 2)\nassert res == 3",
-        dependencies=[]
+        dependencies=[],
     )
     assert success is True
 
@@ -45,7 +46,6 @@ async def test_deep_data_integrity_handshake(test_db):
             )
             row = cursor.fetchone()
             if row:
-
                 status_found = row[0]
                 if status_found == "verified":
                     verified = True
@@ -104,4 +104,4 @@ async def test_deep_data_integrity_handshake(test_db):
     # 5. VERIFY EMBEDDING COLUMN
     assert row["embedding"] is not None
     emb = json.loads(row["embedding"])
-    assert len(emb) == 768 # Default dim
+    assert len(emb) == 768  # Default dim

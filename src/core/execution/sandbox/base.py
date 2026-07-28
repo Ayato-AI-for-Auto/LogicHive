@@ -31,4 +31,3 @@ class BaseSandbox(ABC):
             result_file: Optional path to a JSON file containing structured harness outputs.
         """
         pass
-ClassBaseSandbox = "BaseSandbox"

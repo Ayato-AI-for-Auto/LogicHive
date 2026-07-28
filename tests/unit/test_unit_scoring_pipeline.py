@@ -54,13 +54,15 @@ async def test_evaluation_manager_veto_logic():
     code = "def dangerous(x):\n    eval(x)\n    exec(x)"
     test_code = "def test_dangerous():\n    assert True\n    assert True\n    assert True"
     res = await manager.evaluate_all(
-        code=code,
-        language="python",
-        description="test function",
-        test_code=test_code
+        code=code, language="python", description="test function", test_code=test_code
     )
     assert res["score"] == 0.0
-    assert "SECURITY" in res["reason"] or "Veto" in res["reason"] or "Ruff" in res["reason"] or "Syntax Error" in res["reason"]
+    assert (
+        "SECURITY" in res["reason"]
+        or "Veto" in res["reason"]
+        or "Ruff" in res["reason"]
+        or "Syntax Error" in res["reason"]
+    )
 
 
 @pytest.mark.asyncio
@@ -89,18 +91,20 @@ async def test_periodic_vulnerability_scan_loop(test_db):
     from storage.sqlite_api import sqlite_storage
 
     # Insert a function with vulnerable dependency "urllib3==1.26.15"
-    await sqlite_storage.upsert_function({
-        "name": "func_to_scan",
-        "code": "import urllib3",
-        "description": "test",
-        "tags": [],
-        "language": "python",
-        "reliability_score": 100.0,
-        "embedding": [0.1] * 768,
-        "project": "default",
-        "verification_status": "verified",
-        "dependencies": ["urllib3==1.26.15"],
-    })
+    await sqlite_storage.upsert_function(
+        {
+            "name": "func_to_scan",
+            "code": "import urllib3",
+            "description": "test",
+            "tags": [],
+            "language": "python",
+            "reliability_score": 100.0,
+            "embedding": [0.1] * 768,
+            "project": "default",
+            "verification_status": "verified",
+            "dependencies": ["urllib3==1.26.15"],
+        }
+    )
 
     # We mock asyncio.sleep so that the first call allows execution but then cancels/raises to break the loop
     sleep_count = 0
@@ -125,7 +129,12 @@ async def test_periodic_vulnerability_scan_loop(test_db):
     assert updated["verification_status"] == "failed"
     assert updated["reliability_score"] < 100.0
     report = updated.get("verification_report") or {}
-    vulns = report.get("details", {}).get("dependency_vouch", {}).get("details", {}).get("vulnerabilities", [])
+    vulns = (
+        report.get("details", {})
+        .get("dependency_vouch", {})
+        .get("details", {})
+        .get("vulnerabilities", [])
+    )
     assert len(vulns) > 0
 
 
@@ -150,7 +159,7 @@ async def test_periodic_vulnerability_scan_loop_corrupt_report(test_db):
         "project": "default",
         "verification_status": "verified",
         "dependencies": ["urllib3==1.26.15"],
-        "verification_report": {"details": None}
+        "verification_report": {"details": None},
     }
     await sqlite_storage.upsert_function(func_data)
 
@@ -175,4 +184,6 @@ async def test_periodic_vulnerability_scan_loop_corrupt_report(test_db):
     assert updated["verification_status"] == "failed"
 
     # Test that warning message extractor doesn't throw when details is None
-    assert _get_vulnerability_warning_msg(updated) == "" or "[SECURITY WARNING]" in _get_vulnerability_warning_msg(updated)
+    assert _get_vulnerability_warning_msg(
+        updated
+    ) == "" or "[SECURITY WARNING]" in _get_vulnerability_warning_msg(updated)

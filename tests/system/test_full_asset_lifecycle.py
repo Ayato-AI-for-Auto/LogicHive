@@ -24,7 +24,7 @@ async def test_full_asset_lifecycle(test_db):
         description=description,
         test_code=test_code,
         project=project,
-        language="python"
+        language="python",
     )
     assert success is True
 
@@ -53,6 +53,7 @@ async def test_full_asset_lifecycle(test_db):
     assert final_asset["reliability_score"] > 0
     assert final_asset["embedding"] is not None
 
+
 @pytest.mark.asyncio
 async def test_system_rejection_flow(test_db):
     """
@@ -61,18 +62,13 @@ async def test_system_rejection_flow(test_db):
     name = "bad_func"
     project = "e2e_system"
     code = "def bad_func(): pass"
-    test_code = "" # No assertions -> Immediate rejection in real life, but here it's caught in pre-check or facts gate
+    test_code = ""  # No assertions -> Immediate rejection in real life, but here it's caught in pre-check or facts gate
 
     # Verification will fail because no test_code is provided
     # However, do_save_async returns success because the 'request' is accepted for processing
     # BUT if test_code is empty, it might fail pre-check.
 
-    success = await do_save_async(
-        name=name,
-        code=code,
-        test_code=test_code,
-        project=project
-    )
+    success = await do_save_async(name=name, code=code, test_code=test_code, project=project)
     assert success is True
 
     # Poll for failure

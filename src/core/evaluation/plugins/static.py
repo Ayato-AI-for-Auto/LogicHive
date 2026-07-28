@@ -293,14 +293,18 @@ class PhpStaticEvaluator(BaseEvaluator):
 
         # Check if php CLI is available to run syntax check (php -l)
         try:
-            with tempfile.NamedTemporaryFile(suffix=".php", delete=False, mode="w", encoding="utf-8") as tmp:
+            with tempfile.NamedTemporaryFile(
+                suffix=".php", delete=False, mode="w", encoding="utf-8"
+            ) as tmp:
                 tmp.write(code if code.strip().startswith("<?php") else "<?php\n" + code)
                 tmp_path = tmp.name
 
             proc = await asyncio.create_subprocess_exec(
-                "php", "-l", tmp_path,
+                "php",
+                "-l",
+                tmp_path,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await proc.communicate()
 
@@ -308,7 +312,9 @@ class PhpStaticEvaluator(BaseEvaluator):
                 os.remove(tmp_path)
 
             if proc.returncode == 0:
-                return EvaluationResult(score=100.0, reason="PHP syntax verification (php -l) passed.")
+                return EvaluationResult(
+                    score=100.0, reason="PHP syntax verification (php -l) passed."
+                )
             else:
                 err = stdout.decode().strip() or stderr.decode().strip()
                 return EvaluationResult(score=0.0, reason=f"PHP syntax error: {err}")
@@ -319,7 +325,11 @@ class PhpStaticEvaluator(BaseEvaluator):
             if "$" not in code:
                 score -= 10
                 reasons.append("Notice: No PHP variables ($) defined.")
-            reason_str = " | ".join(reasons) if reasons else "PHP static syntax checks passed (local checks only)."
+            reason_str = (
+                " | ".join(reasons)
+                if reasons
+                else "PHP static syntax checks passed (local checks only)."
+            )
             return EvaluationResult(score=score, reason=reason_str)
 
 
@@ -357,16 +367,20 @@ class HtmlStaticEvaluator(BaseEvaluator):
             return EvaluationResult(score=100.0, reason="Skipped (Not HTML).")
 
         from core.execution.html import StrictHTMLParser
+
         parser = StrictHTMLParser()
         try:
             parser.feed(code)
             parser.close()
             if parser.errors:
-                return EvaluationResult(score=0.0, reason=f"HTML Validation Errors: {'; '.join(parser.errors)}")
+                return EvaluationResult(
+                    score=0.0, reason=f"HTML Validation Errors: {'; '.join(parser.errors)}"
+                )
             if parser.tags:
-                return EvaluationResult(score=0.0, reason=f"Unclosed HTML tags: {', '.join(parser.tags)}")
+                return EvaluationResult(
+                    score=0.0, reason=f"Unclosed HTML tags: {', '.join(parser.tags)}"
+                )
         except Exception as e:
             return EvaluationResult(score=0.0, reason=f"HTML static analysis crashed: {e}")
 
         return EvaluationResult(score=100.0, reason="HTML static structure validation passed.")
-

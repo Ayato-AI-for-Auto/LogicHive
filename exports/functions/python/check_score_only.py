@@ -48,9 +48,7 @@ class ScoreChecker:
         report["security"] = {"bandit": s_bandit, "safety": s_safety}
         security_penalty = s_bandit["score_penalty"] + s_safety["score_penalty"]
 
-        final_score = max(
-            0, 100 - linter_penalty - formatter_penalty - security_penalty
-        )
+        final_score = max(0, 100 - linter_penalty - formatter_penalty - security_penalty)
         report["final_score"] = int(final_score)
 
         # Re-evaluate reliability tier

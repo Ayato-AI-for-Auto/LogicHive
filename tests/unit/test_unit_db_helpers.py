@@ -66,7 +66,7 @@ async def test_sqlite_storage_direct_verification(db_isolation):
         "test_code": "assert add(1, 2) == 3",
         "env_fingerprint": {"python": "3.11"},
         "verification_status": "verified",
-        "verification_report": {"gate": "passed"}
+        "verification_report": {"gate": "passed"},
     }
 
     # Perform upsert
@@ -79,7 +79,10 @@ async def test_sqlite_storage_direct_verification(db_isolation):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM logichive_functions WHERE name = ? AND project = ?", ("add_numbers", "math_library"))
+    cursor.execute(
+        "SELECT * FROM logichive_functions WHERE name = ? AND project = ?",
+        ("add_numbers", "math_library"),
+    )
     row = cursor.fetchone()
     assert row is not None
 
@@ -91,6 +94,7 @@ async def test_sqlite_storage_direct_verification(db_isolation):
 
     # JSON strings must be decoded and matched
     import json
+
     assert json.loads(row["tags"]) == ["math", "utility"]
     assert json.loads(row["test_metrics"]) == {"passed": 3}
     assert json.loads(row["dependencies"]) == ["numpy"]

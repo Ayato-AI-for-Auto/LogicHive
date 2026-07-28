@@ -50,9 +50,7 @@ class EphemeralPhpExecutor(BaseExecutor):
             return ExecutionResult(
                 status=ExecutionStatus.FAILURE,
                 logs=ExecutionLogs(stderr=err_msg),
-                error=ExecutionError(
-                    name="RuntimeError", value=err_msg, traceback=""
-                ),
+                error=ExecutionError(name="RuntimeError", value=err_msg, traceback=""),
                 duration=time.perf_counter() - start_time,
             )
 
@@ -147,4 +145,3 @@ file_put_contents('{res_path}', json_encode($results, JSON_PRETTY_PRINT));
 
 # Auto-register
 ExecutorFactory.register("php", EphemeralPhpExecutor())
-ClassEphemeralPhpExecutor = "EphemeralPhpExecutor"

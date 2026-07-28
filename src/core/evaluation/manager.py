@@ -61,7 +61,7 @@ class EvaluationManager:
                 potential_dirs = [
                     base_dir / "core" / "evaluation" / "plugins",
                     base_dir / "src" / "core" / "evaluation" / "plugins",
-                    base_dir / "engine" / "src" / "core" / "evaluation" / "plugins"
+                    base_dir / "engine" / "src" / "core" / "evaluation" / "plugins",
                 ]
                 for p in potential_dirs:
                     if p.exists():
@@ -185,14 +185,17 @@ class EvaluationManager:
         test_code = kwargs.get("test_code", "")
 
         if not is_draft and not test_code and lang != "html":
-            return cast(dict[str, Any], {
-                "score": 40.0,
-                "reason": (
-                    "Unverified Asset: No test code provided. "
-                    "Use [AI-DRAFT] in description to skip verification check."
-                ),
-                "details": {"system": "Rigor Gate", "status": "missing_tests"},
-            })
+            return cast(
+                dict[str, Any],
+                {
+                    "score": 40.0,
+                    "reason": (
+                        "Unverified Asset: No test code provided. "
+                        "Use [AI-DRAFT] in description to skip verification check."
+                    ),
+                    "details": {"system": "Rigor Gate", "status": "missing_tests"},
+                },
+            )
         kwargs["_is_draft"] = is_draft  # Internal use
         return None
 
@@ -231,71 +234,97 @@ class EvaluationManager:
         # Structural Veto
         struct = results.get("structural")
         if struct and struct.score is not None and struct.score == 0:
-            return cast(dict[str, Any], {
-                "score": 0.0,
-                "reason": f"CRITICAL STRUCTURAL ERROR: {struct.reason}",
-                "details": {"structural": struct},
-                "is_system_error": struct.is_system_error,
-            })
+            return cast(
+                dict[str, Any],
+                {
+                    "score": 0.0,
+                    "reason": f"CRITICAL STRUCTURAL ERROR: {struct.reason}",
+                    "details": {"structural": struct},
+                    "is_system_error": struct.is_system_error,
+                },
+            )
 
         # Security Veto
         sec = results.get("security_static")
         if sec and sec.score is not None and sec.score < 60:
-            return cast(dict[str, Any], {
-                "score": 0.0,
-                "reason": f"SECURITY REJECTION: {sec.reason}",
-                "details": self._serialize_results(results),
-                "is_system_error": aggregate_system_error,
-            })
+            return cast(
+                dict[str, Any],
+                {
+                    "score": 0.0,
+                    "reason": f"SECURITY REJECTION: {sec.reason}",
+                    "details": self._serialize_results(results),
+                    "is_system_error": aggregate_system_error,
+                },
+            )
 
         # Dependency Veto
         dep = results.get("dependency_vouch")
         if dep and dep.score is not None and dep.score < 70:
-            return cast(dict[str, Any], {
-                "score": 0.0,
-                "reason": f"DEPENDENCY REJECTION: {dep.reason}",
-                "details": self._serialize_results(results),
-                "is_system_error": aggregate_system_error,
-            })
+            return cast(
+                dict[str, Any],
+                {
+                    "score": 0.0,
+                    "reason": f"DEPENDENCY REJECTION: {dep.reason}",
+                    "details": self._serialize_results(results),
+                    "is_system_error": aggregate_system_error,
+                },
+            )
 
         # Deterministic Veto (Syntax Errors)
         det = results.get("deterministic")
         if det and det.score is not None and det.score == 0:
             py_stat = results.get("python_static")
-            if py_stat and py_stat.score is not None and py_stat.score == 0 and "Syntax Error" in py_stat.reason:
-                return cast(dict[str, Any], {
+            if (
+                py_stat
+                and py_stat.score is not None
+                and py_stat.score == 0
+                and "Syntax Error" in py_stat.reason
+            ):
+                return cast(
+                    dict[str, Any],
+                    {
+                        "score": 0.0,
+                        "reason": f"CRITICAL SYNTAX ERROR: {py_stat.reason}",
+                        "details": self._serialize_results(results),
+                        "is_system_error": aggregate_system_error,
+                    },
+                )
+            return cast(
+                dict[str, Any],
+                {
                     "score": 0.0,
-                    "reason": f"CRITICAL SYNTAX ERROR: {py_stat.reason}",
+                    "reason": f"DETERMINISTIC REJECTION: {det.reason}",
                     "details": self._serialize_results(results),
                     "is_system_error": aggregate_system_error,
-                })
-            return cast(dict[str, Any], {
-                "score": 0.0,
-                "reason": f"DETERMINISTIC REJECTION: {det.reason}",
-                "details": self._serialize_results(results),
-                "is_system_error": aggregate_system_error,
-            })
+                },
+            )
 
         # Language-specific static Veto (e.g. html_static, c_static, etc.)
         for key in ["html_static", "c_static", "java_static", "php_static"]:
             stat = results.get(key)
             if stat and stat.score is not None and stat.score == 0:
-                return cast(dict[str, Any], {
-                    "score": 0.0,
-                    "reason": f"STATIC VALIDATION REJECTION ({key}): {stat.reason}",
-                    "details": self._serialize_results(results),
-                    "is_system_error": stat.is_system_error or aggregate_system_error,
-                })
+                return cast(
+                    dict[str, Any],
+                    {
+                        "score": 0.0,
+                        "reason": f"STATIC VALIDATION REJECTION ({key}): {stat.reason}",
+                        "details": self._serialize_results(results),
+                        "is_system_error": stat.is_system_error or aggregate_system_error,
+                    },
+                )
 
         # Runtime Veto
         run = results.get("runtime")
         if run and run.score is not None and run.score == 0 and not kwargs.get("_is_draft"):
-            return cast(dict[str, Any], {
-                "score": 0.0,
-                "reason": f"RUNTIME REJECTION: {run.reason}",
-                "details": self._serialize_results(results),
-                "is_system_error": run.is_system_error or aggregate_system_error,
-            })
+            return cast(
+                dict[str, Any],
+                {
+                    "score": 0.0,
+                    "reason": f"RUNTIME REJECTION: {run.reason}",
+                    "details": self._serialize_results(results),
+                    "is_system_error": run.is_system_error or aggregate_system_error,
+                },
+            )
 
         return None
 
@@ -390,9 +419,12 @@ class EvaluationManager:
         self, final_score: float, reasons: list[str], results: dict[str, EvaluationResult]
     ) -> dict[str, Any]:
         aggregate_system_error = any(v.is_system_error for v in results.values())
-        return cast(dict[str, Any], {
-            "score": final_score,
-            "reason": " | ".join(reasons),
-            "details": self._serialize_results(results),
-            "is_system_error": aggregate_system_error,
-        })
+        return cast(
+            dict[str, Any],
+            {
+                "score": final_score,
+                "reason": " | ".join(reasons),
+                "details": self._serialize_results(results),
+                "is_system_error": aggregate_system_error,
+            },
+        )

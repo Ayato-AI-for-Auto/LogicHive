@@ -20,7 +20,7 @@ async def test_storage_upsert_and_physical_check(test_db):
         "code": "def test_func(): pass",
         "language": "python",
         "reliability_score": 0.85,
-        "verification_status": "verified"
+        "verification_status": "verified",
     }
 
     # 1. LogicHive API call
@@ -29,7 +29,10 @@ async def test_storage_upsert_and_physical_check(test_db):
     # 2. Physical verification (Direct SQL)
     conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, reliability_score, verification_status FROM logichive_functions WHERE name=?", (name,))
+    cursor.execute(
+        "SELECT name, reliability_score, verification_status FROM logichive_functions WHERE name=?",
+        (name,),
+    )
     row = cursor.fetchone()
     conn.close()
 
@@ -38,12 +41,14 @@ async def test_storage_upsert_and_physical_check(test_db):
     assert row[1] == 0.85
     assert row[2] == "verified"
 
+
 @pytest.mark.asyncio
 async def test_storage_vector_sync(test_db):
     """
     INTEGRATION: Verify that adding an embedding updates both DB and FAISS index.
     """
     from storage.vector_store import vector_manager
+
     name = "vector_test"
     project = "default"
     embedding = [0.1] * 768
@@ -55,7 +60,9 @@ async def test_storage_vector_sync(test_db):
     await sqlite_storage.update_function_embedding(name, project, embedding)
 
     # 2. Update FAISS via vector_manager
-    await vector_manager.upsert_vector(name, embedding, metadata={"project": project}, project=project)
+    await vector_manager.upsert_vector(
+        name, embedding, metadata={"project": project}, project=project
+    )
 
     # 3. Verify DB physical state
     conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
@@ -70,18 +77,22 @@ async def test_storage_vector_sync(test_db):
     assert vector_manager.collection.count() == 1
     assert len(vector_manager.collection.get(ids=[f"{project}:{name}"])["ids"]) == 1
 
+
 @pytest.mark.asyncio
 async def test_storage_deletion_integrity(test_db):
     """
     INTEGRATION: Verify that deleting a function removes it from both SQLite and FAISS.
     """
     from storage.vector_store import vector_manager
+
     name = "delete_me"
     project = "default"
     embedding = [0.5] * 768
 
     await sqlite_storage.upsert_function({"name": name, "project": project, "code": "..."})
-    await vector_manager.upsert_vector(name, embedding, metadata={"project": project}, project=project)
+    await vector_manager.upsert_vector(
+        name, embedding, metadata={"project": project}, project=project
+    )
 
     # 1. Perform deletion
     await sqlite_storage.delete_function(name, project=project)

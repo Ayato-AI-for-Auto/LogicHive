@@ -27,6 +27,7 @@ async def test_deep_data_analysis(test_db):
         if status["status"] == "verified":
             break
         import asyncio
+
         await asyncio.sleep(0.5)
 
     # 3. Direct SQLite Analysis
@@ -60,18 +61,20 @@ async def test_deep_data_analysis(test_db):
     assert "os" in env
     print(f"Env: {env['os']} ({env.get('python_version')})")
 
+
 @pytest.mark.asyncio
 async def test_zombie_detection(test_db):
     """
     SYSTEM: Check for synchronization between DB and FAISS.
     """
     from storage.vector_store import vector_manager
+
     await vector_manager.ensure_initialized([])
     # Force a desync by inserting directly via SQL (bypassing the logic that updates FAISS)
     conn = sqlite3.connect(core.config.SQLITE_DB_PATH)
     conn.execute(
         "INSERT INTO logichive_functions (id, name, project, code, embedding) VALUES (?, ?, ?, ?, ?)",
-        ("ghost-id", "ghost", "default", "pass", json.dumps([0.1]*768))
+        ("ghost-id", "ghost", "default", "pass", json.dumps([0.1] * 768)),
     )
     conn.commit()
     conn.close()

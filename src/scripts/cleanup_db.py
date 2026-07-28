@@ -3,21 +3,23 @@
 LogicHive DB クリーンアップスクリプト
 未使用テーブルを安全に削除します。
 """
+
 import sqlite3
 import os
 import shutil
 from datetime import datetime
 
-DB_PATH = r'C:\Users\saiha\.logichive\data\logichive.db'
+DB_PATH = r"C:\Users\saiha\.logichive\data\logichive.db"
 
 # 削除対象の未使用テーブル
 UNUSED_TABLES = [
-    'schema_migrations',
-    'functions',
-    'embeddings',
-    'config',
-    'meetings',
+    "schema_migrations",
+    "functions",
+    "embeddings",
+    "config",
+    "meetings",
 ]
+
 
 def backup_db():
     """DBのバックアップを作成"""
@@ -27,16 +29,18 @@ def backup_db():
     print(f"[OK] バックアップ作成: {backup_name}")
     return backup_path
 
+
 def check_table_references():
     """コードベースからテーブル参照を再チェック"""
     # 現在のコードで使用されているテーブル
-    active_tables = {'logichive_functions', 'logichive_function_history', 'sqlite_sequence'}
+    active_tables = {"logichive_functions", "logichive_function_history", "sqlite_sequence"}
 
     print("\n=== テーブル参照チェック ===")
     print(f"  使用中（削除対象外）: {', '.join(active_tables)}")
     print(f"  削除対象: {', '.join(UNUSED_TABLES)}")
 
     return True
+
 
 def drop_tables():
     """未使用テーブルを削除"""
@@ -68,6 +72,7 @@ def drop_tables():
 
     conn.close()
 
+
 def main():
     print("=" * 60)
     print("LogicHive DB クリーンアップ")
@@ -98,6 +103,7 @@ def main():
     print("[OK] クリーンアップ完了")
     print(f"   バックアップ: {backup_path}")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     main()

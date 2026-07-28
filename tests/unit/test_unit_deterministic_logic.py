@@ -11,6 +11,7 @@ def test_is_constant_expr_primitives():
     assert evaluator._is_constant_expr(ast.parse("'hello'").body[0].value) is True
     assert evaluator._is_constant_expr(ast.parse("True").body[0].value) is True
 
+
 def test_is_constant_expr_comparisons():
     evaluator = DeterministicEvaluator()
 
@@ -19,13 +20,17 @@ def test_is_constant_expr_comparisons():
     assert evaluator._is_constant_expr(ast.parse("'a' != 'b'").body[0].value) is True
     assert evaluator._is_constant_expr(ast.parse("True is True").body[0].value) is True
 
+
 def test_is_constant_expr_dynamic():
     evaluator = DeterministicEvaluator()
 
     # 3. Dynamic expressions (Real Testing)
     assert evaluator._is_constant_expr(ast.parse("x == 1").body[0].value) is False
     assert evaluator._is_constant_expr(ast.parse("func() == True").body[0].value) is False
-    assert evaluator._is_constant_expr(ast.parse("1 + 1").body[0].value) is False  # binary op not handled as constant yet
+    assert (
+        evaluator._is_constant_expr(ast.parse("1 + 1").body[0].value) is False
+    )  # binary op not handled as constant yet
+
 
 def test_is_theatrical_call():
     evaluator = DeterministicEvaluator()

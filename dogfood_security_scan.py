@@ -8,6 +8,7 @@ SECRET_PATTERNS: List[str] = [
     r"(?i)(?:api_key|apikey|key|token|secret)['\"]?\s*[:=]\s*['\"]([a-zA-Z0-9_-]{16,})['\"]"
 ]
 
+
 def calculate_entropy(data: str) -> float:
     if not data:
         return 0.0
@@ -21,6 +22,7 @@ def calculate_entropy(data: str) -> float:
             entropy += -p_x * math.log(p_x, 2)
     return entropy
 
+
 def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
     for pattern in SECRET_PATTERNS:
         matches = re.findall(pattern, code)
@@ -29,7 +31,10 @@ def contains_secrets_scanner(code: str) -> Tuple[bool, str, float]:
             risk = calculate_entropy(secret)
             return True, secret, risk
     return False, "", 0.0
+
+
 # --------------------------------------
+
 
 def run_dogfood_scan(directory: str):
     print(f"🚀 LogicHive Dogfooding: Scanning '{directory}' for secrets...")
@@ -42,7 +47,7 @@ def run_dogfood_scan(directory: str):
                     with open(path, "r", encoding="utf-8") as f:
                         content = f.read()
                         found, secret, risk = contains_secrets_scanner(content)
-                        if found and risk > 3.0: # Filter for high-risk only
+                        if found and risk > 3.0:  # Filter for high-risk only
                             print(f"[!] DANGER: High-risk secret found in {path}")
                             print(f"    Secret: {secret[:4]}...{secret[-4:]} (Entropy: {risk:.2f})")
                             found_count += 1
@@ -53,6 +58,7 @@ def run_dogfood_scan(directory: str):
         print("✅ Scan complete: No high-risk secrets found in source files.")
     else:
         print(f"❌ Scan complete: Found {found_count} potential security risks.")
+
 
 if __name__ == "__main__":
     # Scan src and tools

@@ -60,6 +60,7 @@ async def test_system_end_to_end_flow(test_db):
     # Add a small delay to ensure all DB operations (including vector sync) are fully committed
     await asyncio.sleep(0.5)
     from mcp_server import check_integrity
+
     integrity_res = await check_integrity()
     assert "LogicHive Integrity Report" in integrity_res
     assert "✅ Connected" in integrity_res or "✅ Found on disk" in integrity_res

@@ -22,9 +22,9 @@ async def main():
         rows = await cursor.fetchall()
 
     total = len(rows)
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  rebuild_embeddings: {total} functions need embedding regeneration")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     if total == 0:
         print("Nothing to do.")
@@ -41,9 +41,7 @@ async def main():
         try:
             async with semaphore:
                 tags = json.loads(tags_json) if tags_json else []
-                search_doc = intel.construct_search_document(
-                    name, desc or "", tags, code or ""
-                )
+                search_doc = intel.construct_search_document(name, desc or "", tags, code or "")
                 embedding = await intel.generate_embedding(search_doc)
                 await sqlite_storage.update_function_embedding(name, proj, embedding)
                 await vector_manager.upsert_vector(
@@ -60,9 +58,9 @@ async def main():
 
     await asyncio.gather(*[process_one(row) for row in rows])
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Done: {success} succeeded, {fail} failed, {total} total")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

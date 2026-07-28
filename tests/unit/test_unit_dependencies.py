@@ -11,6 +11,7 @@ def test_extract_dependencies_python_simple():
     assert "os" not in deps
     assert "datetime" not in deps
 
+
 def test_extract_dependencies_python_complex():
     code = textwrap.dedent("""
         import numpy as np
@@ -21,6 +22,7 @@ def test_extract_dependencies_python_complex():
     assert "numpy" in deps
     assert "sklearn" in deps
     assert "torch" in deps
+
 
 def test_extract_dependencies_js():
     code = """
@@ -33,9 +35,11 @@ def test_extract_dependencies_js():
     assert "express" in deps
     assert "./path" not in deps
 
+
 def test_extract_dependencies_empty():
     assert extract_dependencies("", language="python") == []
     assert extract_dependencies("print('hello')", language="python") == []
+
 
 def test_extract_dependencies_malformed():
     # Should not crash on invalid syntax

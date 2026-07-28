@@ -42,7 +42,7 @@ async def test_ai_gate_theatrical_abstraction():
         code=code,
         language="python",
         test_code=test_code,
-        description="High-precision distributed arithmetic provider with factory pattern."
+        description="High-precision distributed arithmetic provider with factory pattern.",
     )
 
     ai_res = results["details"].get("ai_gate")
@@ -52,6 +52,7 @@ async def test_ai_gate_theatrical_abstraction():
         print(f"Reason: {ai_res['reason']}")
         # Expectation: AI should notice the over-engineering
         # assert ai_res["score"] < 70
+
 
 @pytest.mark.asyncio
 @pytest.mark.use_real_intelligence
@@ -82,7 +83,7 @@ async def test_ai_gate_math_smoke_screen():
         code=code,
         language="python",
         test_code=test_code,
-        description="Sophisticated high-entropy signal generator for stochastic modeling."
+        description="Sophisticated high-entropy signal generator for stochastic modeling.",
     )
 
     ai_res = results["details"].get("ai_gate")

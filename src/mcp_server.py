@@ -187,6 +187,7 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
         stored_env = f_data.get("env_fingerprint")
         if stored_env:
             from core.system_info import SystemFingerprint
+
             warning = SystemFingerprint.generate_warning_msg(stored_env)
             if warning:
                 warnings_list.append(warning)
@@ -392,9 +393,7 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
             status.append(f"- Record Count: {count} ({expected_count} with embeddings)")
 
         # 2. Vector Store Check (ChromaDB)
-        status.append(
-            f"### 2. Vector Store (ChromaDB)\n- Path: `{CHROMA_DB_DIR}`"
-        )
+        status.append(f"### 2. Vector Store (ChromaDB)\n- Path: `{CHROMA_DB_DIR}`")
 
         # Check for memory sync (Silent check for initialization)
         if not vector_manager._initialized:
@@ -532,9 +531,7 @@ async def rebuild_embeddings(
                 async with semaphore:
                     # Reconstruct search document
                     tags = json.loads(tags_json) if tags_json else []
-                    search_doc = intel.construct_search_document(
-                        name, desc or "", tags, code or ""
-                    )
+                    search_doc = intel.construct_search_document(name, desc or "", tags, code or "")
                     embedding = await intel.generate_embedding(search_doc)
 
                     # Update DB
@@ -639,6 +636,7 @@ def run_server():
             if not os.environ.get("LOGICHIVE_TESTING"):
                 try:
                     import sqlite3 as _sync_sqlite
+
                     db_path = get_sqlite_db_path()
                     _conn = _sync_sqlite.connect(db_path)
                     _cursor = _conn.execute(

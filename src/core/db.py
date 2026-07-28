@@ -36,6 +36,7 @@ async def get_db_connection() -> aiosqlite.Connection:
 
         if _global_db is None:
             from core.config import get_sqlite_db_path
+
             _global_db = await aiosqlite.connect(get_sqlite_db_path())
             _global_db.row_factory = aiosqlite.Row
             _creator_loop = current_loop
@@ -88,9 +89,15 @@ async def get_db_connection() -> aiosqlite.Connection:
                 archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
-            await _global_db.execute("CREATE INDEX IF NOT EXISTS idx_func_project_name ON logichive_functions(project, name);")
-            await _global_db.execute("CREATE INDEX IF NOT EXISTS idx_func_hash ON logichive_functions(code_hash);")
-            await _global_db.execute("CREATE INDEX IF NOT EXISTS idx_hist_name ON logichive_function_history(name);")
+            await _global_db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_func_project_name ON logichive_functions(project, name);"
+            )
+            await _global_db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_func_hash ON logichive_functions(code_hash);"
+            )
+            await _global_db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_hist_name ON logichive_function_history(name);"
+            )
             await _global_db.commit()
 
         duration = time.perf_counter() - start_time

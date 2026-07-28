@@ -27,10 +27,11 @@ async def test_system_bootstrap_and_user_flow(test_db):
     # Assert initially not ready in this clean test_db / home sandbox
     assert bootstrapper.is_venv_ready() is False
 
-    with patch("core.system.bootstrapper.shutil.which", return_value="mock_uv"), \
-         patch("core.system.bootstrapper.subprocess.run") as mock_sub_run, \
-         patch.object(LogicHiveBootstrapper, "get_venv_python") as mock_get_python:
-
+    with (
+        patch("core.system.bootstrapper.shutil.which", return_value="mock_uv"),
+        patch("core.system.bootstrapper.subprocess.run") as mock_sub_run,
+        patch.object(LogicHiveBootstrapper, "get_venv_python") as mock_get_python,
+    ):
         # Mock python_exe path existence check
         mock_python = MagicMock()
         mock_python.exists.return_value = True
@@ -54,7 +55,11 @@ async def test_system_bootstrap_and_user_flow(test_db):
 
     # Save function
     saved = await do_save_async(
-        name=name, code=code, description="multiplies two numbers", test_code=test_code, project=project
+        name=name,
+        code=code,
+        description="multiplies two numbers",
+        test_code=test_code,
+        project=project,
     )
     assert saved is True
 
@@ -72,7 +77,9 @@ async def test_system_bootstrap_and_user_flow(test_db):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (name, project))
+    cursor.execute(
+        "SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (name, project)
+    )
     db_row = cursor.fetchone()
     assert db_row is not None
     assert db_row["verification_status"] == "verified"
@@ -80,9 +87,7 @@ async def test_system_bootstrap_and_user_flow(test_db):
     conn.close()
 
     # Retrieve function via hybrid search
-    results = await do_search_async(
-        query="multiplies", project=project, limit=1
-    )
+    results = await do_search_async(query="multiplies", project=project, limit=1)
     assert len(results) == 1
     assert results[0]["name"] == name
     assert results[0]["project"] == project
@@ -95,7 +100,7 @@ async def test_system_bootstrap_and_user_flow(test_db):
         "project": project,
         "name": None,  # SQLite column 'name' is NOT NULL
         "code": "def bad(): pass",
-        "description": "missing name"
+        "description": "missing name",
     }
 
     # Verify that SqliteStorage raises StorageError when inserting malformed/violating entries
@@ -107,6 +112,6 @@ async def test_system_bootstrap_and_user_flow(test_db):
     with pytest.raises(sqlite3.IntegrityError):
         await db.execute(
             "INSERT INTO logichive_functions (id, name, code) VALUES (?, ?, ?)",
-            ("unique_id_xyz", None, "def error(): pass")
+            ("unique_id_xyz", None, "def error(): pass"),
         )
         await db.commit()

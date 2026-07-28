@@ -4,12 +4,16 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+
 class ValidationError(Exception):
     """Custom validation error for LogicHive."""
+
     pass
+
 
 class LogicHiveError(Exception):
     """Base error for LogicHive."""
+
     pass
 
 

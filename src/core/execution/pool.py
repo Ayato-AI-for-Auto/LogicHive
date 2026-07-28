@@ -45,9 +45,7 @@ class PoolManager:
         self.has_gpu = self._detect_gpu()
         self._worker_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
-        self._in_progress_replenishments: dict[str, int] = {
-            spec: 0 for spec in DEFAULT_POOL_SPECS
-        }
+        self._in_progress_replenishments: dict[str, int] = {spec: 0 for spec in DEFAULT_POOL_SPECS}
 
     @classmethod
     def get_instance(cls) -> "PoolManager":
@@ -59,7 +57,7 @@ class PoolManager:
         """Returns free disk space in GB for the drive containing base_dir."""
         try:
             usage = shutil.disk_usage(str(self.base_dir))
-            free_gb = usage.free / (1024 ** 3)
+            free_gb = usage.free / (1024**3)
             return free_gb
         except Exception:
             return float("inf")
@@ -106,7 +104,9 @@ class PoolManager:
                 if self.base_dir.exists():
                     for item in self.base_dir.iterdir():
                         if item.is_dir():
-                            cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                            cleanup_path = (
+                                self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                            )
                             try:
                                 item.rename(cleanup_path)
                                 shutil.rmtree(cleanup_path)
@@ -191,14 +191,20 @@ class PoolManager:
                 await asyncio.to_thread(cleanup)
                 self.managed_envs.discard(env.path)
                 if not env.path.exists():
-                    logger.info(f"PoolManager: Delayed cleanup of {env.path.name} succeeded (attempt {attempt + 1})")
+                    logger.info(
+                        f"PoolManager: Delayed cleanup of {env.path.name} succeeded (attempt {attempt + 1})"
+                    )
                 else:
                     # Still locked - retry if we haven't exhausted attempts
                     if attempt < 2:
-                        logger.debug(f"PoolManager: Retry {attempt + 1} for {env.path.name}, scheduling next...")
+                        logger.debug(
+                            f"PoolManager: Retry {attempt + 1} for {env.path.name}, scheduling next..."
+                        )
                         asyncio.create_task(retry_cleanup_task(attempt + 1))
                     else:
-                        logger.warning(f"PoolManager: Failed to cleanup {env.path.name} after {attempt + 1} attempts")
+                        logger.warning(
+                            f"PoolManager: Failed to cleanup {env.path.name} after {attempt + 1} attempts"
+                        )
             except Exception as e:
                 logger.debug(f"PoolManager: Retry cleanup error for {env.path.name}: {e}")
 
@@ -208,7 +214,9 @@ class PoolManager:
             if not env.path.exists():
                 logger.debug(f"PoolManager: Released and deleted {env.path.name}")
             else:
-                logger.debug(f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry...")
+                logger.debug(
+                    f"PoolManager: Initial cleanup failed for {env.path.name}, scheduling delayed retry..."
+                )
                 asyncio.create_task(retry_cleanup_task())
         except Exception:
             asyncio.create_task(retry_cleanup_task())
@@ -224,6 +232,7 @@ class PoolManager:
             try:
                 if ENABLE_ENV_POOLING:
                     self._check_and_replenish_pools()
+
                     # Periodically clean up any orphaned cleanup directories
                     def cleanup_orphaned():
                         # 1. Clean old cleanup dirs (with retry on locked files)
@@ -240,11 +249,15 @@ class PoolManager:
                             for item in self.base_dir.iterdir():
                                 if item.is_dir() and item not in self.managed_envs:
                                     try:
-                                        cleanup_path = self.base_dir.parent / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                                        cleanup_path = (
+                                            self.base_dir.parent
+                                            / f"pools_cleanup_{uuid.uuid4().hex[:8]}"
+                                        )
                                         item.rename(cleanup_path)
                                         shutil.rmtree(cleanup_path)
                                     except OSError:
                                         pass
+
                     await asyncio.to_thread(cleanup_orphaned)
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
@@ -261,7 +274,9 @@ class PoolManager:
             if spec_name == "torch-gpu" and not ENABLE_GPU:
                 continue
             for _ in range(POOL_MAX_SIZE):
-                self._in_progress_replenishments[spec_name] = self._in_progress_replenishments.get(spec_name, 0) + 1
+                self._in_progress_replenishments[spec_name] = (
+                    self._in_progress_replenishments.get(spec_name, 0) + 1
+                )
                 asyncio.create_task(self._prepare_env(spec_name))
 
     def _check_and_replenish_pools(self):
@@ -280,9 +295,13 @@ class PoolManager:
             if needed > 0:
                 if spec_name == "torch-gpu" and not ENABLE_GPU:
                     continue
-                logger.debug(f"PoolManager: Replenishing {spec_name} (size: {current_size}, in_progress: {in_progress}, needed: {needed})")
+                logger.debug(
+                    f"PoolManager: Replenishing {spec_name} (size: {current_size}, in_progress: {in_progress}, needed: {needed})"
+                )
                 for _ in range(needed):
-                    self._in_progress_replenishments[spec_name] = self._in_progress_replenishments.get(spec_name, 0) + 1
+                    self._in_progress_replenishments[spec_name] = (
+                        self._in_progress_replenishments.get(spec_name, 0) + 1
+                    )
                     asyncio.create_task(self._prepare_env(spec_name))
 
     async def _prepare_env(self, spec_name: str):
@@ -376,7 +395,9 @@ class PoolManager:
                             except Exception:
                                 pass
         finally:
-            self._in_progress_replenishments[spec_name] = max(0, self._in_progress_replenishments.get(spec_name, 0) - 1)
+            self._in_progress_replenishments[spec_name] = max(
+                0, self._in_progress_replenishments.get(spec_name, 0) - 1
+            )
 
     async def check_health(self) -> dict[str, Any]:
         """Checks if the pooling system is active and pools have environments."""

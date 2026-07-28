@@ -12,9 +12,11 @@ def test_config_paths_centralization():
     # Verify that the test override worked
     assert ".test_logichive" in str(core.config.LOGICHIVE_HOME)
 
+
 def test_env_loading_priority():
     """UNIT: Verify that .env is searched in multiple locations."""
     from core.config import HOME_ENV
+
     # This is more of a structural check since we can't easily mock the file system
     # without deeper refactoring, but we can verify the Path objects exist.
     assert isinstance(HOME_ENV, Path)

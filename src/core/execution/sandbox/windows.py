@@ -27,7 +27,6 @@ PROCESS_SET_QUOTA = 0x0100
 PROCESS_TERMINATE = 0x0200
 
 
-
 class IO_COUNTERS(ctypes.Structure):
     _fields_ = [
         ("ReadOperationCount", ctypes.c_ulonglong),
@@ -115,9 +114,13 @@ class WindowsNativeSandbox(BaseSandbox):
             )
             if not res:
                 err = ctypes.windll.kernel32.GetLastError()
-                logger.error(f"WindowsSandbox: Failed to SetInformationJobObject. Error code: {err}")
+                logger.error(
+                    f"WindowsSandbox: Failed to SetInformationJobObject. Error code: {err}"
+                )
             else:
-                logger.debug(f"WindowsSandbox: Set memory limit to {memory_limit_mb}MB and process limit to 10.")
+                logger.debug(
+                    f"WindowsSandbox: Set memory limit to {memory_limit_mb}MB and process limit to 10."
+                )
         except Exception as e:
             logger.error(f"WindowsSandbox: Error configuring limits: {e}", exc_info=True)
 
@@ -150,7 +153,9 @@ class WindowsNativeSandbox(BaseSandbox):
                         c.memory_info().rss for c in parent.children(recursive=True)
                     )
                     if (total_mem / 1024 / 1024) > limit_mb:
-                        logger.warning(f"WindowsSandbox: Memory limit exceeded in fallback monitor. Killing {process.pid}")
+                        logger.warning(
+                            f"WindowsSandbox: Memory limit exceeded in fallback monitor. Killing {process.pid}"
+                        )
                         state["memory_exceeded"] = True
                         self._kill_process_tree(process.pid)
                         break
@@ -174,7 +179,9 @@ class WindowsNativeSandbox(BaseSandbox):
         if os.name != "nt" or not self.job_handle:
             # Fallback to standard subprocess run on non-Windows/failed initialization
             logger.warning("WindowsSandbox: Falling back to un-isolated subprocess execution.")
-            return await self._fallback_execute(cmd, cwd, env, timeout, memory_limit_mb, result_file)
+            return await self._fallback_execute(
+                cmd, cwd, env, timeout, memory_limit_mb, result_file
+            )
 
         self._configure_limits(memory_limit_mb)
 
@@ -196,9 +203,7 @@ class WindowsNativeSandbox(BaseSandbox):
             PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, process.pid
         )
         if h_process:
-            assign_res = ctypes.windll.kernel32.AssignProcessToJobObject(
-                self.job_handle, h_process
-            )
+            assign_res = ctypes.windll.kernel32.AssignProcessToJobObject(self.job_handle, h_process)
             if not assign_res:
                 err = ctypes.windll.kernel32.GetLastError()
                 logger.error(f"WindowsSandbox: AssignProcessToJobObject failed with code {err}")

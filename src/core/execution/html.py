@@ -25,16 +25,40 @@ class StrictHTMLParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         # Void/self-closing tags in HTML5
         void_tags = {
-            "area", "base", "br", "col", "embed", "hr", "img", "input",
-            "link", "meta", "param", "source", "track", "wbr"
+            "area",
+            "base",
+            "br",
+            "col",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
         }
         if tag not in void_tags:
             self.tags.append(tag)
 
     def handle_endtag(self, tag):
         void_tags = {
-            "area", "base", "br", "col", "embed", "hr", "img", "input",
-            "link", "meta", "param", "source", "track", "wbr"
+            "area",
+            "base",
+            "br",
+            "col",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
         }
         if tag in void_tags:
             return
@@ -123,4 +147,3 @@ class EphemeralHtmlExecutor(BaseExecutor):
 
 # Auto-register
 ExecutorFactory.register("html", EphemeralHtmlExecutor())
-ClassEphemeralHtmlExecutor = "EphemeralHtmlExecutor"

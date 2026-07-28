@@ -200,9 +200,11 @@ VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
 
 # --- Path Resolution Helpers ---
 
+
 def get_logic_hive_home() -> Path:
     # Ensure we return an absolute path to avoid ambiguity in tests
     return Path(os.getenv("LOGICHIVE_HOME", str(Path.home() / ".logichive"))).resolve()
+
 
 def get_data_dir() -> Path:
     # Only use /tmp/logic-hive for Knative services in production
@@ -221,8 +223,10 @@ def get_data_dir() -> Path:
 
     return data_dir
 
+
 def get_sqlite_db_path() -> str:
     return os.getenv("SQLITE_DB_PATH", str(get_data_dir() / "logichive.db"))
+
 
 def get_active_embedding_model_name() -> str:
     """現在の設定に基づいて有効なEmbeddingモデル名を返す"""
@@ -234,11 +238,14 @@ def get_active_embedding_model_name() -> str:
     else:
         return os.getenv("EMBEDDING_MODEL_ID", EMBEDDING_MODEL_ID)
 
+
 def get_chroma_db_dir() -> Path:
     return get_data_dir() / "chroma"
 
+
 def get_pool_base_dir() -> Path:
     return get_logic_hive_home() / "pools"
+
 
 # Legacy support for static imports (will be updated over time)
 LOGICHIVE_HOME = get_logic_hive_home()

@@ -34,7 +34,7 @@ async def test_system_multi_language_flow(test_db):
             description="multiplies two numbers in javascript",
             test_code=js_test,
             project=project,
-            language="javascript"
+            language="javascript",
         )
         assert saved_js is True
 
@@ -59,7 +59,7 @@ async def test_system_multi_language_flow(test_db):
             description="bad html page",
             test_code="",
             project=project,
-            language="html"
+            language="html",
         )
         assert saved_html is True
 
@@ -84,7 +84,7 @@ async def test_system_multi_language_flow(test_db):
             description="adds numbers in PHP",
             test_code=php_test,
             project=project,
-            language="php"
+            language="php",
         )
         assert saved_php is True
 
@@ -106,7 +106,9 @@ async def test_system_multi_language_flow(test_db):
         cursor = conn.cursor()
 
         # Query JS record
-        cursor.execute("SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (js_name, project))
+        cursor.execute(
+            "SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (js_name, project)
+        )
         js_row = cursor.fetchone()
         assert js_row is not None
         assert js_row["verification_status"] == "verified"
@@ -114,14 +116,18 @@ async def test_system_multi_language_flow(test_db):
         assert js_row["language"] == "javascript"
 
         # Query HTML record
-        cursor.execute("SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (html_name, project))
+        cursor.execute(
+            "SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (html_name, project)
+        )
         html_row = cursor.fetchone()
         assert html_row is not None
         assert html_row["verification_status"] == "failed"
         assert html_row["reliability_score"] == 0.0  # Vetoed due to nesting error
 
         # Query PHP record
-        cursor.execute("SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (php_name, project))
+        cursor.execute(
+            "SELECT * FROM logichive_functions WHERE name = ? AND project = ?", (php_name, project)
+        )
         php_row = cursor.fetchone()
         assert php_row is not None
         assert php_row["verification_status"] == "failed"
@@ -133,10 +139,6 @@ async def test_system_multi_language_flow(test_db):
         # 5. Hybrid RAG Search Sorting
         # ==========================================
         # Search for "multiplies", should return js_multiplier first
-        search_res = await do_search_async(
-            query="multiplies",
-            project=project,
-            limit=5
-        )
+        search_res = await do_search_async(query="multiplies", project=project, limit=5)
         assert len(search_res) >= 1
         assert search_res[0]["name"] == js_name

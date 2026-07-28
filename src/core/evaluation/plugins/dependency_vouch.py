@@ -54,7 +54,9 @@ class DependencyVouchEvaluator(BaseEvaluator):
 
         if vulnerabilities:
             score -= len(vulnerabilities) * 40
-            vuln_desc = ", ".join(f"{v['id']} in {v['package']}=={v['version']}" for v in vulnerabilities)
+            vuln_desc = ", ".join(
+                f"{v['id']} in {v['package']}=={v['version']}" for v in vulnerabilities
+            )
             reasons.append(f"Security vulnerabilities detected: {vuln_desc}")
 
         score = max(0.0, score)
@@ -63,10 +65,7 @@ class DependencyVouchEvaluator(BaseEvaluator):
         return EvaluationResult(
             score=score,
             reason=reason_str,
-            details={
-                "missing": hallucinated,
-                "vulnerabilities": vulnerabilities
-            },
+            details={"missing": hallucinated, "vulnerabilities": vulnerabilities},
         )
 
     def _check_osv_vulnerabilities(self, dependencies: list[str]) -> list[dict]:
@@ -91,20 +90,11 @@ class DependencyVouchEvaluator(BaseEvaluator):
                     continue
 
             url = "https://api.osv.dev/v1/query"
-            payload = {
-                "package": {
-                    "name": pkg_name,
-                    "ecosystem": "PyPI"
-                },
-                "version": version
-            }
+            payload = {"package": {"name": pkg_name, "ecosystem": "PyPI"}, "version": version}
             try:
                 data = json.dumps(payload).encode("utf-8")
                 req = urllib.request.Request(
-                    url,
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
+                    url, data=data, headers={"Content-Type": "application/json"}, method="POST"
                 )
                 with urllib.request.urlopen(req, timeout=5) as response:
                     res_data = json.loads(response.read().decode("utf-8"))
@@ -116,15 +106,19 @@ class DependencyVouchEvaluator(BaseEvaluator):
                     for v in vulns:
                         if not isinstance(v, dict):
                             continue
-                        vulnerabilities.append({
-                            "id": v.get("id"),
-                            "package": pkg_name,
-                            "version": version,
-                            "summary": v.get("summary", "No summary provided"),
-                            "aliases": v.get("aliases", [])
-                        })
+                        vulnerabilities.append(
+                            {
+                                "id": v.get("id"),
+                                "package": pkg_name,
+                                "version": version,
+                                "summary": v.get("summary", "No summary provided"),
+                                "aliases": v.get("aliases", []),
+                            }
+                        )
             except Exception as e:
-                logger.warning(f"DependencyVouch: OSV API scan failed for {pkg_name}=={version}: {e}")
+                logger.warning(
+                    f"DependencyVouch: OSV API scan failed for {pkg_name}=={version}: {e}"
+                )
                 continue
         return vulnerabilities
 

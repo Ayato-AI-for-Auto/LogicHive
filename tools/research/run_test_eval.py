@@ -3,17 +3,18 @@ import os
 from dotenv import load_dotenv
 
 # Load config
-load_dotenv('C:/Users/saiha/.logichive/.env')
-load_dotenv('.env', override=True) # Project root .env
+load_dotenv("C:/Users/saiha/.logichive/.env")
+load_dotenv(".env", override=True)  # Project root .env
 
 # Force model override for this test
-os.environ['GEMINI_MODEL'] = 'models/gemma-4-31b-it'
+os.environ["GEMINI_MODEL"] = "models/gemma-4-31b-it"
 
 print(f"DEBUG: GEMINI_MODEL='{os.getenv('GEMINI_MODEL')}'")
 print(f"DEBUG: GEMINI_API_KEY={'set' if os.getenv('GEMINI_API_KEY') else 'not set'}")
 print(f"DEBUG: GOOGLE_API_KEY={'set' if os.getenv('GOOGLE_API_KEY') else 'not set'}")
 
 from core.evaluation.manager import EvaluationManager
+
 
 async def run():
     mgr = EvaluationManager()
@@ -40,9 +41,12 @@ def test():
 
 test()
 """
-    result = await mgr.evaluate_all(code, "python", name="calculate_code_hash_v5", test_code=test_code)
+    result = await mgr.evaluate_all(
+        code, "python", name="calculate_code_hash_v5", test_code=test_code
+    )
     print("--- EVALUATION RESULT ---")
     print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(run())

@@ -65,10 +65,11 @@ def test_kill_logichive_processes():
 
     mock_processes = [mock_hub, mock_settings, mock_other, mock_self]
 
-    with patch("src.core.system.uninstall.psutil.process_iter", return_value=mock_processes), \
-         patch("src.core.system.uninstall.os.getpid", return_value=9999), \
-         patch("src.core.system.uninstall.psutil.wait_procs"):
-
+    with (
+        patch("src.core.system.uninstall.psutil.process_iter", return_value=mock_processes),
+        patch("src.core.system.uninstall.os.getpid", return_value=9999),
+        patch("src.core.system.uninstall.psutil.wait_procs"),
+    ):
         kill_logichive_processes()
 
         # Hub と Settings は終了される

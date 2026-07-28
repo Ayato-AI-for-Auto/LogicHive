@@ -128,6 +128,7 @@ async def db_isolation(request):
     importlib.reload(core.config)
     await close_db_connection()
     import storage.vector_store
+
     importlib.reload(storage.vector_store)
     importlib.reload(storage.sqlite_api)
     importlib.reload(orchestrator)
@@ -150,6 +151,7 @@ async def db_isolation(request):
 @pytest.fixture
 async def test_db(db_isolation):
     from core.db import get_db_connection
+
     await get_db_connection()
     yield
 

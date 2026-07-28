@@ -32,7 +32,9 @@ def kill_logichive_processes() -> None:
 
             # プロセス名での判定
             name = proc.info["name"]
-            if name and any(target.lower() in name.lower() for target in ["logichive-hub", "logichive-settings"]):
+            if name and any(
+                target.lower() in name.lower() for target in ["logichive-hub", "logichive-settings"]
+            ):
                 logger.info(f"Terminating LogicHive process: {name} (PID: {proc.info['pid']})")
                 proc.terminate()
                 continue
@@ -41,7 +43,9 @@ def kill_logichive_processes() -> None:
             cmdline = proc.info["cmdline"]
             if cmdline and name and "python" in name.lower():
                 if any("mcp_server.py" in arg or "settings_ui.py" in arg for arg in cmdline):
-                    logger.info(f"Terminating LogicHive python script: {cmdline} (PID: {proc.info['pid']})")
+                    logger.info(
+                        f"Terminating LogicHive python script: {cmdline} (PID: {proc.info['pid']})"
+                    )
                     proc.terminate()
 
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -99,7 +103,7 @@ def execute_kamikaze_script(executables_to_delete: list[Path] = None) -> None:
     bat_content += "ping 127.0.0.1 -n 3 > nul\n"
 
     for target in targets:
-         bat_content += f'del /F /Q "{target}"\n'
+        bat_content += f'del /F /Q "{target}"\n'
 
     bat_content += 'del "%~f0"\n'
 

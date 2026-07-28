@@ -56,8 +56,11 @@ async def test_python_static_evaluator_pure():
 async def test_vector_store_initialization_filtering(tmp_path):
     """Verifies that VectorIndexManager correctly filters dimensions and 'null' strings."""
     from unittest.mock import patch
-    with patch("storage.vector_store.VECTOR_DIMENSION", 3), \
-         patch("storage.vector_store.CHROMA_DB_DIR", tmp_path / "chroma"):
+
+    with (
+        patch("storage.vector_store.VECTOR_DIMENSION", 3),
+        patch("storage.vector_store.CHROMA_DB_DIR", tmp_path / "chroma"),
+    ):
         manager = VectorIndexManager()
 
         dummy_rows = [

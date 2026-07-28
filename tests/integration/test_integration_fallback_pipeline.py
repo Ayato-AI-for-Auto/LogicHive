@@ -21,10 +21,7 @@ async def test_evaluation_manager_with_php_missing_runtime():
     # Run php evaluation with php missing on PATH by mocking detection
     with patch("core.execution.php.EphemeralPhpExecutor._is_php_available", return_value=False):
         results = await manager.evaluate_all(
-            code=code,
-            language="php",
-            test_code=test_code,
-            description="PHP Asset"
+            code=code, language="php", test_code=test_code, description="PHP Asset"
         )
 
     assert results["score"] == 0.0
@@ -36,14 +33,11 @@ async def test_evaluation_manager_with_c_missing_runtime():
     manager = EvaluationManager()
 
     code = "int test() { return 1; }"
-    test_code = "assert_c(test() == 1, \"error\");"
+    test_code = 'assert_c(test() == 1, "error");'
 
     with patch("core.execution.c.EphemeralCExecutor._find_compiler", return_value=None):
         results = await manager.evaluate_all(
-            code=code,
-            language="c",
-            test_code=test_code,
-            description="C Asset"
+            code=code, language="c", test_code=test_code, description="C Asset"
         )
 
     assert results["score"] == 0.0
@@ -68,14 +62,11 @@ async def test_evaluation_manager_corrupted_harness_json():
         mock_exec.return_value = ExecRes(
             status=ExecutionStatus.FAILURE,
             logs=ExecutionLogs(stdout="ran but crashed", stderr="Parse error"),
-            duration=0.1
+            duration=0.1,
         )
 
         results = await manager.evaluate_all(
-            code=code,
-            language="javascript",
-            test_code=test_code,
-            description="JS Corrupted test"
+            code=code, language="javascript", test_code=test_code, description="JS Corrupted test"
         )
 
         assert results["score"] == 0.0

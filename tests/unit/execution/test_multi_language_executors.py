@@ -41,7 +41,7 @@ async def test_java_executor():
 
     # We define helper method inside Harness class
     code = "public static int add(int a, int b) { return a + b; }"
-    test_code = "if (add(5, 5) != 10) throw new AssertionError(\"add failed\");"
+    test_code = 'if (add(5, 5) != 10) throw new AssertionError("add failed");'
 
     result = await executor.execute(code, test_code=test_code)
 
@@ -72,7 +72,7 @@ async def test_c_executor_missing():
     executor = EphemeralCExecutor()
     code = "int test() { return 1; }"
     with patch.object(executor, "_find_compiler", return_value=None):
-        result = await executor.execute(code, test_code="assert_c(test() == 1, \"error\");")
+        result = await executor.execute(code, test_code='assert_c(test() == 1, "error");')
 
     assert result.status == ExecutionStatus.FAILURE
     assert "c compiler" in result.logs.stderr.lower()

@@ -8,10 +8,11 @@ from mcp_server import get_verification_status, save_function
 @pytest.mark.asyncio
 async def test_syntax_error_rejection(test_db):
     """CHAOS: Verify that immediate syntax errors are rejected with rich detail."""
-    bad_code = "def broken_syntax(:" # Missing closing paren and indent
+    bad_code = "def broken_syntax(:"  # Missing closing paren and indent
     res = await save_function(name="bad_syntax", code=bad_code, project="chaos")
     assert "IMMEDIATE REJECTION" in res
     assert "Syntax Error" in res
+
 
 @pytest.mark.asyncio
 async def test_timeout_enforcement(test_db):
@@ -24,9 +25,9 @@ async def test_timeout_enforcement(test_db):
         name="slow_func",
         code=slow_code,
         test_code=test_code,
-        timeout=1, # 1 second limit
+        timeout=1,  # 1 second limit
         project="chaos",
-        dependencies=[]
+        dependencies=[],
     )
     assert "accepted and saved" in res
 
@@ -39,6 +40,7 @@ async def test_timeout_enforcement(test_db):
     assert "error" in report_lower or "failed" in report_lower
     # The detail report should mention timeout (it says 'timed out')
     assert "timed out" in report_lower or "timeout" in report_lower or "terminated" in report_lower
+
 
 @pytest.mark.asyncio
 async def test_sandbox_network_block(test_db):
@@ -62,6 +64,7 @@ async def test_sandbox_network_block(test_db):
     error_keys = ["denied", "failure", "timeout", "offline", "unreachable", "error"]
     assert any(k in status.lower() for k in error_keys)
 
+
 @pytest.mark.asyncio
 async def test_quality_theater_rejection(test_db):
     """CHAOS: Verify that 'pass' methods or trivial code are rejected by AI Auditor."""
@@ -74,7 +77,7 @@ async def test_quality_theater_rejection(test_db):
         code=theater_code,
         test_code=test_code,
         description="Just a pass method",
-        project="chaos"
+        project="chaos",
     )
     await asyncio.sleep(0.5)
 

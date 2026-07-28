@@ -45,14 +45,14 @@ class EphemeralJavaExecutor(BaseExecutor):
         # Check Java availability
         java_check = await self._is_java_available()
         if not java_check:
-            err_msg = "Execution failed: JDK (javac/java) is not installed or not found in system PATH."
+            err_msg = (
+                "Execution failed: JDK (javac/java) is not installed or not found in system PATH."
+            )
             logger.error(err_msg)
             return ExecutionResult(
                 status=ExecutionStatus.FAILURE,
                 logs=ExecutionLogs(stderr=err_msg),
-                error=ExecutionError(
-                    name="RuntimeError", value=err_msg, traceback=""
-                ),
+                error=ExecutionError(name="RuntimeError", value=err_msg, traceback=""),
                 duration=time.perf_counter() - start_time,
             )
 
@@ -168,4 +168,3 @@ public class Harness {{
 
 # Auto-register
 ExecutorFactory.register("java", EphemeralJavaExecutor())
-ClassEphemeralJavaExecutor = "EphemeralJavaExecutor"

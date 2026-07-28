@@ -1,4 +1,3 @@
-
 import pytest
 
 from core.execution.base import ExecutionStatus
@@ -29,8 +28,6 @@ def check_leak():
     # The harness catch the Exception and marks status as FAILURE
     assert result.status == ExecutionStatus.FAILURE
     assert "NETWORK_ACCESS_DENIED" in result.error.value
-
-
 
 
 @pytest.mark.asyncio

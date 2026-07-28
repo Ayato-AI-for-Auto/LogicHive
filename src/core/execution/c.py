@@ -51,9 +51,7 @@ class EphemeralCExecutor(BaseExecutor):
             return ExecutionResult(
                 status=ExecutionStatus.FAILURE,
                 logs=ExecutionLogs(stderr=err_msg),
-                error=ExecutionError(
-                    name="RuntimeError", value=err_msg, traceback=""
-                ),
+                error=ExecutionError(name="RuntimeError", value=err_msg, traceback=""),
                 duration=time.perf_counter() - start_time,
             )
 
@@ -78,7 +76,9 @@ class EphemeralCExecutor(BaseExecutor):
                 )
                 stdout_c, stderr_c = await compile_proc.communicate()
                 if compile_proc.returncode != 0:
-                    compile_err = stderr_c.decode("utf-8", errors="replace") + stdout_c.decode("utf-8", errors="replace")
+                    compile_err = stderr_c.decode("utf-8", errors="replace") + stdout_c.decode(
+                        "utf-8", errors="replace"
+                    )
                     return ExecutionResult(
                         status=ExecutionStatus.FAILURE,
                         logs=ExecutionLogs(stderr=compile_err),
@@ -181,4 +181,3 @@ int main() {{
 
 # Auto-register
 ExecutorFactory.register("c", EphemeralCExecutor())
-ClassEphemeralCExecutor = "EphemeralCExecutor"

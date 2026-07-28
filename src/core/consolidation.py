@@ -158,7 +158,9 @@ class LogicIntelligence:
             return await self._call_ollama(prompt, use_json)
         raise AIProviderError("No valid AI provider available.")
 
-    async def _call_llm_async_raw(self, prompt: str, use_json: bool = True) -> tuple[Any, str, dict[str, Any]]:
+    async def _call_llm_async_raw(
+        self, prompt: str, use_json: bool = True
+    ) -> tuple[Any, str, dict[str, Any]]:
         """
         Calls the LLM and returns (parsed_result, raw_text, model_info).
         Maintains backward compatibility by not changing _call_llm_async.
@@ -211,7 +213,7 @@ class LogicIntelligence:
                     )
                     if isinstance(parsed, dict)
                     else {},
-                    raw_text
+                    raw_text,
                 )
             return {}, raw_text
         except Exception as e:
@@ -310,7 +312,7 @@ class LogicIntelligence:
             "score": score,
             "reason": res.get("reason", "Failed to obtain evaluation reason."),
             "raw_output": raw_text,
-            "provider_info": model_info
+            "provider_info": model_info,
         }
 
     async def expand_query(self, user_query: str) -> str:

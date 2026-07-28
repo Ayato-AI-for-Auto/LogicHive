@@ -16,11 +16,12 @@ def make_mock_process(pid=1234, name="python.exe"):
 
 def test_port_recovery_retry():
     """Test Option 1: Retry port binding after manually freeing the port."""
-    with patch("sys.stdin.isatty", return_value=True), \
-         patch("builtins.input", side_effect=["1"]), \
-         patch("mcp_server.get_conflicting_process", return_value=None), \
-         patch("uvicorn.run") as mock_run:
-
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["1"]),
+        patch("mcp_server.get_conflicting_process", return_value=None),
+        patch("uvicorn.run") as mock_run,
+    ):
         mock_run.side_effect = [OSError(10048, "Address already in use"), None]
 
         run_server()
@@ -32,11 +33,12 @@ def test_port_recovery_kill():
     """Test Option 2: Kill conflicting process and retry."""
     mock_proc = make_mock_process(pid=5360, name="python.exe")
 
-    with patch("sys.stdin.isatty", return_value=True), \
-         patch("builtins.input", side_effect=["2"]), \
-         patch("mcp_server.get_conflicting_process", return_value=mock_proc), \
-         patch("uvicorn.run") as mock_run:
-
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["2"]),
+        patch("mcp_server.get_conflicting_process", return_value=mock_proc),
+        patch("uvicorn.run") as mock_run,
+    ):
         mock_run.side_effect = [OSError(10048, "Address already in use"), None]
 
         run_server()
@@ -48,12 +50,13 @@ def test_port_recovery_kill():
 
 def test_port_recovery_autofind_with_save():
     """Test Option 3: Auto-find next available port and save to config."""
-    with patch("sys.stdin.isatty", return_value=True), \
-         patch("builtins.input", side_effect=["3", "y"]), \
-         patch("mcp_server.find_available_port", return_value=10881), \
-         patch("core.config.save_config", return_value=True) as mock_save_config, \
-         patch("uvicorn.run") as mock_run:
-
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["3", "y"]),
+        patch("mcp_server.find_available_port", return_value=10881),
+        patch("core.config.save_config", return_value=True) as mock_save_config,
+        patch("uvicorn.run") as mock_run,
+    ):
         mock_run.side_effect = [OSError(10048, "Address already in use"), None]
 
         run_server()
@@ -65,12 +68,13 @@ def test_port_recovery_autofind_with_save():
 
 def test_port_recovery_exit():
     """Test Option 4: Exit application."""
-    with patch("sys.stdin.isatty", return_value=True), \
-         patch("builtins.input", side_effect=["4"]), \
-         patch("mcp_server.wait_on_error"), \
-         patch("sys.exit", side_effect=SystemExit) as mock_exit, \
-         patch("uvicorn.run") as mock_run:
-
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["4"]),
+        patch("mcp_server.wait_on_error"),
+        patch("sys.exit", side_effect=SystemExit) as mock_exit,
+        patch("uvicorn.run") as mock_run,
+    ):
         mock_run.side_effect = OSError(10048, "Address already in use")
 
         with pytest.raises(SystemExit):
@@ -81,10 +85,11 @@ def test_port_recovery_exit():
 
 def test_port_recovery_non_interactive():
     """Test Non-interactive fallback: Auto-find port and run without prompt/saving."""
-    with patch("sys.stdin.isatty", return_value=False), \
-         patch("mcp_server.find_available_port", return_value=10882), \
-         patch("uvicorn.run") as mock_run:
-
+    with (
+        patch("sys.stdin.isatty", return_value=False),
+        patch("mcp_server.find_available_port", return_value=10882),
+        patch("uvicorn.run") as mock_run,
+    ):
         mock_run.side_effect = [OSError(10048, "Address already in use"), None]
 
         run_server()

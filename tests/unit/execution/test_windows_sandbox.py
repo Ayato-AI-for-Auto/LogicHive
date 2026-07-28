@@ -55,4 +55,7 @@ async def test_sandbox_memory_limit(sandbox):
         memory_limit_mb=40,  # limit to 40MB
     )
     assert result.status == ExecutionStatus.MEMORY_LIMIT
-    assert "memory limit exceeded" in result.logs.stderr.lower() or "limit of 40mb exceeded" in result.logs.stderr.lower()
+    assert (
+        "memory limit exceeded" in result.logs.stderr.lower()
+        or "limit of 40mb exceeded" in result.logs.stderr.lower()
+    )

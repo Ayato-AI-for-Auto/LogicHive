@@ -31,8 +31,8 @@ class EphemeralPythonExecutor(BaseExecutor):
     def __init__(self):
         self.name = "python"
         from core.execution.sandbox import WindowsNativeSandbox
-        self.sandbox = WindowsNativeSandbox()
 
+        self.sandbox = WindowsNativeSandbox()
 
     def _kill_process_tree(self, pid: int):
         """Kills a process and all its children cross-platform."""
@@ -134,6 +134,7 @@ class EphemeralPythonExecutor(BaseExecutor):
 
     def _build_command(self, pooled_env, harness_file, dependencies):
         import sys
+
         if pooled_env:
             return [str(pooled_env.python_executable), str(harness_file)]
 
@@ -175,7 +176,6 @@ class EphemeralPythonExecutor(BaseExecutor):
             memory_limit_mb=memory_limit,
             result_file=str(result_file),
         )
-
 
     async def _monitor_resources(self, process, limit_mb, done_event, state):
         import psutil
@@ -341,6 +341,3 @@ sys.exit(0 if success else 1)
 
 # Auto-register
 ExecutorFactory.register("python", EphemeralPythonExecutor())
-"""
-Implement EphemeralPythonExecutor
-"""

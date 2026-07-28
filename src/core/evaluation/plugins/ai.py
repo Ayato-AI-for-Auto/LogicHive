@@ -28,7 +28,7 @@ class AIGateEvaluator(BaseEvaluator):
             # Store raw output and provider info in details
             details = {
                 "raw_output": quality.get("raw_output"),
-                "provider_info": quality.get("provider_info")
+                "provider_info": quality.get("provider_info"),
             }
             return EvaluationResult(score=score, reason=reason, details=details)
         except Exception as e:

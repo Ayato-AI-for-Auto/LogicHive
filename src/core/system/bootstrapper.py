@@ -81,10 +81,14 @@ class LogicHiveBootstrapper:
         uv_path = shutil.which("uv")
         if not uv_path:
             # ユーザーにインストールを促すか、将来的に uv 自体も同梱することを検討
-            raise FileNotFoundError("uv command not found. Please install 'uv' to bootstrap LogicHive.")
+            raise FileNotFoundError(
+                "uv command not found. Please install 'uv' to bootstrap LogicHive."
+            )
         return uv_path
 
-    async def setup_environment(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:
+    async def setup_environment(
+        self, progress_callback: Optional[Callable[[str], None]] = None
+    ) -> bool:
         """
         ~/.logichive/.venv を構築し、依存関係をインストールします。
 
@@ -111,7 +115,7 @@ class LogicHiveBootstrapper:
                 check=True,
                 capture_output=True,
                 text=True,
-                creationflags=0x08000000 if sys.platform == "win32" else 0
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
             )
 
             # 2. 依存関係のインストール (pyproject.toml を使用)
@@ -119,8 +123,8 @@ class LogicHiveBootstrapper:
                 progress_callback("Installing Hub Engine dependencies (ChromaDB, etc.)...")
 
             if not self.pyproject_path.exists():
-                 logger.error(f"pyproject.toml not found at {self.pyproject_path}")
-                 return False
+                logger.error(f"pyproject.toml not found at {self.pyproject_path}")
+                return False
 
             # uv pip install -r pyproject.toml 的な挙動
             # 実際には uv sync の方が早いが、ここではシンプルに pip install を使う
@@ -130,7 +134,7 @@ class LogicHiveBootstrapper:
                 check=True,
                 capture_output=True,
                 text=True,
-                creationflags=0x08000000 if sys.platform == "win32" else 0
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
             )
 
             if progress_callback:
@@ -172,6 +176,6 @@ class LogicHiveBootstrapper:
                 stderr=f,
                 cwd=str(self.root_dir),
                 creationflags=0x08000000 if sys.platform == "win32" else 0,
-                start_new_session=True # 親(Settings)が閉じても死なないようにする
+                start_new_session=True,  # 親(Settings)が閉じても死なないようにする
             )
         return proc

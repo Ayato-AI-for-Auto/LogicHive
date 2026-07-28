@@ -58,7 +58,9 @@ def handle_port_conflict(current_port: int, host_val: str) -> int:
         elif choice == "2":
             if proc:
                 try:
-                    logger.info(f"Attempting to terminate process {proc.name()} (PID: {proc.pid})...")
+                    logger.info(
+                        f"Attempting to terminate process {proc.name()} (PID: {proc.pid})..."
+                    )
                     proc.terminate()
                     try:
                         proc.wait(timeout=3)
@@ -81,7 +83,11 @@ def handle_port_conflict(current_port: int, host_val: str) -> int:
                 sys.exit(1)
             logger.info(f"Auto-found available port: {new_port}")
             try:
-                save_choice = input("Would you like to save this port as the default in your config? (y/N): ").strip().lower()
+                save_choice = (
+                    input("Would you like to save this port as the default in your config? (y/N): ")
+                    .strip()
+                    .lower()
+                )
             except (KeyboardInterrupt, EOFError):
                 save_choice = "n"
             if save_choice in ("y", "yes"):

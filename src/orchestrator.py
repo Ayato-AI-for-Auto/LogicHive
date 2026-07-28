@@ -199,6 +199,7 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
 
         # 2. Vector index deletion (background)
         from storage.vector_store import vector_manager
+
         asyncio.create_task(vector_manager.remove_vector(name, project=project))
 
         logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful.")
@@ -296,6 +297,7 @@ async def _run_async_verification_pipeline(
 
             # Sync to Vector Store
             from storage.vector_store import vector_manager
+
             await vector_manager.upsert_vector(
                 name,
                 embedding,

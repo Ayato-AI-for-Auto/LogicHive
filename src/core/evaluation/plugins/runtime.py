@@ -124,8 +124,7 @@ class RuntimeEvaluator(BaseEvaluator):
                 return EvaluationResult(
                     score=0.0,
                     reason=(
-                        "Infrastructure Error: Execution environment error. "
-                        f"{result.logs.stderr}"
+                        f"Infrastructure Error: Execution environment error. {result.logs.stderr}"
                     ),
                     is_system_error=True,
                     details={"status": result.status.value},

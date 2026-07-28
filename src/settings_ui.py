@@ -80,7 +80,9 @@ class LogicHiveUI:
             return True
 
         # 環境構築画面の表示
-        progress_text = ft.Text("Initializing LogicHive Hub Engine...", size=20, weight=ft.FontWeight.BOLD)
+        progress_text = ft.Text(
+            "Initializing LogicHive Hub Engine...", size=20, weight=ft.FontWeight.BOLD
+        )
         progress_bar = ft.ProgressBar(width=400, color=ft.Colors.BLUE_400)
         status_msg = ft.Text("Starting environment setup...", size=14, color=ft.Colors.GREY_400)
 
@@ -121,13 +123,16 @@ class LogicHiveUI:
             bootstrapper.run_hub_background()
             # 少し待ってからメイン画面へ
             import asyncio
+
             await asyncio.sleep(1)
             return True
         else:
             # 失敗時はエラー表示をして止める
             progress_bar.color = ft.Colors.RED
             progress_bar.value = 1.0
-            status_msg.value = "Bootstrap Failed. Please check the logs in ~/.logichive/logs/hub.log"
+            status_msg.value = (
+                "Bootstrap Failed. Please check the logs in ~/.logichive/logs/hub.log"
+            )
             status_msg.color = ft.Colors.RED
             self.page.update()
             return False
@@ -477,9 +482,7 @@ class LogicHiveUI:
             )
         )
 
-        return ft.Container(
-            content=ft.Column([uninstall_card], spacing=20), padding=20
-        )
+        return ft.Container(content=ft.Column([uninstall_card], spacing=20), padding=20)
 
     def build(self):
         self.initialize_state()

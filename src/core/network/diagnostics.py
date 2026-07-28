@@ -29,9 +29,7 @@ def get_conflicting_process(port: int):
             if conn.laddr.port == port and conn.status == "LISTEN":
                 return psutil.Process(conn.pid)
     except Exception as e:
-        logger.debug(
-            f"Diagnostics: Failed to check for conflicting process on port {port}: {e}"
-        )
+        logger.debug(f"Diagnostics: Failed to check for conflicting process on port {port}: {e}")
     return None
 
 
