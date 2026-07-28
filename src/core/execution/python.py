@@ -115,8 +115,12 @@ class EphemeralPythonExecutor(BaseExecutor):
             target_spec = "torch-gpu" if pool_manager.has_gpu else "torch-cpu"
 
         if target_spec:
-            return await pool_manager.acquire(target_spec, timeout=1.0)
-        return None
+            env = await pool_manager.acquire(target_spec, timeout=1.0)
+            if env:
+                return env
+
+        # Fallback for dynamic package requirements (e.g. stripe, pandas, arxiv)
+        return await pool_manager.create_dynamic_env(dependencies)
 
     def _prepare_workspace(self, tmpdir, code, test_code, mock_imports):
         tmp_path = Path(tmpdir)

@@ -31,7 +31,7 @@ last_run.txt
 *.log
 *.jsonl
 logs/
-
+exports/
 
 # Build and Temp
 build/

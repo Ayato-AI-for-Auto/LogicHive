@@ -316,6 +316,9 @@ class PoolManager:
                 )
                 return
 
+            if not hasattr(self, "_uv_semaphore") or self._uv_semaphore is None:
+                self._uv_semaphore = asyncio.Semaphore(2)
+
             async with self._uv_semaphore:
                 env_id = str(uuid.uuid4())[:8]
                 env_path = self.base_dir / f"{spec_name}_{env_id}"
@@ -398,6 +401,98 @@ class PoolManager:
             self._in_progress_replenishments[spec_name] = max(
                 0, self._in_progress_replenishments.get(spec_name, 0) - 1
             )
+
+    async def create_dynamic_env(
+        self, dependencies: list[str], timeout: float = 60.0
+    ) -> PreWarmedEnv | None:
+        """
+        Creates an on-demand virtual environment with the requested dependencies.
+        Used as a fallback when requested dependencies are not available in pre-warmed pools.
+        """
+        if not ENABLE_ENV_POOLING or not dependencies:
+            return None
+
+        free_gb = self._check_disk_space()
+        if free_gb < MIN_DISK_SPACE_GB:
+            logger.warning(
+                f"PoolManager: Skipping dynamic env creation - "
+                f"only {free_gb:.1f}GB free (minimum: {MIN_DISK_SPACE_GB}GB)"
+            )
+            return None
+
+        if not hasattr(self, "_uv_semaphore") or self._uv_semaphore is None:
+            self._uv_semaphore = asyncio.Semaphore(2)
+
+        async with self._uv_semaphore:
+            env_id = str(uuid.uuid4())[:8]
+            env_path = self.base_dir / f"dynamic_{env_id}"
+
+            uv_path = r"C:\Users\saiha\.local\bin\uv.exe"
+            if not os.path.exists(uv_path):
+                uv_path = "uv"
+
+            python_exe = (
+                env_path / "Scripts" / "python.exe"
+                if os.name == "nt"
+                else env_path / "bin" / "python"
+            )
+
+            logger.info(
+                f"PoolManager: Creating dynamic env ({env_id}) for packages: {dependencies}"
+            )
+
+            def run_cmd(cmd):
+                return subprocess.run(
+                    cmd, capture_output=True, text=True, shell=True, encoding="utf-8"
+                )
+
+            try:
+                # 1. Create venv
+                vcmd = f'"{uv_path}" venv --system-site-packages "{env_path}"'
+                res = await asyncio.to_thread(run_cmd, vcmd)
+                if res.returncode != 0:
+                    logger.error(f"PoolManager: uv venv failed for dynamic env: {res.stderr}")
+                    return None
+
+                # 2. Install packages
+                pkg_str = " ".join(dependencies)
+                python_exe_str = str(python_exe)
+
+                icmd = (
+                    f'"{uv_path}" pip install --link-mode=hardlink '
+                    f'--python "{python_exe_str}" {pkg_str}'
+                )
+                res = await asyncio.to_thread(run_cmd, icmd)
+
+                if res.returncode != 0:
+                    logger.warning(
+                        f"PoolManager: dynamic env hardlink failed, falling back to copy mode: {res.stderr[:200]}"
+                    )
+                    icmd = (
+                        f'"{uv_path}" pip install --link-mode=copy '
+                        f'--python "{python_exe_str}" {pkg_str}'
+                    )
+                    res = await asyncio.to_thread(run_cmd, icmd)
+
+                if res.returncode != 0:
+                    logger.error(
+                        f"PoolManager: uv pip install failed for dynamic env: {res.stderr}"
+                    )
+                    return None
+
+                env = PreWarmedEnv("dynamic", env_path, python_exe)
+                self.managed_envs.add(env_path)
+                logger.info(f"PoolManager: Dynamic env ({env_id}) is READY.")
+                return env
+
+            except Exception as e:
+                logger.error(f"PoolManager: Failed to create dynamic env: {e}", exc_info=True)
+                if env_path.exists():
+                    try:
+                        shutil.rmtree(env_path)
+                    except OSError:
+                        pass
+                return None
 
     async def check_health(self) -> dict[str, Any]:
         """Checks if the pooling system is active and pools have environments."""

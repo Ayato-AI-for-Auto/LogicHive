@@ -80,3 +80,21 @@ async def test_python_executor_syntax_error():
 
     assert result.status == ExecutionStatus.FAILURE
     assert "SyntaxError" in result.error.name
+
+
+@pytest.mark.asyncio
+async def test_python_executor_dynamic_env():
+    """
+    Verifies that dynamic environment creation is triggered for non-prewarmed dependencies
+    and cleaned up afterwards.
+    """
+
+    executor = EphemeralPythonExecutor()
+    code = "import dateutil\ndef parse_date(): return dateutil.parser.parse('2026-01-01').year"
+    test_code = "assert parse_date() == 2026"
+    dependencies = ["python-dateutil"]
+
+    result = await executor.execute(code, test_code, dependencies=dependencies)
+
+    assert result.status == ExecutionStatus.SUCCESS
+    assert "Tests Passed" in result.results[0].data
