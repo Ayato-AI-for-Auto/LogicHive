@@ -1,3 +1,10 @@
+# [0.22.0-dev.15](https://github.com/ayato-labs/LogicHive/compare/v0.22.0-dev.14...v0.22.0-dev.15) (2026-06-16)
+
+
+### Features
+
+* add windows setup and launch batch scripts ([3d35251](https://github.com/ayato-labs/LogicHive/commit/3d352518040eb362937a6f9740deb38652f2f327))
+
 # [0.22.0-dev.14](https://github.com/ayato-labs/LogicHive/compare/v0.22.0-dev.13...v0.22.0-dev.14) (2026-06-14)
 
 
