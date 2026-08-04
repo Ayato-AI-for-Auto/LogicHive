@@ -8,6 +8,7 @@
 import ast
 import asyncio
 import re
+import sys
 import uuid
 from typing import Any
 
@@ -30,6 +31,58 @@ logger = get_logger(__name__)
 # Limit concurrent search requests to prevent LLM pipeline instability
 search_semaphore = asyncio.Semaphore(3)
 
+# Standard library modules (Python 3.10+ provides sys.stdlib_module_names)
+# Fallback for older versions (should not happen with requires-python>=3.12)
+try:
+    STD_LIB_MODULES: set[str] = set(sys.stdlib_module_names)
+except AttributeError:
+    # Fallback for Python < 3.10
+    STD_LIB_MODULES = {
+        "os",
+        "sys",
+        "json",
+        "math",
+        "datetime",
+        "typing",
+        "asyncio",
+        "logging",
+        "ast",
+        "pathlib",
+        "abc",
+        "collections",
+        "functools",
+        "itertools",
+        "threading",
+        "multiprocessing",
+        "pickle",
+        "shutil",
+        "tempfile",
+        "time",
+        "uuid",
+        "hashlib",
+        "base64",
+        "xml",
+        "html",
+        "unittest",
+        "random",
+        "enum",
+        "inspect",
+        "traceback",
+        "warnings",
+        "importlib",
+        "glob",
+        "argparse",
+        "re",
+        "decimal",
+        "fractions",
+        "statistics",
+        "string",
+        "textwrap",
+        "dataclasses",
+        "contextlib",
+        "typing_extensions",
+    }
+
 # --- Helpers ---
 
 
@@ -44,25 +97,7 @@ def extract_dependencies(code: str, language: str = "python") -> list[str]:
         dependencies = _extract_js_deps(code)
 
     # Clean up standard libs/internal refs
-    std_lib = {
-        "os",
-        "sys",
-        "json",
-        "math",
-        "datetime",
-        "typing",
-        "asyncio",
-        "logging",
-        "ast",
-        "pathlib",
-        "abc",
-        "fs",
-        "path",
-        "http",
-        "https",
-        "crypto",
-    }
-    return sorted(dependencies - std_lib)
+    return sorted(dependencies - STD_LIB_MODULES)
 
 
 def _extract_python_deps(code: str) -> set[str]:

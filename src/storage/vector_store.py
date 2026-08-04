@@ -22,7 +22,7 @@ from core.config import (
     VECTOR_DIMENSION,
     get_active_embedding_model_name,
 )
-from core.db import get_db_connection
+from core.db import db_connection
 from core.exceptions import StorageError
 from core.logging_config import get_logger
 
@@ -174,11 +174,11 @@ class VectorIndexManager:
                     metadata={"hnsw:space": "cosine"}
                 )
 
-                db = await get_db_connection()
-                async with db.execute(
-                    "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
-                ) as cursor:
-                    rows = await cursor.fetchall()
+                async with db_connection() as db:
+                    async with db.execute(
+                        "SELECT project, name, embedding FROM logichive_functions WHERE embedding IS NOT NULL AND embedding != 'null'"
+                    ) as cursor:
+                        rows = await cursor.fetchall()
 
                 ids, embeddings, metadatas = [], [], []
                 for row in rows:

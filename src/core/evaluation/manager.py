@@ -6,12 +6,9 @@
 # (at your option) any later version.
 
 import asyncio
-import importlib
-import importlib.util
+import importlib.metadata
 import os
-import pkgutil
 import sys
-from pathlib import Path
 from typing import Any, cast
 
 from core.logging_config import get_logger
@@ -20,11 +17,26 @@ from .base import BaseEvaluator, EvaluationResult
 
 logger = get_logger(__name__)
 
+# Entry point group name for evaluator plugins
+EVALUATOR_ENTRY_POINT_GROUP = "logichive.evaluators"
+
+# Built-in evaluator modules (for backward compatibility and explicit registration)
+BUILTIN_EVALUATORS = [
+    "core.evaluation.plugins.deterministic:DeterministicEvaluator",
+    "core.evaluation.plugins.static:PythonStaticEvaluator",
+    "core.evaluation.plugins.static:RuffEvaluator",
+    "core.evaluation.plugins.security_static:SecurityStaticEvaluator",
+    "core.evaluation.plugins.runtime:RuntimeEvaluator",
+    "core.evaluation.plugins.metrics_gate:MetricsGateEvaluator",
+    "core.evaluation.plugins.dependency_vouch:DependencyVouchEvaluator",
+    "core.evaluation.plugins.ai:AIGateEvaluator",
+]
+
 
 class EvaluationManager:
     """
     Coordinates multiple evaluators to determine the final quality score.
-    Now supports dynamic plugin loading from the .plugins package.
+    Uses entry points for plugin discovery (replaces fragile filesystem scanning).
     """
 
     def __init__(self):
@@ -33,117 +45,48 @@ class EvaluationManager:
 
     def _load_plugins(self):
         """
-        Dynamically discovers and instantiates all BaseEvaluator subclasses.
+        Loads evaluator plugins via entry points with fallback to built-in list.
         """
-        logger.debug("EvaluationManager: _load_plugins called")
+        logger.debug("EvaluationManager: Loading plugins via entry points")
+        loaded = False
+
+        # 1. Try entry points (setuptools / pip installed packages)
         try:
-            modules = self._discover_modules()
-            self._instantiate_evaluators(modules)
-        except Exception as e:
-            logger.error(f"EvaluationManager: Plugin discovery process failed: {e}")
-
-    def _discover_modules(self):
-        """Discovers modules via package and filesystem."""
-        # --- PyInstaller Path Fix ---
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            # Bundled app: find the plugins directory recursively in _MEIPASS
-            plugins_dir = None
-            for root, dirs, files in os.walk(getattr(sys, "_MEIPASS")):
-                if "plugins" in dirs:
-                    plugins_dir = Path(os.path.join(root, "plugins"))
-                    logger.debug(f"EvaluationManager: Found plugins dir at: {plugins_dir}")
-                    break
-
-            # If not found via search, fallback to historical locations
-            if not plugins_dir:
-                base_dir = Path(getattr(sys, "_MEIPASS"))
-                # Potential locations
-                potential_dirs = [
-                    base_dir / "core" / "evaluation" / "plugins",
-                    base_dir / "src" / "core" / "evaluation" / "plugins",
-                    base_dir / "engine" / "src" / "core" / "evaluation" / "plugins",
-                ]
-                for p in potential_dirs:
-                    if p.exists():
-                        plugins_dir = p
-                        break
-                else:
-                    # Final resort: use the first one
-                    plugins_dir = potential_dirs[0]
-
-        else:
-            # Source mode: standard relative path
-            plugins_dir = Path(os.path.dirname(__file__)) / "plugins"
-
-        logger.debug(f"EvaluationManager: Searching for plugins in {plugins_dir}")
-
-        if not plugins_dir.exists():
-            logger.error(f"EvaluationManager: Plugins directory not found at {plugins_dir}")
-            return []
-
-        # 1. Try package-based discovery
-        modules = self._discover_via_package()
-        if modules:
-            return modules
-
-        # 2. Filesystem fallback
-        return self._discover_via_filesystem(str(plugins_dir))
-
-    def _discover_via_package(self):
-        modules = []
-        package_names = [
-            f"{__package__}.plugins" if __package__ else None,
-            "core.evaluation.plugins",
-            "src.core.evaluation.plugins",
-        ]
-        for pkg_name in [p for p in package_names if p]:
-            try:
-                pkg = importlib.import_module(pkg_name)
-                for _loader, name, _is_pkg in pkgutil.walk_packages(
-                    pkg.__path__, pkg.__name__ + "."
-                ):
-                    try:
-                        modules.append(importlib.import_module(name))
-                    except ImportError:
-                        continue
-                if modules:
-                    return modules
-            except ImportError:
-                continue
-        return []
-
-    def _discover_via_filesystem(self, plugins_dir):
-        modules = []
-        for filename in os.listdir(plugins_dir):
-            if filename.endswith(".py") and filename != "__init__.py":
-                module_name = filename[:-3]
-                file_path = os.path.join(plugins_dir, filename)
+            eps = importlib.metadata.entry_points(group=EVALUATOR_ENTRY_POINT_GROUP)
+            for ep in eps:
                 try:
-                    spec = importlib.util.spec_from_file_location(module_name, file_path)
-                    if spec and spec.loader:
-                        mod = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(mod)
-                        modules.append(mod)
-                except Exception as e:
-                    logger.error(f"EvaluationManager: Failed to load {filename} via fallback: {e}")
-        return modules
-
-    def _instantiate_evaluators(self, modules):
-        for module in modules:
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, BaseEvaluator)
-                    and attr is not BaseEvaluator
-                ):
-                    try:
-                        inst = attr()
+                    evaluator_class = ep.load()
+                    if issubclass(evaluator_class, BaseEvaluator) and evaluator_class is not BaseEvaluator:
+                        inst = evaluator_class()
                         if not any(e.name == inst.name for e in self.evaluators):
                             self.evaluators.append(inst)
-                            logger.info(f"EvaluationManager: Loaded plugin '{inst.name}'")
-                    except Exception as e:
-                        logger.error(f"EvaluationManager: Failed to instantiate {attr_name}: {e}")
+                            logger.info(f"EvaluationManager: Loaded plugin '{inst.name}' via entry point '{ep.name}'")
+                            loaded = True
+                except Exception as e:
+                    logger.error(f"EvaluationManager: Failed to load entry point '{ep.name}': {e}")
+        except Exception as e:
+            logger.debug(f"EvaluationManager: Entry point discovery failed (expected in dev): {e}")
+
+        # 2. Fallback: explicit built-in evaluators (works in source and frozen)
+        if not loaded:
+            logger.debug("EvaluationManager: Falling back to built-in evaluator list")
+            for spec in BUILTIN_EVALUATORS:
+                try:
+                    module_path, class_name = spec.split(":")
+                    module = __import__(module_path, fromlist=[class_name])
+                    evaluator_class = getattr(module, class_name)
+                    if issubclass(evaluator_class, BaseEvaluator):
+                        inst = evaluator_class()
+                        if not any(e.name == inst.name for e in self.evaluators):
+                            self.evaluators.append(inst)
+                            logger.info(f"EvaluationManager: Loaded built-in plugin '{inst.name}'")
+                except Exception as e:
+                    logger.error(f"EvaluationManager: Failed to load built-in '{spec}': {e}")
+
+        # Sort evaluators by priority if they have it (lower = runs first)
+        self.evaluators.sort(key=lambda e: getattr(e, "priority", 100))
+
+        logger.info(f"EvaluationManager: Total evaluators loaded: {len(self.evaluators)}")
 
     def get_evaluator(self, name: str) -> BaseEvaluator | None:
         """Returns a loaded evaluator by its name."""
@@ -220,7 +163,6 @@ class EvaluationManager:
             elif isinstance(res, EvaluationResult):
                 results[name] = res
             else:
-                # This case should not be reachable if evaluate() returns EvaluationResult
                 results[name] = EvaluationResult(
                     score=0.0, reason="Unexpected internal result type", is_system_error=True
                 )

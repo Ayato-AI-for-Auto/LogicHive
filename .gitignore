@@ -40,7 +40,7 @@ tmp_storage/
 *.egg-info/
 .installed.cfg
 *.egg
-
+OpenCodeReview.md
 # Node/Frontend
 node_modules/
 

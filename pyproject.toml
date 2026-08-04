@@ -2,7 +2,7 @@
 name = "logichive-hub"
 version = "0.30.0"
 description = "LogicHive: Private Hub Backend"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn",
@@ -34,6 +34,16 @@ dependencies = [
     "loguru>=0.7.3",
 ]
 
+[project.entry-points."logichive.evaluators"]
+deterministic = "core.evaluation.plugins.deterministic:DeterministicEvaluator"
+python_static = "core.evaluation.plugins.static:PythonStaticEvaluator"
+ruff = "core.evaluation.plugins.static:RuffEvaluator"
+security_static = "core.evaluation.plugins.security_static:SecurityStaticEvaluator"
+runtime = "core.evaluation.plugins.runtime:RuntimeEvaluator"
+metrics_gate = "core.evaluation.plugins.metrics_gate:MetricsGateEvaluator"
+dependency_vouch = "core.evaluation.plugins.dependency_vouch:DependencyVouchEvaluator"
+ai_gate = "core.evaluation.plugins.ai:AIGateEvaluator"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["api", "core", "storage"]
@@ -45,7 +55,7 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 # Do not strictly exclude everything; CI wants to check all files but with relaxed rules outside core logic
 exclude = [
@@ -86,7 +96,7 @@ ignore = [
 known-first-party = ["api", "core", "storage"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

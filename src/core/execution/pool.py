@@ -323,10 +323,7 @@ class PoolManager:
                 env_id = str(uuid.uuid4())[:8]
                 env_path = self.base_dir / f"{spec_name}_{env_id}"
 
-                # Path to uv.exe (absolute path for reliability on Windows)
-                uv_path = r"C:\Users\saiha\.local\bin\uv.exe"
-                if not os.path.exists(uv_path):
-                    uv_path = "uv"  # fallback
+                uv_path = shutil.which("uv") or "uv"
 
                 # Determine python executable path (Windows specific)
                 python_exe = (
@@ -427,9 +424,7 @@ class PoolManager:
             env_id = str(uuid.uuid4())[:8]
             env_path = self.base_dir / f"dynamic_{env_id}"
 
-            uv_path = r"C:\Users\saiha\.local\bin\uv.exe"
-            if not os.path.exists(uv_path):
-                uv_path = "uv"
+            uv_path = shutil.which("uv") or "uv"
 
             python_exe = (
                 env_path / "Scripts" / "python.exe"
