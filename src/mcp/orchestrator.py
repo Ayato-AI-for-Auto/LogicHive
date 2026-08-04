@@ -18,11 +18,11 @@ from core.config import (
 )
 from core.consolidation import LogicIntelligence
 from core.evaluation.manager import EvaluationManager
-from core.exceptions import SyntaxValidationError, ValidationError
 from core.hash_utils import calculate_code_hash
-from core.logging_config import get_logger
 from core.tracer import trace_execution
-from storage.sqlite_api import sqlite_storage
+from core.storage.sqlite_api import sqlite_storage
+from shared.exceptions import SyntaxValidationError, ValidationError
+from shared.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -198,7 +198,7 @@ async def do_delete_async(name: str, project: str = "default") -> bool:
             return False
 
         # 2. Vector index deletion (background)
-        from storage.vector_store import vector_manager
+        from core.storage.vector_store import vector_manager
         asyncio.create_task(vector_manager.remove_vector(name, project=project))
 
         logger.info(f"[TRACE] Orchestrator: Deletion of '{name}' successful.")
@@ -276,7 +276,7 @@ async def _run_async_verification_pipeline(
             await sqlite_storage.update_function_embedding(name, project, embedding)
 
             # Sync to Vector Store
-            from storage.vector_store import vector_manager
+            from core.storage.vector_store import vector_manager
             await vector_manager.upsert_vector(
                 name,
                 embedding,
@@ -386,9 +386,8 @@ async def check_integrity() -> dict[str, Any]:
     """
     Checks the health of various components (Database, Vector Index, Pool).
     """
-    from core.execution.pool import PoolManager
-    from storage.sqlite_api import sqlite_storage
-    from storage.vector_store import vector_manager
+    from core.storage.sqlite_api import sqlite_storage
+    from core.storage.vector_store import vector_manager
 
     details = {}
 
@@ -400,10 +399,8 @@ async def check_integrity() -> dict[str, Any]:
     vector_health = await vector_manager.check_health()
     details["vector_store"] = vector_health
 
-    # 3. Pool Check
-    pool_manager = PoolManager.get_instance()
-    pool_health = await pool_manager.check_health()
-    details["pool_manager"] = pool_health
+    # 3. Pool Check (MVP: skipped)
+    details["pool_manager"] = {"status": "Skipped", "message": "MVP: no runtime verification"}
 
     status = "Healthy"
     if any(h.get("status") == "Error" for h in details.values()):

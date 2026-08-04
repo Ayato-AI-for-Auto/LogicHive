@@ -17,17 +17,15 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 import core.config
-import orchestrator
+import mcp.orchestrator
 from core.config import CHROMA_DB_DIR, get_sqlite_db_path
 from core.db import get_db_connection
-from core.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
 from core.formatters import (
     format_report as _format_report,
     format_syntax_error as _format_syntax_error,
     format_validation_error as _format_validation_error,
     get_status_description as _get_status_description,
 )
-from core.logging_config import get_logger
 from core.network import (
     find_available_port,
     get_conflicting_process,
@@ -39,13 +37,15 @@ from core.vulnerability import (
     get_vulnerability_warning_msg as _get_vulnerability_warning_msg,
     periodic_vulnerability_scan_loop as _periodic_vulnerability_scan_loop,
 )
-from orchestrator import (
+from mcp.orchestrator import (
     do_delete_async,
     do_get_verification_status,
     do_save_async,
 )
-from storage.sqlite_api import sqlite_storage
-from storage.vector_store import vector_manager
+from core.storage.sqlite_api import sqlite_storage
+from core.storage.vector_store import vector_manager
+from shared.exceptions import LogicHiveError, SyntaxValidationError, ValidationError
+from shared.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -61,18 +61,12 @@ __all__ = [
 
 @asynccontextmanager
 async def lifespan(server: FastMCP):
-    """Initializes and cleans up background workers for environment pooling and vulnerability scanning."""
-    from core.execution.pool import PoolManager
-
-    manager = PoolManager.get_instance()
-    await manager.initialize()
-
+    """Initializes and cleans up background workers for vulnerability scanning."""
     scan_task = asyncio.create_task(_periodic_vulnerability_scan_loop())
     try:
         yield
     finally:
         scan_task.cancel()
-        await manager.shutdown()
 
 
 # Initialize FastMCP server with lifespan management
@@ -114,7 +108,7 @@ async def search_functions(
     """
 
     try:
-        results = await orchestrator.do_search_async(query, limit, language, project=project)
+        results = await mcp.orchestrator.do_search_async(query, limit, language, project=project)
         if not results:
             return "No matching functions found."
 
@@ -163,14 +157,14 @@ async def get_function(name: str, project: str = "default", wait_for_previous: b
     Use this AFTER search_functions if you've identified a promising candidate name.
 
     Args:
-        name: The precise, case-sensitive name of the function (e.g., "save_log").
-        project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn
-            to complete before starting. Set to false (or omit) to run in parallel.
-            Use true when this tool depends on the output of previous tools.
+    name: The precise, case-sensitive name of the function (e.g., "save_log").
+    project: The project namespace (defaults to 'default').
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
     try:
-        f_data = await orchestrator.do_get_async(name, project=project)
+        f_data = await mcp.orchestrator.do_get_async(name, project=project)
         if not f_data:
             return f"Function '{name}' not found"
 
@@ -266,9 +260,9 @@ async def debug_db(wait_for_previous: bool = False) -> str:
     Debug tool to inspect LogicHive database configuration and table structure.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn
-            to complete before starting. Set to false (or omit) to run in parallel.
-            Use true when this tool depends on the output of previous tools.
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
 
     db_path = get_sqlite_db_path()
@@ -298,11 +292,11 @@ async def delete_function(
     Deletes a function from the LogicHive vault for a specific project.
 
     Args:
-        name: The case-sensitive name of the function to delete.
-        project: The project namespace (defaults to 'default').
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn
-            to complete before starting. Set to false (or omit) to run in parallel.
-            Use true when this tool depends on the output of previous tools.
+    name: The case-sensitive name of the function to delete.
+    project: The project namespace (defaults to 'default').
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
     success = await do_delete_async(name, project=project)
     if success:
@@ -321,15 +315,15 @@ async def list_functions(
     Use this to browse available assets when search_functions is too specific.
 
     Args:
-        project: Optional project name to filter by.
-        tags: Optional list of tags to filter by.
-        limit: Max results. Default 50.
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn
-            to complete before starting. Set to false (or omit) to run in parallel.
-            Use true when this tool depends on the output of previous tools.
+    project: Optional project name to filter by.
+    tags: Optional list of tags to filter by.
+    limit: Max results. Default 50.
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
     try:
-        results = await orchestrator.do_list_async(project=project, tags=tags, limit=limit)
+        results = await mcp.orchestrator.do_list_async(project=project, tags=tags, limit=limit)
         if not results:
             return "No functions found in the vault."
 
@@ -359,12 +353,12 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
     including DB status, Vector store synchronization, and Environment pools.
 
     Args:
-        wait_for_previous: Set to true to wait for all previously requested tools in this turn
-            to complete before starting. Set to false (or omit) to run in parallel.
-            Use true when this tool depends on the output of previous tools.
+    wait_for_previous: Set to true to wait for all previously requested tools in this turn
+        to complete before starting. Set to false (or omit) to run in parallel.
+        Use true when this tool depends on the output of previous tools.
     """
 
-    from storage.vector_store import vector_manager
+    from core.storage.vector_store import vector_manager
 
     status = ["## LogicHive Integrity Report\n"]
     db_path = get_sqlite_db_path()
@@ -413,13 +407,9 @@ async def check_integrity(wait_for_previous: bool = False) -> str:
             else:
                 status.append(f"- **Status**: ❌ Error: {health['message']}")
 
-        # 3. Environment Pool Check
-        from core.execution.pool import PoolManager
-
-        pool = PoolManager.get_instance()
+        # 3. Environment Pool Check (MVP: skipped)
         status.append(
-            f"### 3. Environment Pool\n- Base Dir: `{pool.base_dir}`\n- GPU Available: "
-            f"{'✅' if pool.has_gpu else '❌'}"
+            "### 3. Environment Pool\n- Status: ⏭️ Skipped (MVP: no runtime verification)"
         )
 
         return "\n".join(status)
